@@ -1,0 +1,9 @@
+[package]
+name = "spacegame"
+version = "0.1.0"
+authors = ["Dennis Möhlmann <dmo479@gmail.com>"]
+
+[dependencies]
+specs = "0.7"
+#lazy_static = "0.2.1"
+radiant-rs = { path = "../radiant-rs/" }
