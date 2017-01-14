@@ -27,6 +27,7 @@ impl Level {
         world.register::<component::Spatial>();
         world.register::<component::Inertial>();
         world.register::<component::Visual>();
+        world.register::<component::Controlled>();
 
         // create a scene and a layer
 
@@ -65,6 +66,7 @@ impl Level {
         world.create_now()
             .with(component::Spatial::new(Vec2(300.0, 220.0), 0.0))
             .with(component::Visual::new(base, friend))
+            .with(component::Controlled::new(1))
             .build();
 
         // create planner and add systems
@@ -72,6 +74,7 @@ impl Level {
         let mut planner = specs::Planner::<WorldState>::new(world, 4);
         planner.add_system(system::Inertia { }, "inertia", 15);
         planner.add_system(system::Render::new(&scene), "render", 15);
+        planner.add_system(system::Control::new(&input), "control", 15);
 
         // return level
 

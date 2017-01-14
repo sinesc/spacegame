@@ -16,10 +16,12 @@ fn main() {
 
     utils::renderloop(|frame| {
 
+        display.poll_events();
+
         renderer.clear_target(Color::black());
         level.process(&renderer, frame.delta_f32);
         renderer.swap_target();
 
-        !display.poll_events().was_closed() && !input.escape()
+        !display.was_closed() && !input.escape()
     });
 }
