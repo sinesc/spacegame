@@ -66,13 +66,14 @@ impl Level {
         world.create_now()
             .with(component::Spatial::new(Vec2(300.0, 220.0), 0.0))
             .with(component::Visual::new(base, friend))
+            .with(component::Inertial::new(Vec2(10.0, 8.0), 4.0, 1.0))
             .with(component::Controlled::new(1))
             .build();
 
         // create planner and add systems
 
         let mut planner = specs::Planner::<WorldState>::new(world, 4);
-        planner.add_system(system::Inertia { }, "inertia", 15);
+        planner.add_system(system::Inertia::new(), "inertia", 15);
         planner.add_system(system::Render::new(&scene), "render", 15);
         planner.add_system(system::Control::new(&input), "control", 15);
 

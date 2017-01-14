@@ -8,12 +8,23 @@ use level::WorldState;
 
 pub struct Inertia;
 
-impl<'a> specs::System<WorldState> for Inertia {
+impl Inertia {
+    pub fn new() -> Self {
+        Inertia { }
+    }
+}
+
+impl specs::System<WorldState> for Inertia {
+
 	fn run(&mut self, arg: specs::RunArg, state: WorldState) {
 		use specs::Join;
-		let (mut space, inertia) = arg.fetch(|w| (w.write::<component::Spatial>(), w.read::<component::Inertial>()));
-		for (s, i) in (&mut space, &inertia).iter() {
-			s.pos = s.pos + i.velocity * state.delta;
+
+		let (mut spatials, intertials) = arg.fetch(|w|
+            (w.write::<component::Spatial>(), w.read::<component::Inertial>())
+        );
+
+		for (s, i) in (&mut spatials, &intertials).iter() {
+			//s.pos = s.pos + i.velocity * state.delta;
             //s.orient = s.orient + i.angular_velocity * state.delta;
 		}
         //println!("inertia");
