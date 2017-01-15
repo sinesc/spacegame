@@ -26,20 +26,31 @@ impl<'a> specs::System<WorldState> for Control {
 
 		for (controlled, mut spatial, mut inertial) in (&controlleds, &mut spatials, &mut inertials).iter() {
 
-            // !todo ugly
+            let mut vertical = 0.0;
+            let mut horizontal = 0.0;
 
-            let left = !!self.input.cursor_left();
-            let right = !!self.input.cursor_right();
-            let up = !!self.input.cursor_up();
-            let down = !!self.input.cursor_down();
+            for input_id in self.input.iter().down() {
+                match input_id {
+                    InputId::CursorUp => vertical -= 1.0,
+                    InputId::CursorDown => vertical += 1.0,
+                    InputId::CursorLeft => horizontal -= 1.0,
+                    InputId::CursorRight => horizontal += 1.0,
+                    InputId::Mouse1 => horizontal += 5.0,
+                    _ => {}
+                }
+            }
 
-            let trans_current = if left ^ right | up ^ down { inertial.trans_motion } else { inertial.trans_rest };
-            let v_target = Vec2(
-                if left & !right { -inertial.v_max.0 } else if right & !left { inertial.v_max.0 } else { 0.0 },
-                if up & !down { -inertial.v_max.1 } else if down & !up { inertial.v_max.1 } else { 0.0 }
+            let trans_current = Vec2(
+                if horizontal != 0.0 { inertial.trans_motion } else { inertial.trans_rest },
+                if vertical != 0.0 { inertial.trans_motion } else { inertial.trans_rest },
             );
 
-            inertial.v_current = inertial.v_current * (1.0 - state.delta * trans_current) + v_target * (state.delta * trans_current);
+            let v_target = Vec2(
+                inertial.v_max.0 * horizontal,
+                inertial.v_max.1 * vertical,
+            );
+
+            inertial.v_current = inertial.v_current * (Vec2(1.0, 1.0) - state.delta * trans_current) + (v_target * (state.delta * trans_current));
 
             spatial.pos += inertial.v_current;
 		}

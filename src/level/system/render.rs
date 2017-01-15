@@ -19,7 +19,7 @@ impl<'a> Render {
 
 impl<'a> specs::System<WorldState> for Render {
 
-	fn run(&mut self, arg: specs::RunArg, state: WorldState) {
+	fn run(&mut self, arg: specs::RunArg, _: WorldState) {
 		use specs::Join;
 
 		let (spatials, mut visuals) = arg.fetch(|w|
