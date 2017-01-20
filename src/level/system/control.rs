@@ -26,12 +26,13 @@ impl<'a> specs::System<WorldState> for Control {
             w.write::<component::Visual>()
         ));
 
-        let mut test = false;
+        let mut spawn = Vec::new();
 
-		for (controlled, mut spatial, mut inertial) in (&controlleds, &mut spatials, &mut inertials).iter() {
+		for (controlled, spatial, mut inertial) in (&controlleds, &spatials, &mut inertials).iter() {
 
             let mut vertical = 0.0;
             let mut horizontal = 0.0;
+            let mut shoot = false;
 
             for input_id in state.inf.input.iter().down() {
                 match input_id {
@@ -39,21 +40,23 @@ impl<'a> specs::System<WorldState> for Control {
                     InputId::CursorDown => vertical += 1.0,
                     InputId::CursorLeft => horizontal -= 1.0,
                     InputId::CursorRight => horizontal += 1.0,
-                    InputId::Mouse1 => {
-                        test = true;
-                    },
+                    InputId::Mouse1 => shoot = true,
                     _ => {}
                 }
             }
 
             inertial.v_fraction = Vec2(horizontal, vertical);
+
+            if shoot {
+                spawn.push((spatial.position, spatial.angle));
+            }
 		}
 
-        if (test) {
+        for (position, angle) in spawn {
             let shot = arg.create();
-            spatials.insert(shot, component::Spatial::new(Vec2(300.0, 220.0), 0.0));
-            visuals.insert(shot, component::Visual::new(state.inf.layer, state.inf.sprite));
-            inertials.insert(shot, component::Inertial::new(Vec2(10.0, 8.0), Vec2(1.0, 1.0), 4.0, 1.0));
+            spatials.insert(shot, component::Spatial::new(position, angle));
+            visuals.insert(shot, component::Visual::new(state.inf.layer, state.inf.sprite, 30));
+            inertials.insert(shot, component::Inertial::new(Vec2(1.0, 1.0), Vec2::from_rad(angle), 4.0, 1.0));
         }
 	}
 }

@@ -12,6 +12,7 @@ pub struct Infrastructure {
 
     sprite: SpriteId,
     layer: LayerId,
+    font: FontId,
 }
 
 #[derive(Clone)]
@@ -39,6 +40,7 @@ impl Level {
 
         // create a scene and a layer
 
+        let font = Font::from_info(&context, FontInfo { family: "Arial".to_string(), size: 12.0, ..FontInfo::default() } );
         let scene = Scene::new(context);
         let base = scene.register_layer(1024, 768);
         let effects = scene.register_layer(1024, 768);
@@ -47,6 +49,7 @@ impl Level {
         let powerup = scene.register_sprite_from_file("res/sprite/powerup/ball_v_32x32x18.jpg");
 
         let laser = scene.register_sprite_from_file("res/sprite/projectile/bolt_white_60x36x1.jpg");
+        let font = scene.register_font(font);
 
         scene.op(Op::SetBlendmode(base, blendmodes::ALPHA));
         scene.op(Op::SetBlendmode(effects, blendmodes::LIGHTEN));
@@ -54,28 +57,28 @@ impl Level {
         scene.op(Op::Draw(effects));
         scene.op(Op::Clear(base));
         scene.op(Op::Clear(effects));
-        scene.op(Op::RotateModelMatrixAt(base, 1.0, Vec2(0.0, 0.0), 0.1));
+        //scene.op(Op::RotateModelMatrixAt(base, 1.0, Vec2(0.0, 0.0), 0.1));
 
         // create test entity
 
         world.create_now()
-            .with(component::Spatial::new(Vec2(330.0, 250.0), 0.0))
-            .with(component::Visual::new(base, friend))
+            .with(component::Spatial::new(Vec2(230.0, 350.0), 0.0))
+            .with(component::Visual::new(base, friend, 30))
             .build();
 
         world.create_now()
-            .with(component::Spatial::new(Vec2(320.0, 240.0), 0.0))
-            .with(component::Visual::new(base, hostile))
+            .with(component::Spatial::new(Vec2(120.0, 640.0), 0.0))
+            .with(component::Visual::new(base, hostile, 30))
             .build();
 
         world.create_now()
-            .with(component::Spatial::new(Vec2(330.0, 250.0), 0.0))
-            .with(component::Visual::new(effects, powerup))
+            .with(component::Spatial::new(Vec2(530.0, 450.0), 0.0))
+            .with(component::Visual::new(effects, powerup, 30))
             .build();
 
         world.create_now()
-            .with(component::Spatial::new(Vec2(300.0, 220.0), 0.0))
-            .with(component::Visual::new(base, friend))
+            .with(component::Spatial::new(Vec2(512.0, 384.0), 0.0))
+            .with(component::Visual::new(base, friend, 0))
             .with(component::Inertial::new(Vec2(10.0, 8.0), Vec2(0.0, 0.0), 4.0, 1.0))
             .with(component::Controlled::new(1))
             .build();
@@ -96,6 +99,7 @@ impl Level {
                 input   : input.clone(),
                 sprite: laser,
                 layer: effects,
+                font: font,
             })
         }
     }

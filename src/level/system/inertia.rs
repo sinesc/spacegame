@@ -35,7 +35,14 @@ impl specs::System<WorldState> for Inertia {
             let v_target = inertial.v_max * inertial.v_fraction;
 
             inertial.v_current = inertial.v_current * (Vec2(1.0, 1.0) - state.delta * trans_current) + (v_target * (state.delta * trans_current));
-            spatial.pos += inertial.v_current;
+            spatial.position += inertial.v_current;
+
+            if inertial.v_current.len() > 0.01 {
+                spatial.angle = inertial.v_current.to_rad();
+
+                spatial.lean = Vec2(inertial.v_current.0.abs(), inertial.v_current.1.abs()).to_rad(); // !todo fake logic
+                //println!("{:?}", spatial.lean)
+            }
 		}
 	}
 }

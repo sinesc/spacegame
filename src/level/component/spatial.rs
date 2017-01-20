@@ -3,15 +3,17 @@ use radiant_rs::Vec2;
 
 #[derive(Clone, Debug)]
 pub struct Spatial {
-    pub pos: Vec2,
-    pub dir: f32,
+    pub position: Vec2,
+    pub angle: f32,
+    pub lean: f32,
 }
 
 impl Spatial {
-    pub fn new(pos: Vec2, dir: f32) -> Self {
+    pub fn new(position: Vec2, angle: f32) -> Self {
         Spatial {
-            pos: pos,
-            dir: dir
+            position: position,
+            angle   : angle,
+            lean    : 0.0,    
         }
     }
 }
