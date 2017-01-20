@@ -22,6 +22,6 @@ fn main() {
         level.process(&renderer, frame.delta_f32);
         renderer.swap_target();
 
-        !display.was_closed() && !input.escape()
+        !display.was_closed() && !input.down(InputId::Escape)
     });
 }
