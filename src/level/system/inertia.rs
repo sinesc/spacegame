@@ -26,7 +26,7 @@ impl specs::System<WorldState> for Inertia {
 
 		for (spatial, inertial) in (&mut spatials, &mut intertials).iter() {
 
-            // todo: make this scale linearly between trans_rest and trans_motion based on v_fraction
+            // todo: make this scale linearly between trans_rest and trans_motion based on v_fraction?
             let trans_current = Vec2(
                 if inertial.v_fraction.0 != 0.0 { inertial.trans_motion } else { inertial.trans_rest },
                 if inertial.v_fraction.1 != 0.0 { inertial.trans_motion } else { inertial.trans_rest },
@@ -37,11 +37,17 @@ impl specs::System<WorldState> for Inertia {
             inertial.v_current = inertial.v_current * (Vec2(1.0, 1.0) - state.delta * trans_current) + (v_target * (state.delta * trans_current));
             spatial.position += inertial.v_current;
 
-            if inertial.v_current.len() > 0.01 {
-                spatial.angle = inertial.v_current.to_rad();
+            // compute angle and left/right leaning
 
-                spatial.lean = Vec2(inertial.v_current.0.abs(), inertial.v_current.1.abs()).to_rad(); // !todo fake logic
-                //println!("{:?}", spatial.lean)
+            if inertial.v_current.len() > 0.01 {
+                let old_angle = spatial.angle;
+                spatial.angle = inertial.v_current.to_radians();
+                // ignore moment angle passes the full circle
+                if (old_angle - spatial.angle).abs() < 3.0 {
+                    let current_lean = 5.0 * (spatial.angle - old_angle);
+                    // average over past 10 lean samples
+                    spatial.lean = (9.0*spatial.lean + current_lean) / 10.0;
+                }
             }
 		}
 	}

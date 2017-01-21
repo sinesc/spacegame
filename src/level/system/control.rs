@@ -2,7 +2,6 @@ use specs;
 use level::component;
 use level::WorldState;
 use radiant_rs::*;
-use radiant_rs::scene::*;
 
 pub struct Control {
 }
@@ -12,6 +11,22 @@ impl Control {
         Control {
         }
     }
+}
+
+fn input(input: &Input, input_id: u32) -> (f32, f32, bool) {
+    use radiant_rs::InputId::*;
+    let (up, down, left, right, fire) = if input_id == 1 {
+        (CursorUp, CursorDown, CursorLeft, CursorRight, RControl)
+    } else {
+        (W, S, A, D, LControl)
+    };
+    let mut vertical = 0.0;
+    let mut horizontal = 0.0;
+    if input.down(up) { vertical -= 1.0 }
+    if input.down(down) { vertical += 1.0 }
+    if input.down(left) { horizontal -= 1.0 }
+    if input.down(right) { horizontal += 1.0 }
+    (horizontal, vertical, input.down(fire))
 }
 
 impl<'a> specs::System<WorldState> for Control {
@@ -30,20 +45,7 @@ impl<'a> specs::System<WorldState> for Control {
 
 		for (controlled, spatial, mut inertial) in (&controlleds, &spatials, &mut inertials).iter() {
 
-            let mut vertical = 0.0;
-            let mut horizontal = 0.0;
-            let mut shoot = false;
-
-            for input_id in state.inf.input.iter().down() {
-                match input_id {
-                    InputId::CursorUp => vertical -= 1.0,
-                    InputId::CursorDown => vertical += 1.0,
-                    InputId::CursorLeft => horizontal -= 1.0,
-                    InputId::CursorRight => horizontal += 1.0,
-                    InputId::Mouse1 => shoot = true,
-                    _ => {}
-                }
-            }
+            let (horizontal, vertical, shoot) = input(&state.inf.input, controlled.input_id);
 
             inertial.v_fraction = Vec2(horizontal, vertical);
 
@@ -54,9 +56,9 @@ impl<'a> specs::System<WorldState> for Control {
 
         for (position, angle) in spawn {
             let shot = arg.create();
-            spatials.insert(shot, component::Spatial::new(position, angle));
+            spatials.insert(shot, component::Spatial::new(position + Vec2::from_radians(angle) * 40.0, angle));
             visuals.insert(shot, component::Visual::new(state.inf.layer, state.inf.sprite, 30));
-            inertials.insert(shot, component::Inertial::new(Vec2(1.0, 1.0), Vec2::from_rad(angle), 4.0, 1.0));
+            inertials.insert(shot, component::Inertial::new(Vec2(10.0, 10.0), Vec2::from_radians(angle), 4.0, 1.0));
         }
 	}
 }

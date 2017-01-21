@@ -63,7 +63,9 @@ impl Level {
 
         world.create_now()
             .with(component::Spatial::new(Vec2(230.0, 350.0), 0.0))
-            .with(component::Visual::new(base, friend, 30))
+            .with(component::Visual::new(base, friend, 0))
+            .with(component::Inertial::new(Vec2(10.0, 8.0), Vec2(0.0, 0.0), 4.0, 1.0))
+            .with(component::Controlled::new(1))
             .build();
 
         world.create_now()
@@ -80,7 +82,7 @@ impl Level {
             .with(component::Spatial::new(Vec2(512.0, 384.0), 0.0))
             .with(component::Visual::new(base, friend, 0))
             .with(component::Inertial::new(Vec2(10.0, 8.0), Vec2(0.0, 0.0), 4.0, 1.0))
-            .with(component::Controlled::new(1))
+            .with(component::Controlled::new(2))
             .build();
 
         // create planner and add systems
