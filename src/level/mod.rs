@@ -2,6 +2,7 @@ use specs;
 use radiant_rs::*;
 use radiant_rs::scene::*;
 use std::sync::Arc;
+use std::time::Instant;
 
 mod component;
 mod system;
@@ -18,12 +19,14 @@ pub struct Infrastructure {
 #[derive(Clone)]
 pub struct WorldState {
     delta   : f32,
+    age     : f32,
     inf     : Arc<Infrastructure>,
 }
 
 pub struct Level {
     planner : specs::Planner<WorldState>,
     inf     : Arc<Infrastructure>,
+    created : Instant,
 }
 
 impl Level {
@@ -37,13 +40,14 @@ impl Level {
         world.register::<component::Inertial>();
         world.register::<component::Visual>();
         world.register::<component::Controlled>();
+        world.register::<component::Lifetime>();
 
         // create a scene and a layer
 
         let font = Font::from_info(&context, FontInfo { family: "Arial".to_string(), size: 12.0, ..FontInfo::default() } );
         let scene = Scene::new(context);
-        let base = scene.register_layer(1024, 768);
-        let effects = scene.register_layer(1024, 768);
+        let base = scene.register_layer(1600, 900);
+        let effects = scene.register_layer(1600, 900);
         let hostile = scene.register_sprite_from_file("res/sprite/hostile/mine_red_64x64x15.png");
         let friend = scene.register_sprite_from_file("res/sprite/player/speedy_98x72x30.png");
         let powerup = scene.register_sprite_from_file("res/sprite/powerup/ball_v_32x32x18.jpg");
@@ -77,25 +81,27 @@ impl Level {
             .with(component::Spatial::new(Vec2(530.0, 450.0), 0.0))
             .with(component::Visual::new(effects, powerup, 30))
             .build();
-
+/*
         world.create_now()
             .with(component::Spatial::new(Vec2(512.0, 384.0), 0.0))
             .with(component::Visual::new(base, friend, 0))
             .with(component::Inertial::new(Vec2(10.0, 8.0), Vec2(0.0, 0.0), 4.0, 1.0))
             .with(component::Controlled::new(2))
             .build();
-
+*/
         // create planner and add systems
 
         let mut planner = specs::Planner::<WorldState>::new(world, 4);
-        planner.add_system(system::Inertia::new(), "inertia", 15);
-        planner.add_system(system::Render::new(), "render", 15);
-        planner.add_system(system::Control::new(), "control", 15);
+        planner.add_system(system::Cleanup::new(), "cleanup", 100);
+        planner.add_system(system::Control::new(), "control", 75);
+        planner.add_system(system::Inertia::new(), "inertia", 50);
+        planner.add_system(system::Render::new(), "render", 0);
 
         // return level
 
         Level {
             planner: planner,
+            created: Instant::now(),
             inf: Arc::new(Infrastructure {
                 scene   : scene,
                 input   : input.clone(),
@@ -108,9 +114,12 @@ impl Level {
 
     pub fn process(self: &mut Self, renderer: &Renderer, delta: f32) {
 
+        let age = Instant::now() - self.created;
+
         let world_state = WorldState {
-            delta: delta,
-            inf: self.inf.clone(),
+            delta   : delta,
+            age     : age.as_secs() as f32 + (age.subsec_nanos() as f64 / 1000000000.0) as f32,
+            inf     : self.inf.clone(),
         };
 
         self.planner.wait();

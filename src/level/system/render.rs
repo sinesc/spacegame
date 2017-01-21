@@ -39,7 +39,7 @@ impl<'a> specs::System<WorldState> for Render {
 		}
 
         state.inf.scene.write(state.inf.layer, state.inf.font, &format!("entities: {:?}", num_sprites), 10.0, 1.0);
-        state.inf.scene.write(state.inf.layer, state.inf.font, "W A S D Ctrl-Left", 10.0, 740.0);
-        state.inf.scene.write(state.inf.layer, state.inf.font, "Left Right Up Down Ctrl-Right", 870.0, 740.0);
+        state.inf.scene.write(state.inf.layer, state.inf.font, "Player1: Cursor: move, Ctrl-Right: fire, Shift-Right + Cursor: rotate only", 10.0, 740.0);
+        state.inf.scene.write(state.inf.layer, state.inf.font, "Player2: WASD: move, Ctrl-Left: fire, Shift-Left + WASD: rotate only", 10.0, 760.0);
 	}
 }

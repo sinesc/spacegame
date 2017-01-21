@@ -9,3 +9,6 @@ pub use self::inertial::Inertial;
 
 mod controlled;
 pub use self::controlled::Controlled;
+
+mod lifetime;
+pub use self::lifetime::Lifetime;

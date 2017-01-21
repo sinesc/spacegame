@@ -39,7 +39,7 @@ impl specs::System<WorldState> for Inertia {
 
             // compute angle and left/right leaning
 
-            if inertial.v_current.len() > 0.01 {
+            /*if inertial.v_current.len() > 0.01 {
                 let old_angle = spatial.angle;
                 spatial.angle = inertial.v_current.to_radians();
                 // ignore moment angle passes the full circle
@@ -48,7 +48,7 @@ impl specs::System<WorldState> for Inertia {
                     // average over past 10 lean samples
                     spatial.lean = (9.0*spatial.lean + current_lean) / 10.0;
                 }
-            }
+            }*/
 		}
 	}
 }
