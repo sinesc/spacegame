@@ -39,8 +39,8 @@ impl<'a> specs::System<WorldState> for Control {
 	fn run(&mut self, arg: specs::RunArg, state: WorldState) {
 		use specs::Join;
 
-		let (controlleds, mut spatials, mut inertials, mut visuals, mut lifetimes) = arg.fetch(|w| (
-            w.read::<component::Controlled>(),
+		let (mut controlleds, mut spatials, mut inertials, mut visuals, mut lifetimes) = arg.fetch(|w| (
+            w.write::<component::Controlled>(),
             w.write::<component::Spatial>(),
             w.write::<component::Inertial>(),
             w.write::<component::Visual>(),
@@ -49,7 +49,7 @@ impl<'a> specs::System<WorldState> for Control {
 
         let mut spawn = Vec::new();
 
-		for (controlled, mut spatial, mut inertial) in (&controlleds, &mut spatials, &mut inertials).iter() {
+		for (mut controlled, mut spatial, mut inertial) in (&mut controlleds, &mut spatials, &mut inertials).iter() {
 
             let (v_fraction, shoot, rotate) = input(&state.inf.input, controlled.input_id);
 
@@ -57,11 +57,17 @@ impl<'a> specs::System<WorldState> for Control {
 
             inertial.v_fraction = if rotate { Vec2(0.0, 0.0) } else { v_fraction };
 
-            // compute target angle. fix current angle to avoid transitioning from/to values near PI/-PI
+            // compute target angle
 
             let new_angle = inertial.v_current.to_radians();
 
+            if spatial.angle.abs() > PI {
+                // fix angles outside of +/- PI
+                spatial.angle -= spatial.angle.signum() * 2.0 * PI;
+            }
+
             if (spatial.angle.abs() > 0.5 * PI) & (new_angle.abs() > 0.5 * PI) & (spatial.angle.signum() != new_angle.signum()) {
+                // fix rotation step from + <-> - PI by temporarily representing the angle smaller +/- PI with its greater +/- PI equivalent
                 spatial.angle = if new_angle.signum() == -1.0 { -PI - (PI - spatial.angle) } else { PI - (-PI - spatial.angle)};
             }
 
@@ -69,12 +75,20 @@ impl<'a> specs::System<WorldState> for Control {
 
             let old_angle = spatial.angle;
 
-            if !rotate {
+            if rotate {
+
+                // acellerating angular velocity (av)
+                let av_target = controlled.av_max * v_fraction.1;
+                controlled.av_current = controlled.av_current * (1.0 - state.delta * controlled.av_trans) + (av_target * (state.delta * controlled.av_trans));
+
+                // change angle based on player input (rotate ship)
+                spatial.angle += controlled.av_current * state.delta;
+
+            } else if v_fraction.len() > 0.0 {
+
                 // gradually approach the angle computed from flight direction
                 approach(&mut spatial.angle, new_angle, 5.0);
-            } else {
-                // change angle based on player input (rotate ship)
-                spatial.angle += v_fraction.1 * state.delta * 5.0;
+                controlled.av_current = controlled.av_current * (1.0 - state.delta * controlled.av_trans) + (0.0 * (state.delta * controlled.av_trans));
             }
 
             // lean into rotation direction
