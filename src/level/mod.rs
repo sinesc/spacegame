@@ -41,6 +41,7 @@ impl Level {
         world.register::<component::Visual>();
         world.register::<component::Controlled>();
         world.register::<component::Lifetime>();
+        world.register::<component::Shooter>();
 
         // create a scene and a layer
 
@@ -66,29 +67,31 @@ impl Level {
         // create test entity
 
         world.create_now()
-            .with(component::Spatial::new(Vec2(230.0, 350.0), 0.0))
+            .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0)))
             .with(component::Visual::new(base, friend, 0))
-            .with(component::Inertial::new(Vec2(10.0, 8.0), Vec2(0.0, 0.0), 4.0, 1.0))
+            .with(component::Inertial::new(Vec2(800.0, 800.0), Vec2(0.0, 0.0), 4.0, 1.0))
             .with(component::Controlled::new(1))
+            .with(component::Shooter::new(0.05))
             .build();
 
         world.create_now()
-            .with(component::Spatial::new(Vec2(120.0, 640.0), 0.0))
+            .with(component::Spatial::new(Vec2(512.0, 384.0), Angle(0.0)))
+            .with(component::Visual::new(base, friend, 0))
+            .with(component::Inertial::new(Vec2(800.0, 800.0), Vec2(0.0, 0.0), 4.0, 1.0))
+            .with(component::Controlled::new(2))
+            .with(component::Shooter::new(0.15))
+            .build();
+
+        world.create_now()
+            .with(component::Spatial::new(Vec2(120.0, 640.0), Angle(0.0)))
             .with(component::Visual::new(base, hostile, 30))
             .build();
 
         world.create_now()
-            .with(component::Spatial::new(Vec2(530.0, 450.0), 0.0))
+            .with(component::Spatial::new(Vec2(530.0, 450.0), Angle(0.0)))
             .with(component::Visual::new(effects, powerup, 30))
             .build();
-/*
-        world.create_now()
-            .with(component::Spatial::new(Vec2(512.0, 384.0), 0.0))
-            .with(component::Visual::new(base, friend, 0))
-            .with(component::Inertial::new(Vec2(10.0, 8.0), Vec2(0.0, 0.0), 4.0, 1.0))
-            .with(component::Controlled::new(2))
-            .build();
-*/
+
         // create planner and add systems
 
         let mut planner = specs::Planner::<WorldState>::new(world, 4);
@@ -117,7 +120,7 @@ impl Level {
         let age = Instant::now() - self.created;
 
         let world_state = WorldState {
-            delta   : delta,
+            delta   : if delta.is_nan() || delta == 0.0 { 0.0001 } else { delta },
             age     : age.as_secs() as f32 + (age.subsec_nanos() as f64 / 1000000000.0) as f32,
             inf     : self.inf.clone(),
         };

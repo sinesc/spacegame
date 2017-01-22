@@ -12,3 +12,6 @@ pub use self::controlled::Controlled;
 
 mod lifetime;
 pub use self::lifetime::Lifetime;
+
+mod shooter;
+pub use self::shooter::Shooter;
