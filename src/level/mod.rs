@@ -42,6 +42,7 @@ impl Level {
         world.register::<component::Controlled>();
         world.register::<component::Lifetime>();
         world.register::<component::Shooter>();
+        world.register::<component::Fading>();
 
         // create a scene and a layer
 
@@ -68,28 +69,28 @@ impl Level {
 
         world.create_now()
             .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0)))
-            .with(component::Visual::new(base, friend, 0))
-            .with(component::Inertial::new(Vec2(800.0, 800.0), Vec2(0.0, 0.0), 4.0, 1.0))
+            .with(component::Visual::new(base, friend, Color(0.8, 0.8, 1.0, 1.0), 0))
+            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(1))
-            .with(component::Shooter::new(0.05))
+            .with(component::Shooter::new(0.015))
             .build();
 
         world.create_now()
             .with(component::Spatial::new(Vec2(512.0, 384.0), Angle(0.0)))
-            .with(component::Visual::new(base, friend, 0))
-            .with(component::Inertial::new(Vec2(800.0, 800.0), Vec2(0.0, 0.0), 4.0, 1.0))
+            .with(component::Visual::new(base, friend, Color(1.0, 0.8, 0.8, 1.0), 0))
+            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(2))
-            .with(component::Shooter::new(0.15))
+            .with(component::Shooter::new(0.05))
             .build();
 
         world.create_now()
             .with(component::Spatial::new(Vec2(120.0, 640.0), Angle(0.0)))
-            .with(component::Visual::new(base, hostile, 30))
+            .with(component::Visual::new(base, hostile, Color::white(), 30))
             .build();
 
         world.create_now()
             .with(component::Spatial::new(Vec2(530.0, 450.0), Angle(0.0)))
-            .with(component::Visual::new(effects, powerup, 30))
+            .with(component::Visual::new(effects, powerup, Color::white(), 30))
             .build();
 
         // create planner and add systems

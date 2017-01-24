@@ -13,7 +13,7 @@ impl Controlled {
         Controlled {
             input_id: input_id,
             av_current: 0.0,
-            av_trans: 10.0,
+            av_trans: 5.0,
             av_max: 10.0,
         }
     }

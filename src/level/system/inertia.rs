@@ -3,7 +3,7 @@
 #![allow(unused_imports)]
 
 use specs;
-use radiant_rs::Vec2;
+use radiant_rs::*;
 use level::component;
 use level::WorldState;
 
@@ -36,6 +36,19 @@ impl specs::System<WorldState> for Inertia {
 
             inertial.v_current = inertial.v_current * (Vec2(1.0, 1.0) - state.delta * trans_current) + (v_target * (state.delta * trans_current));
             spatial.position += inertial.v_current * state.delta;
+
+            if let Some(outbound) = spatial.position.outbound(Rect::new(0.0, 0.0, 1600.0, 900.0)) {
+
+                let edge_normal = -outbound.normalize();
+                let reflection = inertial.v_current - 2.0 * (inertial.v_current.dot(&edge_normal)) * edge_normal;
+
+                spatial.position -= outbound;
+                inertial.v_current = reflection;
+                inertial.v_fraction = reflection.normalize() * inertial.v_fraction.len();
+
+                // !todo don't want this for player
+                spatial.angle = inertial.v_fraction.to_angle();
+            }
 		}
 	}
 }

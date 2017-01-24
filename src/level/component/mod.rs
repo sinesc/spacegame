@@ -15,3 +15,6 @@ pub use self::lifetime::Lifetime;
 
 mod shooter;
 pub use self::shooter::Shooter;
+
+mod fading;
+pub use self::fading::Fading;
