@@ -6,14 +6,16 @@ pub struct Spatial {
     pub position: Vec2,
     pub angle: Angle,
     pub lean: f32,
+    pub angle_locked: bool,
 }
 
 impl Spatial {
-    pub fn new(position: Vec2, angle: Angle) -> Self {
+    pub fn new(position: Vec2, angle: Angle, angle_locked: bool) -> Self {
         Spatial {
-            position: position,
-            angle   : angle,
-            lean    : 0.0,
+            position    : position,
+            angle       : angle,
+            lean        : 0.0,
+            angle_locked: angle_locked,
         }
     }
 }

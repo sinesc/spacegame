@@ -10,10 +10,11 @@ mod system;
 pub struct Infrastructure {
     scene   : Scene,
     input   : Input,
-
+    // temporary stuff
     sprite: SpriteId,
     layer: LayerId,
     font: FontId,
+    asteroid: SpriteId,
 }
 
 #[derive(Clone)]
@@ -26,6 +27,7 @@ pub struct WorldState {
 pub struct Level {
     planner : specs::Planner<WorldState>,
     inf     : Arc<Infrastructure>,
+    roidspawn: utils::Periodic,
     created : Instant,
 }
 
@@ -46,13 +48,14 @@ impl Level {
 
         // create a scene and a layer
 
-        let font = Font::from_info(&context, FontInfo { family: "Arial".to_string(), size: 12.0, ..FontInfo::default() } );
+        let font = Font::from_info(&context, FontInfo { family: "Arial".to_string(), size: 13.0, ..FontInfo::default() } );
         let scene = Scene::new(context);
         let base = scene.register_layer(1600, 900);
         let effects = scene.register_layer(1600, 900);
         let hostile = scene.register_sprite_from_file("res/sprite/hostile/mine_red_64x64x15.png");
         let friend = scene.register_sprite_from_file("res/sprite/player/speedy_98x72x30.png");
         let powerup = scene.register_sprite_from_file("res/sprite/powerup/ball_v_32x32x18.jpg");
+        let asteroid = scene.register_sprite_from_file("res/sprite/asteroid/type1_64x64x60.png");
 
         let laser = scene.register_sprite_from_file("res/sprite/projectile/bolt_white_60x36x1.jpg");
         let font = scene.register_font(font);
@@ -68,15 +71,15 @@ impl Level {
         // create test entity
 
         world.create_now()
-            .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0)))
+            .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0), true))
             .with(component::Visual::new(base, friend, Color(0.8, 0.8, 1.0, 1.0), 0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(1))
-            .with(component::Shooter::new(0.015))
+            .with(component::Shooter::new(0.05))
             .build();
 
         world.create_now()
-            .with(component::Spatial::new(Vec2(512.0, 384.0), Angle(0.0)))
+            .with(component::Spatial::new(Vec2(512.0, 384.0), Angle(0.0), true))
             .with(component::Visual::new(base, friend, Color(1.0, 0.8, 0.8, 1.0), 0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(2))
@@ -84,12 +87,12 @@ impl Level {
             .build();
 
         world.create_now()
-            .with(component::Spatial::new(Vec2(120.0, 640.0), Angle(0.0)))
+            .with(component::Spatial::new(Vec2(120.0, 640.0), Angle(0.0), true))
             .with(component::Visual::new(base, hostile, Color::white(), 30))
             .build();
 
         world.create_now()
-            .with(component::Spatial::new(Vec2(530.0, 450.0), Angle(0.0)))
+            .with(component::Spatial::new(Vec2(530.0, 450.0), Angle(0.0), true))
             .with(component::Visual::new(effects, powerup, Color::white(), 30))
             .build();
 
@@ -103,14 +106,19 @@ impl Level {
 
         // return level
 
+        let created = Instant::now();
+
         Level {
             planner: planner,
-            created: Instant::now(),
+            created: created,
+            roidspawn: utils::Periodic::new(0.0, 0.5),
             inf: Arc::new(Infrastructure {
                 scene   : scene,
                 input   : input.clone(),
+
                 sprite: laser,
                 layer: effects,
+                asteroid: asteroid,
                 font: font,
             })
         }
@@ -119,15 +127,28 @@ impl Level {
     pub fn process(self: &mut Self, renderer: &Renderer, delta: f32) {
 
         let age = Instant::now() - self.created;
+        let age = age.as_secs() as f32 + (age.subsec_nanos() as f64 / 1000000000.0) as f32;
 
         let world_state = WorldState {
             delta   : if delta.is_nan() || delta == 0.0 { 0.0001 } else { delta },
-            age     : age.as_secs() as f32 + (age.subsec_nanos() as f64 / 1000000000.0) as f32,
+            age     : age,
             inf     : self.inf.clone(),
         };
 
         self.planner.wait();
         renderer.draw_scene(&self.inf.scene, delta);
+
+        self.inf.scene.write(self.inf.layer, self.inf.font, "Player1: Cursor: move, Ctrl-Right: fire, Shift-Right + Up/Down: rotate, Shift-Right + Left/Right: forward/backward", Point2(10.0, 740.0));
+        self.inf.scene.write(self.inf.layer, self.inf.font, "Player2: WASD: move, Ctrl-Left: fire, Shift-Left + WS: rotate, Shift-Left + AD: forward/backward", Point2(10.0, 760.0));
+
+        if self.roidspawn.elapsed(age) {
+            self.planner.mut_world().create_now()
+                .with(component::Spatial::new(Vec2(120.0, 640.0), Angle(-2.0), true))
+                .with(component::Visual::new(self.inf.layer, self.inf.asteroid, Color::white(), 30))
+                .with(component::Inertial::new(Vec2(100.0, 100.0), Vec2(0.0, 0.0), 4.0, 1.5))
+                .build();
+        }
+
         self.planner.dispatch(world_state);
     }
 }

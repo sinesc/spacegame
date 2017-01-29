@@ -1,10 +1,9 @@
 extern crate radiant_rs;
 extern crate specs;
-// #[macro_use] extern crate lazy_static;
 use radiant_rs::*;
 
 mod level;
-use level::*;
+use level::Level;
 
 fn main() {
 

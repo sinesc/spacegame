@@ -46,8 +46,9 @@ impl specs::System<WorldState> for Inertia {
                 inertial.v_current = reflection;
                 inertial.v_fraction = reflection.normalize() * inertial.v_fraction.len();
 
-                // !todo don't want this for player
-                spatial.angle = inertial.v_fraction.to_angle();
+                if !spatial.angle_locked {
+                    spatial.angle = inertial.v_fraction.to_angle();
+                }
             }
 		}
 	}

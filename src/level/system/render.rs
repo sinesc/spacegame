@@ -54,7 +54,5 @@ impl<'a> specs::System<WorldState> for Render {
 		}
 
         state.inf.scene.write(state.inf.layer, state.inf.font, &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", (1.0 / state.delta).floor(), state.delta, num_sprites), Point2(10.0, 10.0));
-        state.inf.scene.write(state.inf.layer, state.inf.font, "Player1: Cursor: move, Ctrl-Right: fire, Shift-Right + Cursor: rotate only", Point2(10.0, 740.0));
-        state.inf.scene.write(state.inf.layer, state.inf.font, "Player2: WASD: move, Ctrl-Left: fire, Shift-Left + WASD: rotate only", Point2(10.0, 760.0));
 	}
 }
