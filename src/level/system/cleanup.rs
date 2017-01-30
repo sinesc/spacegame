@@ -23,7 +23,7 @@ impl<'a> specs::System<WorldState> for Cleanup {
 		);
 
 		for (lifetime, entity) in (&lifetimes, &entities).iter() {
-            if lifetime.0.partial_cmp(&state.age).unwrap_or(Ordering::Less) == Ordering::Less {
+            if lifetime.0 < state.age {
                 arg.delete(entity);
             }
 		}

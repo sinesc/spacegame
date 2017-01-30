@@ -49,6 +49,7 @@ impl Level {
         world.register::<component::Lifetime>();
         world.register::<component::Shooter>();
         world.register::<component::Fading>();
+        world.register::<component::Bounding>();
 
         // create a scene and a layer
 
@@ -80,6 +81,7 @@ impl Level {
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(1))
             .with(component::Shooter::new(0.05))
+            .with(component::Bounding::new(20.0, 1))
             .build();
 
         world.create_now()
@@ -88,16 +90,19 @@ impl Level {
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(2))
             .with(component::Shooter::new(0.05))
+            .with(component::Bounding::new(20.0, 1))
             .build();
 
         world.create_now()
             .with(component::Spatial::new(Vec2(120.0, 640.0), Angle(0.0), true))
             .with(component::Visual::new(base, hostile, Color::white(), 30))
+            .with(component::Bounding::new(20.0, 0))
             .build();
 
         world.create_now()
             .with(component::Spatial::new(Vec2(530.0, 450.0), Angle(0.0), true))
             .with(component::Visual::new(effects, powerup, Color::white(), 30))
+            .with(component::Bounding::new(20.0, 0))
             .build();
 
         // create planner and add systems
@@ -106,6 +111,7 @@ impl Level {
         planner.add_system(system::Cleanup::new(), "cleanup", 100);
         planner.add_system(system::Control::new(), "control", 75);
         planner.add_system(system::Inertia::new(), "inertia", 50);
+        planner.add_system(system::Collider::new(), "collider", 0);
         planner.add_system(system::Render::new(), "render", 0);
 
         // return level
@@ -163,6 +169,7 @@ impl Level {
                 .with(component::Spatial::new(pos, angle, true))
                 .with(component::Visual::new(self.inf.base, self.inf.asteroid, Color::white(), 30))
                 .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 4.0, 1.5))
+                .with(component::Bounding::new(20.0, 2))
                 .build();
         }
 

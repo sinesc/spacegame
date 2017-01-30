@@ -18,3 +18,6 @@ pub use self::shooter::Shooter;
 
 mod fading;
 pub use self::fading::Fading;
+
+mod bounding;
+pub use self::bounding::Bounding;

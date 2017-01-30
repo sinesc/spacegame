@@ -36,14 +36,15 @@ impl<'a> specs::System<WorldState> for Control {
 		use specs::Join;
         use std::f32::consts::PI;
 
-		let (mut controlleds, mut spatials, mut inertials, mut visuals, mut lifetimes, mut shooters, mut faders) = arg.fetch(|w| (
+		let (mut controlleds, mut spatials, mut inertials, mut visuals, mut lifetimes, mut shooters, mut faders, mut boundings) = arg.fetch(|w| (
             w.write::<component::Controlled>(),
             w.write::<component::Spatial>(),
             w.write::<component::Inertial>(),
             w.write::<component::Visual>(),
             w.write::<component::Lifetime>(),
             w.write::<component::Shooter>(),
-            w.write::<component::Fading>()
+            w.write::<component::Fading>(),
+            w.write::<component::Bounding>()
         ));
 
         let mut projectiles = Vec::new();
@@ -106,13 +107,14 @@ impl<'a> specs::System<WorldState> for Control {
             inertials.insert(shot, component::Inertial::new(Vec2(1433.0, 1433.0), Vec2::from_angle(angle), 4.0, 1.0));
             lifetimes.insert(shot, component::Lifetime(state.age + 1.0));
             faders.insert(shot, component::Fading::new(state.age + 0.5, state.age + 1.0));
+            boundings.insert(shot, component::Bounding::new(5.0, 1));
         };
 
         for (mut position, angle) in projectiles {
             let dir = angle.to_vec2();
             position -= dir * 10.0;
-            spawn(position + (dir.right() * 20.0), angle);
-            spawn(position + (dir.left() * 20.0), angle);
+            spawn(position + (dir.right() * 30.0), angle);
+            spawn(position + (dir.left() * 30.0), angle);
         }
 	}
 }

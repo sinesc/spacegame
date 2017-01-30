@@ -9,3 +9,6 @@ pub use self::control::Control;
 
 mod cleanup;
 pub use self::cleanup::Cleanup;
+
+mod collider;
+pub use self::collider::Collider;

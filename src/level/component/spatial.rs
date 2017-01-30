@@ -3,7 +3,7 @@ use radiant_rs::*;
 
 #[derive(Clone, Debug)]
 pub struct Spatial {
-    pub position: Vec2,
+    pub position: Point2,
     pub angle: Angle,
     pub lean: f32,
     pub angle_locked: bool,
