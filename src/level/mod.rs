@@ -3,6 +3,8 @@ use radiant_rs::*;
 use radiant_rs::scene::*;
 use std::sync::Arc;
 use std::time::Instant;
+use std::f32::consts::PI;
+//use avec::AVec;
 
 mod component;
 mod system;
@@ -13,6 +15,7 @@ pub struct Infrastructure {
     // temporary stuff
     sprite: SpriteId,
     layer: LayerId,
+    base: LayerId,
     font: FontId,
     asteroid: SpriteId,
 }
@@ -28,6 +31,7 @@ pub struct Level {
     planner : specs::Planner<WorldState>,
     inf     : Arc<Infrastructure>,
     roidspawn: utils::Periodic,
+    rng: utils::Rng,
     created : Instant,
 }
 
@@ -48,7 +52,7 @@ impl Level {
 
         // create a scene and a layer
 
-        let font = Font::from_info(&context, FontInfo { family: "Arial".to_string(), size: 13.0, ..FontInfo::default() } );
+        let font = Font::from_info(&context, FontInfo { family: "Arial".to_string(), size: 20.0, ..FontInfo::default() } );
         let scene = Scene::new(context);
         let base = scene.register_layer(1600, 900);
         let effects = scene.register_layer(1600, 900);
@@ -112,10 +116,12 @@ impl Level {
             planner: planner,
             created: created,
             roidspawn: utils::Periodic::new(0.0, 0.5),
+            rng: utils::Rng::new(123.4),
             inf: Arc::new(Infrastructure {
                 scene   : scene,
                 input   : input.clone(),
 
+                base: base,
                 sprite: laser,
                 layer: effects,
                 asteroid: asteroid,
@@ -138,14 +144,25 @@ impl Level {
         self.planner.wait();
         renderer.draw_scene(&self.inf.scene, delta);
 
-        self.inf.scene.write(self.inf.layer, self.inf.font, "Player1: Cursor: move, Ctrl-Right: fire, Shift-Right + Up/Down: rotate, Shift-Right + Left/Right: forward/backward", Point2(10.0, 740.0));
-        self.inf.scene.write(self.inf.layer, self.inf.font, "Player2: WASD: move, Ctrl-Left: fire, Shift-Left + WS: rotate, Shift-Left + AD: forward/backward", Point2(10.0, 760.0));
+        self.inf.scene.write(self.inf.layer, self.inf.font,
+            &("Player1: Cursor: move, Ctrl-Right: fire, Shift-Right + Up/Down: rotate, Shift-Right + Left/Right: forward/backward\r\n".to_string() +
+            "Player2: WASD: move, Ctrl-Left: fire, Shift-Left + WS: rotate, Shift-Left + AD: forward/backward"),
+            Point2(10.0, 740.0)
+        );
 
         if self.roidspawn.elapsed(age) {
+            let angle = Angle(self.rng.range(-PI, PI));
+            let mut pos = Vec2(800.0, 450.0) + angle.to_vec2() * 2000.0;
+            let outbound = pos.outbound(Rect::new(0.0, 0.0, 1600.0, 900.0)).unwrap();
+
+            pos -= outbound;
+
+            let v_max = (-angle).to_vec2() * 100.0;
+
             self.planner.mut_world().create_now()
-                .with(component::Spatial::new(Vec2(120.0, 640.0), Angle(-2.0), true))
-                .with(component::Visual::new(self.inf.layer, self.inf.asteroid, Color::white(), 30))
-                .with(component::Inertial::new(Vec2(100.0, 100.0), Vec2(0.0, 0.0), 4.0, 1.5))
+                .with(component::Spatial::new(pos, angle, true))
+                .with(component::Visual::new(self.inf.base, self.inf.asteroid, Color::white(), 30))
+                .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 4.0, 1.5))
                 .build();
         }
 

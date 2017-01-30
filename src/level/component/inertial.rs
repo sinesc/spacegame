@@ -16,7 +16,20 @@ pub struct Inertial {
 }
 
 impl Inertial {
-    pub fn new(v_max: Vec2, v_fraction: Vec2, trans_motion: f32, trans_rest: f32) -> Self {
+    pub fn new(mut v_max: Vec2, mut v_fraction: Vec2, trans_motion: f32, trans_rest: f32) -> Self {
+
+        // move sign from  v_max to v_fraction/v_current to ensure reflections are properly calculated
+
+        if v_max.0 <= 0.0 {
+            v_max.0 *= -1.0;
+            v_fraction.0 *= -1.0;
+        }
+        
+        if v_max.1 <= 0.0 {
+            v_max.1 *= -1.0;
+            v_fraction.1 *= -1.0;
+        }
+
         Inertial {
             v_max       : v_max,
             v_fraction  : v_fraction,

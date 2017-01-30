@@ -51,7 +51,7 @@ impl<'a> specs::System<WorldState> for Render {
             };
 
             num_sprites += 1;
-		}
+        }
 
         state.inf.scene.write(state.inf.layer, state.inf.font, &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", (1.0 / state.delta).floor(), state.delta, num_sprites), Point2(10.0, 10.0));
 	}
