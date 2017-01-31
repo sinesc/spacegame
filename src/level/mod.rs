@@ -18,6 +18,7 @@ pub struct Infrastructure {
     base: LayerId,
     font: FontId,
     asteroid: SpriteId,
+    explosion: SpriteId,
 }
 
 #[derive(Clone)]
@@ -61,6 +62,7 @@ impl Level {
         let friend = scene.register_sprite_from_file("res/sprite/player/speedy_98x72x30.png");
         let powerup = scene.register_sprite_from_file("res/sprite/powerup/ball_v_32x32x18.jpg");
         let asteroid = scene.register_sprite_from_file("res/sprite/asteroid/type1_64x64x60.png");
+        let explosion = scene.register_sprite_from_file("res/sprite/explosion/default_256x256x40.jpg");
 
         let laser = scene.register_sprite_from_file("res/sprite/projectile/bolt_white_60x36x1.jpg");
         let font = scene.register_font(font);
@@ -132,6 +134,7 @@ impl Level {
                 layer: effects,
                 asteroid: asteroid,
                 font: font,
+                explosion: explosion,
             })
         }
     }

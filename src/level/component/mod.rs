@@ -21,3 +21,6 @@ pub use self::fading::Fading;
 
 mod bounding;
 pub use self::bounding::Bounding;
+
+mod explosion;
+pub use self::explosion::Explosion;

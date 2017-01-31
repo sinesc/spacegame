@@ -95,7 +95,7 @@ impl<'a> specs::System<WorldState> for Control {
             // shoot ?
 
             if shoot && shooter.interval.elapsed(state.age) {
-                inertial.v_fraction -= spatial.angle.to_vec2() * 0.005 / state.delta;
+                inertial.v_fraction -= spatial.angle.to_vec2() * 0.001 / state.delta;
                 projectiles.push((spatial.position, spatial.angle));
             }
 		}
