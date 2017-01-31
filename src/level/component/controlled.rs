@@ -2,9 +2,13 @@ use specs;
 
 #[derive(Clone, Debug)]
 pub struct Controlled {
+    /// Input mapping id.
     pub input_id: u32,
+    /// Current angular velocity.
     pub av_current: f32,
+    /// Rate of change for angular velocity.
     pub av_trans: f32,
+    /// Maximum angular velocity.
     pub av_max: f32,
 }
 

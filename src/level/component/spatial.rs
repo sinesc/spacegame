@@ -3,9 +3,13 @@ use radiant_rs::*;
 
 #[derive(Clone, Debug)]
 pub struct Spatial {
+    /// Current position
     pub position: Point2,
+    /// Current angle
     pub angle: Angle,
+    /// Current lean left/right value
     pub lean: f32,
+    /// True if the angle should not be updated from inertial.v_current
     pub angle_locked: bool,
 }
 

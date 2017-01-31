@@ -1,7 +1,6 @@
 use specs;
 use level::component;
 use level::WorldState;
-use std::cmp::Ordering;
 
 pub struct Cleanup {
 }
