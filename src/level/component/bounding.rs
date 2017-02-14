@@ -3,7 +3,7 @@ use radiant_rs::*;
 
 #[derive(Clone, Debug)]
 pub struct Bounding {
-    pub radius: f32, // !todo staring out simple
+    pub radius: f32, // !todo starting out simple
     pub faction: u32,
 }
 

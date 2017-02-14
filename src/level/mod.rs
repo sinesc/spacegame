@@ -29,11 +29,11 @@ pub struct WorldState {
 }
 
 pub struct Level {
-    planner : specs::Planner<WorldState>,
-    inf     : Arc<Infrastructure>,
-    roidspawn: utils::Periodic,
-    rng: utils::Rng,
-    created : Instant,
+    planner     : specs::Planner<WorldState>,
+    inf         : Arc<Infrastructure>,
+    roidspawn   : utils::Periodic,
+    rng         : utils::Rng,
+    created     : Instant,
 }
 
 impl Level {
@@ -56,15 +56,15 @@ impl Level {
 
         let font = Font::from_info(&context, FontInfo { family: "Arial".to_string(), size: 20.0, ..FontInfo::default() } );
         let scene = Scene::new(context);
-        let base = scene.register_layer(1600, 900);
-        let effects = scene.register_layer(1600, 900);
-        let hostile = scene.register_sprite_from_file("res/sprite/hostile/mine_red_64x64x15.png");
-        let friend = scene.register_sprite_from_file("res/sprite/player/speedy_98x72x30.png");
-        let powerup = scene.register_sprite_from_file("res/sprite/powerup/ball_v_32x32x18.jpg");
-        let asteroid = scene.register_sprite_from_file("res/sprite/asteroid/type1_64x64x60.png");
-        let explosion = scene.register_sprite_from_file("res/sprite/explosion/default_256x256x40.jpg");
+        let base = scene.register_layer((1600., 900.), 0);
+        let effects = scene.register_layer((1600., 900.), 0);
+        let hostile = scene.register_sprite_from_file("res/sprite/hostile/mine_red_64x64x15.png").unwrap();
+        let friend = scene.register_sprite_from_file("res/sprite/player/speedy_98x72x30.png").unwrap();
+        let powerup = scene.register_sprite_from_file("res/sprite/powerup/ball_v_32x32x18.jpg").unwrap();
+        let asteroid = scene.register_sprite_from_file("res/sprite/asteroid/type1_64x64x60.png").unwrap();
+        let explosion = scene.register_sprite_from_file("res/sprite/explosion/default_256x256x40.jpg").unwrap();
 
-        let laser = scene.register_sprite_from_file("res/sprite/projectile/bolt_white_60x36x1.jpg");
+        let laser = scene.register_sprite_from_file("res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap();
         let font = scene.register_font(font);
 
         scene.op(Op::SetBlendmode(base, blendmodes::ALPHA));
