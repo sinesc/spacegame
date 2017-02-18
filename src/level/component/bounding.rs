@@ -1,5 +1,4 @@
 use specs;
-use radiant_rs::*;
 
 #[derive(Clone, Debug)]
 pub struct Bounding {

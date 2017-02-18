@@ -22,7 +22,7 @@ impl<'a> specs::System<WorldState> for Collider {
             w.write::<component::Spatial>(),
             w.write::<component::Visual>(),
             w.write::<component::Lifetime>(),
-            w.write::<component::Fading>(), 
+            w.write::<component::Fading>(),
             w.read::<component::Bounding>(),
             w.entities()
         ));
@@ -46,7 +46,7 @@ impl<'a> specs::System<WorldState> for Collider {
         let mut spawn = |origin: Point2| {
             let explosion = arg.create();
             spatials.insert(explosion, component::Spatial::new(origin, Angle(0.0), false));
-            visuals.insert(explosion, component::Visual::new(state.inf.layer, state.inf.explosion, Color::white(), 30));
+            visuals.insert(explosion, component::Visual::new(state.inf.effects.clone(), Some(state.inf.bloom.clone()), state.inf.explosion.clone(), Color::white(), 30));
             lifetimes.insert(explosion, component::Lifetime(state.age + 1.0));
             faders.insert(explosion, component::Fading::new(state.age + 0.5, state.age + 1.0));
         };

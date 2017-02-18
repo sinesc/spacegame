@@ -1,24 +1,21 @@
 use specs;
 use radiant_rs::*;
-use radiant_rs::scene::*;
 use std::sync::Arc;
 use std::time::Instant;
 use std::f32::consts::PI;
-//use avec::AVec;
 
 mod component;
 mod system;
 
 pub struct Infrastructure {
-    scene   : Scene,
     input   : Input,
-    // temporary stuff
-    sprite: SpriteId,
-    layer: LayerId,
-    base: LayerId,
-    font: FontId,
-    asteroid: SpriteId,
-    explosion: SpriteId,
+    effects: Arc<Layer>,
+    base: Arc<Layer>,
+    bloom: Arc<Layer>,
+    font: Arc<Font>,
+    sprite: Arc<Sprite>,
+    asteroid: Arc<Sprite>,
+    explosion: Arc<Sprite>,
 }
 
 #[derive(Clone)]
@@ -33,6 +30,7 @@ pub struct Level {
     inf         : Arc<Infrastructure>,
     roidspawn   : utils::Periodic,
     rng         : utils::Rng,
+    bloom       : Arc<super::post::Bloom>,
     created     : Instant,
 }
 
@@ -54,32 +52,26 @@ impl Level {
 
         // create a scene and a layer
 
-        let font = Font::from_info(&context, FontInfo { family: "Arial".to_string(), size: 20.0, ..FontInfo::default() } );
-        let scene = Scene::new(context);
-        let base = scene.register_layer((1600., 900.), 0);
-        let effects = scene.register_layer((1600., 900.), 0);
-        let hostile = scene.register_sprite_from_file("res/sprite/hostile/mine_red_64x64x15.png").unwrap();
-        let friend = scene.register_sprite_from_file("res/sprite/player/speedy_98x72x30.png").unwrap();
-        let powerup = scene.register_sprite_from_file("res/sprite/powerup/ball_v_32x32x18.jpg").unwrap();
-        let asteroid = scene.register_sprite_from_file("res/sprite/asteroid/type1_64x64x60.png").unwrap();
-        let explosion = scene.register_sprite_from_file("res/sprite/explosion/default_256x256x40.jpg").unwrap();
+        let base = Layer::new((1600., 900.), 0).arc();
+        let effects = Layer::new((1600., 900.), 0).arc();
+        let bloom = Layer::new((1600., 900.), 1).arc();
 
-        let laser = scene.register_sprite_from_file("res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap();
-        let font = scene.register_font(font);
+        effects.set_blendmode(blendmodes::LIGHTEN);
+        bloom.set_blendmode(blendmodes::LIGHTEN);
 
-        scene.op(Op::SetBlendmode(base, blendmodes::ALPHA));
-        scene.op(Op::SetBlendmode(effects, blendmodes::LIGHTEN));
-        scene.op(Op::Draw(base));
-        scene.op(Op::Draw(effects));
-        scene.op(Op::Clear(base));
-        scene.op(Op::Clear(effects));
-        //scene.op(Op::RotateModelMatrixAt(base, 1.0, Vec2(0.0, 0.0), 0.1));
+        let font = Font::from_info(&context, FontInfo { family: "Arial".to_string(), size: 20.0, ..FontInfo::default() } ).arc();
+        let hostile = Sprite::from_file(context, "res/sprite/hostile/mine_red_64x64x15.png").unwrap().arc();
+        let friend = Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc();
+        let powerup = Sprite::from_file(context, "res/sprite/powerup/ball_v_32x32x18.jpg").unwrap().arc();
+        let asteroid = Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc();
+        let explosion = Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc();
+        let laser = Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc();
 
         // create test entity
 
         world.create_now()
             .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0), true))
-            .with(component::Visual::new(base, friend, Color(0.8, 0.8, 1.0, 1.0), 0))
+            .with(component::Visual::new(base.clone(), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(1))
             .with(component::Shooter::new(0.05))
@@ -88,7 +80,7 @@ impl Level {
 
         world.create_now()
             .with(component::Spatial::new(Vec2(512.0, 384.0), Angle(0.0), true))
-            .with(component::Visual::new(base, friend, Color(1.0, 0.8, 0.8, 1.0), 0))
+            .with(component::Visual::new(base.clone(), None, friend.clone(), Color(1.0, 0.8, 0.8, 1.0), 0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(2))
             .with(component::Shooter::new(0.05))
@@ -97,13 +89,13 @@ impl Level {
 
         world.create_now()
             .with(component::Spatial::new(Vec2(120.0, 640.0), Angle(0.0), true))
-            .with(component::Visual::new(base, hostile, Color::white(), 30))
+            .with(component::Visual::new(base.clone(), None, hostile.clone(), Color::white(), 30))
             .with(component::Bounding::new(20.0, 0))
             .build();
 
         world.create_now()
             .with(component::Spatial::new(Vec2(530.0, 450.0), Angle(0.0), true))
-            .with(component::Visual::new(effects, powerup, Color::white(), 30))
+            .with(component::Visual::new(effects.clone(), None, powerup.clone(), Color::white(), 30))
             .with(component::Bounding::new(20.0, 0))
             .build();
 
@@ -121,25 +113,26 @@ impl Level {
         let created = Instant::now();
 
         Level {
-            planner: planner,
-            created: created,
-            roidspawn: utils::Periodic::new(0.0, 0.5),
-            rng: utils::Rng::new(123.4),
+            planner     : planner,
+            created     : created,
+            roidspawn   : utils::Periodic::new(0.0, 0.5),
+            rng         : utils::Rng::new(123.4),
+            bloom       : Arc::new(super::post::Bloom::new(&context, 8, blendmodes::COPY)),
             inf: Arc::new(Infrastructure {
-                scene   : scene,
-                input   : input.clone(),
-
-                base: base,
-                sprite: laser,
-                layer: effects,
-                asteroid: asteroid,
-                font: font,
-                explosion: explosion,
+                input       : input.clone(),
+                base        : base,
+                bloom       : bloom,
+                effects     : effects,
+                sprite      : laser,
+                asteroid    : asteroid,
+                font        : font,
+                explosion   : explosion,
             })
         }
     }
 
     pub fn process(self: &mut Self, renderer: &Renderer, delta: f32) {
+        use std::ops::Deref;
 
         let age = Instant::now() - self.created;
         let age = age.as_secs() as f32 + (age.subsec_nanos() as f64 / 1000000000.0) as f32;
@@ -151,13 +144,24 @@ impl Level {
         };
 
         self.planner.wait();
-        renderer.draw_scene(&self.inf.scene, delta);
 
-        self.inf.scene.write(self.inf.layer, self.inf.font,
+        renderer.postprocess(blendmodes::ALPHA, self.bloom.deref(), || {
+            //renderer.draw_layer(&self.inf.bloom);
+            renderer.draw_layer(&self.inf.effects);
+        });
+
+        self.inf.font.write(&self.inf.base,
             &("Player1: Cursor: move, Ctrl-Right: fire, Shift-Right + Up/Down: rotate, Shift-Right + Left/Right: forward/backward\r\n".to_string() +
             "Player2: WASD: move, Ctrl-Left: fire, Shift-Left + WS: rotate, Shift-Left + AD: forward/backward"),
             Point2(10.0, 740.0)
         );
+
+        renderer.draw_layer(&self.inf.base);
+        renderer.draw_layer(&self.inf.effects);
+
+        self.inf.base.clear();
+        self.inf.effects.clear();
+        self.inf.bloom.clear();
 
         if self.roidspawn.elapsed(age) {
             let angle = Angle(self.rng.range(-PI, PI));
@@ -170,7 +174,7 @@ impl Level {
 
             self.planner.mut_world().create_now()
                 .with(component::Spatial::new(pos, angle, true))
-                .with(component::Visual::new(self.inf.base, self.inf.asteroid, Color::white(), 30))
+                .with(component::Visual::new(self.inf.base.clone(), None, self.inf.asteroid.clone(), Color::white(), 30))
                 .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 4.0, 1.5))
                 .with(component::Bounding::new(20.0, 2))
                 .build();

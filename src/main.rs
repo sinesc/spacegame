@@ -3,6 +3,7 @@ extern crate specs;
 use radiant_rs::*;
 
 mod level;
+mod post;
 use level::Level;
 
 fn main() {
@@ -10,8 +11,7 @@ fn main() {
     let display = Display::new(DisplayInfo { width: 1600, height: 900, vsync: true, ..DisplayInfo::default() });
     let renderer =  Renderer::new(&display).unwrap();
     let input = Input::new(&display);
-    let context = renderer.context();
-    let mut level = Level::new(&input, &context);
+    let mut level = Level::new(&input, &renderer.context());
 
     utils::renderloop(|frame| {
         display.poll_events();

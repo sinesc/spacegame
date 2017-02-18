@@ -42,7 +42,11 @@ impl<'a> specs::System<WorldState> for Render {
 
 		for (spatial, mut visual) in (&spatials, &mut visuals).iter() {
 
-            state.inf.scene.sprite_transformed(visual.layer_id, visual.sprite_id, visual.frame_id as u32, spatial.position, visual.color, spatial.angle.to_radians(), Point2(1.0, 1.0));
+            visual.sprite_id.draw_transformed(&visual.layer_id, visual.frame_id as u32, spatial.position, visual.color, spatial.angle.to_radians(), Point2(1.0, 1.0));
+
+            if let Some(ref effect_layer_id) = visual.effect_layer_id {
+                visual.sprite_id.draw_transformed(&effect_layer_id, visual.frame_id as u32, spatial.position, visual.color, spatial.angle.to_radians(), Point2(1.0, 1.0));
+            }
 
             visual.frame_id = if visual.fps == 0 {
                 cmp::min(29, cmp::max(0, (15.0 + (15.0 * spatial.lean)) as i32)) as f32
@@ -53,6 +57,6 @@ impl<'a> specs::System<WorldState> for Render {
             num_sprites += 1;
         }
 
-        state.inf.scene.write(state.inf.layer, state.inf.font, &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", (1.0 / state.delta).floor(), state.delta, num_sprites), Point2(10.0, 10.0));
+        state.inf.font.write(&state.inf.base, &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", (1.0 / state.delta).floor(), state.delta, num_sprites), Point2(10.0, 10.0));
 	}
 }

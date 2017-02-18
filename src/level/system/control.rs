@@ -103,7 +103,7 @@ impl<'a> specs::System<WorldState> for Control {
         let mut spawn = |origin: Point2, angle: Angle| {
             let shot = arg.create();
             spatials.insert(shot, component::Spatial::new(origin, angle, false));
-            visuals.insert(shot, component::Visual::new(state.inf.layer, state.inf.sprite, Color::white(), 30));
+            visuals.insert(shot, component::Visual::new(state.inf.effects.clone(), None, state.inf.sprite.clone(), Color::white(), 30));
             inertials.insert(shot, component::Inertial::new(Vec2(1433.0, 1433.0), Vec2::from_angle(angle), 4.0, 1.0));
             lifetimes.insert(shot, component::Lifetime(state.age + 1.0));
             faders.insert(shot, component::Fading::new(state.age + 0.5, state.age + 1.0));
