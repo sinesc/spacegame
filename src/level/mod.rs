@@ -145,7 +145,7 @@ impl Level {
 
         self.planner.wait();
 
-        renderer.postprocess(blendmodes::ALPHA, self.bloom.deref(), || {
+        renderer.postprocess(self.bloom.deref(), &blendmodes::ALPHA, || {
             //renderer.draw_layer(&self.inf.bloom);
             renderer.draw_layer(&self.inf.effects);
         });

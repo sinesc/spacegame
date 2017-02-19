@@ -678,7 +678,7 @@ dependencies = [
 [[package]]
 name = "radiant-rs"
 version = "0.3.0"
-source = "git+https://github.com/sinesc/radiant-rs#4445bd430c2c0d7591cd8754dc420eff65c46cbf"
+source = "git+https://github.com/sinesc/radiant-rs#63495013bf84f466ad384466b9755513e229a3e2"
 dependencies = [
  "avec 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "enum_primitive 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
