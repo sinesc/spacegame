@@ -2,14 +2,21 @@ use specs;
 use level::component;
 use level::WorldState;
 use radiant_rs::*;
+use radiant_rs::utils;
 use std::cmp;
 
 pub struct Render {
+    fps_interval: utils::Periodic,
+    num_frames: u32,
+    last_num_frames: u32,
 }
 
 impl<'a> Render {
     pub fn new() -> Self {
         Render {
+            fps_interval: utils::Periodic::new(0.0, 1.0),
+            num_frames: 0,
+            last_num_frames: 0,
         }
     }
 }
@@ -57,6 +64,13 @@ impl<'a> specs::System<WorldState> for Render {
             num_sprites += 1;
         }
 
-        state.inf.font.write(&state.inf.base, &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", (1.0 / state.delta).floor(), state.delta, num_sprites), Point2(10.0, 10.0));
+        self.num_frames += 1;
+
+        if self.fps_interval.elapsed(state.age) {
+            self.last_num_frames = self.num_frames;
+            self.num_frames = 0;
+        }
+
+        state.inf.font.write(&state.inf.base, &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, state.delta, num_sprites), Point2(10.0, 10.0));
 	}
 }
