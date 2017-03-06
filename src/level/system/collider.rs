@@ -43,7 +43,7 @@ impl<'a> specs::System<WorldState> for Collider {
             }
 		}
 
-        let mut spawn = |origin: Point2| {
+        let mut spawn = |origin: Vec2| {
             let explosion = arg.create();
             spatials.insert(explosion, component::Spatial::new(origin, Angle(0.0), false));
             visuals.insert(explosion, component::Visual::new(state.inf.effects.clone(), Some(state.inf.bloom.clone()), state.inf.explosion.clone(), Color::white(), 30));

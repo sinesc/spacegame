@@ -1,2 +1,2 @@
 mod bloom;
-pub use post::bloom::Bloom;
+pub use post::bloom::{Bloom, BloomArgs};

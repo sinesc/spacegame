@@ -4,7 +4,7 @@ use radiant_rs::*;
 #[derive(Clone, Debug)]
 pub struct Spatial {
     /// Current position
-    pub position: Point2,
+    pub position: Vec2,
     /// Current angle
     pub angle: Angle,
     /// Current lean left/right value

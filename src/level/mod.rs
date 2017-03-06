@@ -52,14 +52,14 @@ impl Level {
 
         // create a scene and a layer
 
-        let base = Layer::new((1600., 900.), 0).arc();
-        let effects = Layer::new((1600., 900.), 0).arc();
-        let bloom = Layer::new((1600., 900.), 1).arc();
+        let base = Layer::new((1600., 900.)).arc();
+        let effects = Layer::new((1600., 900.)).arc();
+        let bloom = Layer::new((1600., 900.)).arc();
 
         effects.set_blendmode(blendmodes::LIGHTEN);
         bloom.set_blendmode(blendmodes::LIGHTEN);
 
-        let font = Font::from_info(&context, FontInfo { family: "Arial".to_string(), size: 20.0, ..FontInfo::default() } ).arc();
+        let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let hostile = Sprite::from_file(context, "res/sprite/hostile/mine_red_64x64x15.png").unwrap().arc();
         let friend = Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc();
         let powerup = Sprite::from_file(context, "res/sprite/powerup/ball_v_32x32x18.jpg").unwrap().arc();
@@ -117,7 +117,7 @@ impl Level {
             created     : created,
             roidspawn   : utils::Periodic::new(0.0, 0.5),
             rng         : utils::Rng::new(123.4),
-            bloom       : Arc::new(super::post::Bloom::new(&context, 8, blendmodes::COPY)),
+            bloom       : Arc::new(super::post::Bloom::new(&context)),
             inf: Arc::new(Infrastructure {
                 input       : input.clone(),
                 base        : base,
@@ -145,19 +145,29 @@ impl Level {
 
         self.planner.wait();
 
-        renderer.postprocess(self.bloom.deref(), &blendmodes::ALPHA, || {
-            //renderer.draw_layer(&self.inf.bloom);
-            renderer.draw_layer(&self.inf.effects);
+        let bloom_args = super::post::BloomArgs {
+            iterations  : 4,
+            iter_blend  : blendmodes::COPY,
+            final_blend : blendmodes::LIGHTEN,
+            spread      : 5,
+            color       : Color(1.0, 1.0, 1.0, 0.5),
+        };
+
+        renderer.clear(Color(0.0, 0.0, 0.0, 1.0));
+
+        renderer.postprocess(self.bloom.deref(), &bloom_args, || {
+            renderer.clear(Color(0.0, 0.0, 0.0, 1.0));
+            renderer.draw_layer(&self.inf.effects, 0);
         });
 
         self.inf.font.write(&self.inf.base,
             &("Player1: Cursor: move, Ctrl-Right: fire, Shift-Right + Up/Down: rotate, Shift-Right + Left/Right: forward/backward\r\n".to_string() +
             "Player2: WASD: move, Ctrl-Left: fire, Shift-Left + WS: rotate, Shift-Left + AD: forward/backward"),
-            Point2(10.0, 740.0)
+            Vec2(10.0, 740.0)
         );
 
-        renderer.draw_layer(&self.inf.base);
-        renderer.draw_layer(&self.inf.effects);
+        renderer.draw_layer(&self.inf.base, 0);
+        renderer.draw_layer(&self.inf.effects, 0);
 
         self.inf.base.clear();
         self.inf.effects.clear();

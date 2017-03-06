@@ -100,7 +100,7 @@ impl<'a> specs::System<WorldState> for Control {
             }
 		}
 
-        let mut spawn = |origin: Point2, angle: Angle| {
+        let mut spawn = |origin: Vec2, angle: Angle| {
             let shot = arg.create();
             spatials.insert(shot, component::Spatial::new(origin, angle, false));
             visuals.insert(shot, component::Visual::new(state.inf.effects.clone(), None, state.inf.sprite.clone(), Color::white(), 30));
