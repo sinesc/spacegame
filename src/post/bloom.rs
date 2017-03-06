@@ -1,4 +1,4 @@
-use radiant_rs::{Postprocessor, RenderContext, Renderer, Color, Texture, TextureFilter, Program, BlendMode, Rect, Point2, Vec2, blendmodes};
+use radiant_rs::{Postprocessor, RenderContext, Renderer, Color, Texture, TextureFilter, Program, BlendMode, Point2, blendmodes};
 use std::sync::Mutex;
 
 pub struct Bloom {
@@ -77,8 +77,8 @@ impl Postprocessor for Bloom {
         use std::ops::DerefMut;
         let mut combine = self.combine_program.lock().unwrap();
         let combine = combine.deref_mut();
-        combine.set_uniform("bloom_color", &args.color);
-        renderer.fill().blendmode(args.final_blend).program(&combine).draw();
+        renderer.fill().blendmode(args.final_blend).program(&combine).color(args.color).draw();
+        self.targets[0][0].clear(Color::transparent());
     }
 }
 

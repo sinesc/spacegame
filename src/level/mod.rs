@@ -115,7 +115,7 @@ impl Level {
         Level {
             planner     : planner,
             created     : created,
-            roidspawn   : utils::Periodic::new(0.0, 0.5),
+            roidspawn   : utils::Periodic::new(0.0, 0.2),
             rng         : utils::Rng::new(123.4),
             bloom       : Arc::new(super::post::Bloom::new(&context)),
             inf: Arc::new(Infrastructure {
@@ -150,7 +150,7 @@ impl Level {
             iter_blend  : blendmodes::COPY,
             final_blend : blendmodes::LIGHTEN,
             spread      : 5,
-            color       : Color(1.0, 1.0, 1.0, 0.5),
+            color       : Color::alpha_pm(0.25),
         };
 
         renderer.clear(Color(0.0, 0.0, 0.0, 1.0));
