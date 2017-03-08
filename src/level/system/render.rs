@@ -49,10 +49,10 @@ impl<'a> specs::System<WorldState> for Render {
 
 		for (spatial, mut visual) in (&spatials, &mut visuals).iter() {
 
-            visual.sprite_id.draw_transformed(&visual.layer_id, visual.frame_id as u32, spatial.position, visual.color, spatial.angle.to_radians(), Vec2(1.0, 1.0));
+            visual.sprite.draw_transformed(&visual.layer, visual.frame_id as u32, spatial.position, visual.color, spatial.angle.to_radians(), Vec2(1.0, 1.0));
 
-            if let Some(ref effect_layer_id) = visual.effect_layer_id {
-                visual.sprite_id.draw_transformed(&effect_layer_id, visual.frame_id as u32, spatial.position, visual.color, spatial.angle.to_radians(), Point2(1.0, 1.0));
+            if let Some(ref effect_layer) = visual.effect_layer {
+                visual.sprite.draw_transformed(&effect_layer, visual.frame_id as u32, spatial.position, visual.color, spatial.angle.to_radians(), Point2(1.0, 1.0));
             }
 
             visual.frame_id = if visual.fps == 0 {
