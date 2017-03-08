@@ -8,14 +8,13 @@ mod component;
 mod system;
 
 pub struct Infrastructure {
-    input   : Input,
-    effects: Arc<Layer>,
-    base: Arc<Layer>,
-    bloom: Arc<Layer>,
-    font: Arc<Font>,
-    sprite: Arc<Sprite>,
-    asteroid: Arc<Sprite>,
-    explosion: Arc<Sprite>,
+    input       : Input,
+    effects     : Arc<Layer>,
+    base        : Arc<Layer>,
+    font        : Arc<Font>,
+    sprite      : Arc<Sprite>,
+    asteroid    : Arc<Sprite>,
+    explosion   : Arc<Sprite>,
 }
 
 #[derive(Clone)]
@@ -49,6 +48,7 @@ impl Level {
         world.register::<component::Shooter>();
         world.register::<component::Fading>();
         world.register::<component::Bounding>();
+        world.register::<component::Hitpoints>();
 
         // create a scene and a layer
 
@@ -71,32 +71,36 @@ impl Level {
 
         world.create_now()
             .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0), true))
-            .with(component::Visual::new(base.clone(), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 0))
+            .with(component::Visual::new(Some(base.clone()), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 0, 1.0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(1))
             .with(component::Shooter::new(0.05))
             .with(component::Bounding::new(20.0, 1))
+            .with(component::Hitpoints::new(100.))
             .build();
 
         world.create_now()
             .with(component::Spatial::new(Vec2(512.0, 384.0), Angle(0.0), true))
-            .with(component::Visual::new(base.clone(), None, friend.clone(), Color(1.0, 0.8, 0.8, 1.0), 0))
+            .with(component::Visual::new(Some(base.clone()), None, friend.clone(), Color(1.0, 0.8, 0.8, 1.0), 0, 1.0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(2))
             .with(component::Shooter::new(0.05))
             .with(component::Bounding::new(20.0, 1))
+            .with(component::Hitpoints::new(100.))
             .build();
 
         world.create_now()
             .with(component::Spatial::new(Vec2(120.0, 640.0), Angle(0.0), true))
-            .with(component::Visual::new(base.clone(), None, hostile.clone(), Color::white(), 30))
+            .with(component::Visual::new(Some(base.clone()), None, hostile.clone(), Color::white(), 30, 1.0))
             .with(component::Bounding::new(20.0, 0))
+            .with(component::Hitpoints::new(100.))
             .build();
 
         world.create_now()
             .with(component::Spatial::new(Vec2(530.0, 450.0), Angle(0.0), true))
-            .with(component::Visual::new(effects.clone(), None, powerup.clone(), Color::white(), 30))
+            .with(component::Visual::new(Some(effects.clone()), None, powerup.clone(), Color::white(), 30, 1.0))
             .with(component::Bounding::new(20.0, 0))
+            .with(component::Hitpoints::new(100.))
             .build();
 
         // create planner and add systems
@@ -121,7 +125,6 @@ impl Level {
             inf: Arc::new(Infrastructure {
                 input       : input.clone(),
                 base        : base,
-                bloom       : bloom,
                 effects     : effects,
                 sprite      : laser,
                 asteroid    : asteroid,
@@ -171,7 +174,6 @@ impl Level {
 
         self.inf.base.clear();
         self.inf.effects.clear();
-        self.inf.bloom.clear();
 
         if self.roidspawn.elapsed(age) {
             let angle = Angle(self.rng.range(-PI, PI));
@@ -184,9 +186,10 @@ impl Level {
 
             self.planner.mut_world().create_now()
                 .with(component::Spatial::new(pos, angle, true))
-                .with(component::Visual::new(self.inf.base.clone(), None, self.inf.asteroid.clone(), Color::white(), 30))
+                .with(component::Visual::new(Some(self.inf.base.clone()), None, self.inf.asteroid.clone(), Color::white(), 30, 1.0))
                 .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 4.0, 1.5))
                 .with(component::Bounding::new(20.0, 2))
+                .with(component::Hitpoints::new(100.))
                 .build();
         }
 

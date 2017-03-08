@@ -4,8 +4,9 @@ use radiant_rs::*;
 
 #[derive(Clone)]
 pub struct Visual {
-    pub layer           : Arc<Layer>,
+    pub layer           : Option<Arc<Layer>>,
     pub effect_layer    : Option<Arc<Layer>>,
+    pub effect_size     : f32,
     pub sprite          : Arc<Sprite>,
     pub color           : Color,
     pub frame_id        : f32,
@@ -13,10 +14,11 @@ pub struct Visual {
 }
 
 impl Visual {
-    pub fn new(layer: Arc<Layer>, effect_layer: Option<Arc<Layer>>, sprite: Arc<Sprite>, color: Color, fps: u32) -> Self {
+    pub fn new(layer: Option<Arc<Layer>>, effect_layer: Option<Arc<Layer>>, sprite: Arc<Sprite>, color: Color, fps: u32, effect_size: f32) -> Self {
         Visual {
             layer           : layer,
             effect_layer    : effect_layer,
+            effect_size     : effect_size,
             sprite          : sprite,
             color           : color,
             frame_id        : 0.0,

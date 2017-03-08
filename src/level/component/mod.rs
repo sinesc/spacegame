@@ -24,3 +24,6 @@ pub use self::bounding::Bounding;
 
 mod explosion;
 pub use self::explosion::Explosion;
+
+mod hitpoints;
+pub use self::hitpoints::Hitpoints;

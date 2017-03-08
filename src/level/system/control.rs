@@ -36,7 +36,7 @@ impl<'a> specs::System<WorldState> for Control {
 		use specs::Join;
         use std::f32::consts::PI;
 
-		let (mut controlleds, mut spatials, mut inertials, mut visuals, mut lifetimes, mut shooters, mut faders, mut boundings) = arg.fetch(|w| (
+		let (mut controlleds, mut spatials, mut inertials, mut visuals, mut lifetimes, mut shooters, mut faders, mut boundings, mut hitpoints) = arg.fetch(|w| (
             w.write::<component::Controlled>(),
             w.write::<component::Spatial>(),
             w.write::<component::Inertial>(),
@@ -44,7 +44,8 @@ impl<'a> specs::System<WorldState> for Control {
             w.write::<component::Lifetime>(),
             w.write::<component::Shooter>(),
             w.write::<component::Fading>(),
-            w.write::<component::Bounding>()
+            w.write::<component::Bounding>(),
+            w.write::<component::Hitpoints>()
         ));
 
         let mut projectiles = Vec::new();
@@ -103,11 +104,12 @@ impl<'a> specs::System<WorldState> for Control {
         let mut spawn = |origin: Vec2, angle: Angle| {
             let shot = arg.create();
             spatials.insert(shot, component::Spatial::new(origin, angle, false));
-            visuals.insert(shot, component::Visual::new(state.inf.effects.clone(), None, state.inf.sprite.clone(), Color::white(), 30));
+            visuals.insert(shot, component::Visual::new(Some(state.inf.effects.clone()), None, state.inf.sprite.clone(), Color::white(), 30, 0.2));
             inertials.insert(shot, component::Inertial::new(Vec2(1433.0, 1433.0), Vec2::from_angle(angle), 4.0, 1.0));
             lifetimes.insert(shot, component::Lifetime(state.age + 1.0));
             faders.insert(shot, component::Fading::new(state.age + 0.5, state.age + 1.0));
             boundings.insert(shot, component::Bounding::new(5.0, 1));
+            hitpoints.insert(shot, component::Hitpoints::new(5.0));
         };
 
         for (mut position, angle) in projectiles {
