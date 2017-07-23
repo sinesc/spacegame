@@ -12,18 +12,23 @@ impl<'a> Cleanup {
     }
 }
 
-impl<'a> specs::System<WorldState> for Cleanup {
+#[derive(SystemData)]
+pub struct CleanupData<'a> {
+    world_state: specs::Fetch<'a, WorldState>,
+    lifetime: specs::ReadStorage<'a, component::Lifetime>,
+    entities: specs::Entities<'a>,
+}
 
-	fn run(&mut self, arg: specs::RunArg, state: WorldState) {
+
+impl<'a> specs::System<'a> for Cleanup {
+    type SystemData = CleanupData<'a>;
+
+    fn run(&mut self, data: CleanupData) {
 		use specs::Join;
 
-		let (lifetimes, entities) = arg.fetch(|w|
-			(w.read::<component::Lifetime>(), w.entities())
-		);
-
-		for (lifetime, entity) in (&lifetimes, &entities).iter() {
-            if lifetime.0 < state.age {
-                arg.delete(entity);
+		for (lifetime, entity) in (&data.lifetime, &*data.entities).join() {
+            if lifetime.0 < data.world_state.age {
+                data.entities.delete(entity);
             }
 		}
 

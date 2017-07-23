@@ -1,4 +1,7 @@
 extern crate radiant_rs;
+extern crate shred;
+#[macro_use]
+extern crate shred_derive;
 extern crate specs;
 use radiant_rs::*;
 

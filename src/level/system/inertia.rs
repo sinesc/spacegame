@@ -3,10 +3,14 @@
 #![allow(unused_imports)]
 
 use specs;
+use specs::Join;
+use specs::SystemData;
 use radiant_rs::*;
 use radiant_rs::math::*;
 use level::component;
 use level::WorldState;
+//use specs::{Component, DispatcherBuilder, Join, ReadStorage, System, VecStorage,
+            //World, WriteStorage};
 
 pub struct Inertia;
 
@@ -16,16 +20,22 @@ impl Inertia {
     }
 }
 
-impl specs::System<WorldState> for Inertia {
+#[derive(SystemData)]
+pub struct InertiaData<'a> {
+    world_state: specs::Fetch<'a, WorldState>,
+    spatial: specs::WriteStorage<'a, component::Spatial>,
+    inertial: specs::WriteStorage<'a, component::Inertial>,
+}
 
-	fn run(&mut self, arg: specs::RunArg, state: WorldState) {
+impl<'a> specs::System<'a> for Inertia {
+    type SystemData = InertiaData<'a>;
+
+    fn run(&mut self, mut data: Self::SystemData) {
 		use specs::Join;
 
-		let (mut spatials, mut intertials) = arg.fetch(|w|
-            (w.write::<component::Spatial>(), w.write::<component::Inertial>())
-        );
+        let delta = data.world_state.delta;
 
-		for (spatial, inertial) in (&mut spatials, &mut intertials).iter() {
+        for (spatial, inertial) in (&mut data.spatial, &mut data.inertial).join() {
 
             // todo: make this scale linearly between trans_rest and trans_motion based on v_fraction?
             let trans_current = Vec2(
@@ -35,8 +45,8 @@ impl specs::System<WorldState> for Inertia {
 
             let v_target = inertial.v_max * inertial.v_fraction;
 
-            inertial.v_current = inertial.v_current * (Vec2(1.0, 1.0) - state.delta * trans_current) + (v_target * (state.delta * trans_current));
-            spatial.position += inertial.v_current * state.delta;
+            inertial.v_current = inertial.v_current * (Vec2(1.0, 1.0) - delta * trans_current) + (v_target * (delta * trans_current));
+            spatial.position += inertial.v_current * delta;
 
             if let Some(outbound) = spatial.position.outbound(Rect::new(0.0, 0.0, 1600.0, 900.0)) {
 

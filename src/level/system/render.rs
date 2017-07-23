@@ -22,21 +22,26 @@ impl<'a> Render {
     }
 }
 
-impl<'a> specs::System<WorldState> for Render {
+#[derive(SystemData)]
+pub struct RenderData<'a> {
+    world_state: specs::Fetch<'a, WorldState>,
+    spatial: specs::ReadStorage<'a, component::Spatial>,
+    visual: specs::WriteStorage<'a, component::Visual>,
+    fading: specs::ReadStorage<'a, component::Fading>,
+}
 
-	fn run(&mut self, arg: specs::RunArg, state: WorldState) {
+impl<'a> specs::System<'a> for Render {
+    type SystemData = RenderData<'a>;
+
+    fn run(&mut self, mut data: RenderData) {
 		use specs::Join;
-
-		let (spatials, mut visuals, faders) = arg.fetch(|w|
-			(w.read::<component::Spatial>(), w.write::<component::Visual>(), w.read::<component::Fading>())
-		);
 
         // apply fade effects
 
-		for (fading, mut visual) in (&faders, &mut visuals).iter() {
-            if state.age >= fading.start {
+		for (fading, visual) in (&data.fading, &mut data.visual).join() {
+            if data.world_state.age >= fading.start {
                 let duration = fading.end - fading.start;
-                let progress = state.age - fading.start;
+                let progress = data.world_state.age - fading.start;
                 let alpha = 1.0 - (progress / duration);
                 if alpha >= 0.0 {
                     visual.color.set_a(alpha);
@@ -48,7 +53,7 @@ impl<'a> specs::System<WorldState> for Render {
 
         let mut num_sprites = 0;
 
-		for (spatial, mut visual) in (&spatials, &mut visuals).iter() {
+		for (spatial, visual) in (&data.spatial, &mut data.visual).join() {
 
             if let Some(ref layer) = visual.layer {
                 visual.sprite.draw_transformed(&layer, visual.frame_id as u32, spatial.position, visual.color, spatial.angle.to_radians(), Vec2(1.0, 1.0));
@@ -61,7 +66,7 @@ impl<'a> specs::System<WorldState> for Render {
             visual.frame_id = if visual.fps == 0 {
                 cmp::min(29, cmp::max(0, (15.0 + (15.0 * spatial.lean)) as i32)) as f32
             } else {
-                visual.frame_id + state.delta * visual.fps as f32
+                visual.frame_id + data.world_state.delta * visual.fps as f32
             };
 
             num_sprites += 1;
@@ -69,11 +74,11 @@ impl<'a> specs::System<WorldState> for Render {
 
         self.num_frames += 1;
 
-        if self.fps_interval.elapsed(state.age) {
+        if self.fps_interval.elapsed(data.world_state.age) {
             self.last_num_frames = self.num_frames;
             self.num_frames = 0;
         }
 
-        state.inf.font.write(&state.inf.base, &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, state.delta, num_sprites), Point2(10.0, 10.0), Color::white());
+        data.world_state.inf.font.write(&data.world_state.inf.base, &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, data.world_state.delta, num_sprites), Point2(10.0, 10.0), Color::white());
 	}
 }

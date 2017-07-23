@@ -4,7 +4,10 @@ version = "0.1.0"
 authors = ["Dennis Möhlmann <dmo479@gmail.com>"]
 
 [dependencies]
-specs = "0.7"
+shred = "*"
+shred-derive = "*"
+specs = "0.9"
+specs-derive = "0.1"
 radiant-rs = { git = "https://github.com/sinesc/radiant-rs" }
 
 [profile.dev]

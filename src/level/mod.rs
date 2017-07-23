@@ -25,8 +25,9 @@ pub struct WorldState {
     inf     : Arc<Infrastructure>,
 }
 
-pub struct Level {
-    planner     : specs::Planner<WorldState>,
+pub struct Level<'a, 'b> {
+    world       : specs::World,
+    dispatcher  : specs::Dispatcher<'a, 'b>,
     inf         : Arc<Infrastructure>,
     roidspawn   : utils::Periodic,
     rng         : utils::Rng,
@@ -34,9 +35,9 @@ pub struct Level {
     created     : Instant,
 }
 
-impl Level {
+impl<'a, 'b> Level<'a, 'b> {
 
-    pub fn new(input: &Input, context: &RenderContext) -> Level {
+    pub fn new(input: &Input, context: &RenderContext) -> Level<'a, 'b> {
 
         // create world and register components
 
@@ -55,10 +56,10 @@ impl Level {
 
         let base = Layer::new((1600., 900.)).arc();
         let effects = Layer::new((1600., 900.)).arc();
-        let bloom = Layer::new((1600., 900.)).arc();
+        //let bloom = Layer::new((1600., 900.)).arc();
 
         effects.set_blendmode(blendmodes::LIGHTEN);
-        bloom.set_blendmode(blendmodes::LIGHTEN);
+        //bloom.set_blendmode(blendmodes::LIGHTEN);
 
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let hostile = Sprite::from_file(context, "res/sprite/hostile/mine_red_64x64x15.png").unwrap().arc();
@@ -70,7 +71,7 @@ impl Level {
 
         // create test entity
 
-        world.create_now()
+        world.create_entity()
             .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0), true))
             .with(component::Visual::new(Some(base.clone()), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 0, 1.0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
@@ -80,7 +81,7 @@ impl Level {
             .with(component::Hitpoints::new(100.))
             .build();
 
-        world.create_now()
+        world.create_entity()
             .with(component::Spatial::new(Vec2(512.0, 384.0), Angle(0.0), true))
             .with(component::Visual::new(Some(base.clone()), None, friend.clone(), Color(1.0, 0.8, 0.8, 1.0), 0, 1.0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
@@ -90,48 +91,55 @@ impl Level {
             .with(component::Hitpoints::new(100.))
             .build();
 
-        world.create_now()
+        world.create_entity()
             .with(component::Spatial::new(Vec2(120.0, 640.0), Angle(0.0), true))
             .with(component::Visual::new(Some(base.clone()), None, hostile.clone(), Color::white(), 30, 1.0))
             .with(component::Bounding::new(20.0, 0))
             .with(component::Hitpoints::new(100.))
             .build();
 
-        world.create_now()
+        world.create_entity()
             .with(component::Spatial::new(Vec2(530.0, 450.0), Angle(0.0), true))
             .with(component::Visual::new(Some(effects.clone()), None, powerup.clone(), Color::white(), 30, 1.0))
             .with(component::Bounding::new(20.0, 0))
             .with(component::Hitpoints::new(100.))
             .build();
 
+
+        let infrastructure = Arc::new(Infrastructure {
+            input       : input.clone(),
+            base        : base,
+            effects     : effects,
+            sprite      : laser,
+            asteroid    : asteroid,
+            font        : font,
+            explosion   : explosion,
+        });
+
+        world.add_resource(WorldState { delta: 0.0, age: 0.0, inf: infrastructure.clone() });
+
         // create planner and add systems
 
-        let mut planner = specs::Planner::<WorldState>::new(world, 4);
-        planner.add_system(system::Cleanup::new(), "cleanup", 100);
-        planner.add_system(system::Control::new(), "control", 75);
-        planner.add_system(system::Inertia::new(), "inertia", 50);
-        planner.add_system(system::Collider::new(), "collider", 0);
-        planner.add_system(system::Render::new(), "render", 0);
+        let dispatcher = specs::DispatcherBuilder::new()
+                .add(system::Control::new(), "control", &[])
+                .add(system::Inertia::new(), "inertia", &[])
+                .add(system::Collider::new(), "collider", &[])
+                .add(system::Render::new(), "render", &[])
+                .add(system::Cleanup::new(), "cleanup", &[])
+                .build();
 
         // return level
 
         let created = Instant::now();
 
         Level {
-            planner     : planner,
+            world       : world,
+            dispatcher  : dispatcher,
             created     : created,
             roidspawn   : utils::Periodic::new(0.0, 0.2),
             rng         : utils::Rng::new(123.4),
             bloom       : Arc::new(super::post::Bloom::new(&context)),
-            inf: Arc::new(Infrastructure {
-                input       : input.clone(),
-                base        : base,
-                effects     : effects,
-                sprite      : laser,
-                asteroid    : asteroid,
-                font        : font,
-                explosion   : explosion,
-            })
+            inf         : infrastructure
         }
     }
 
@@ -141,13 +149,17 @@ impl Level {
         let age = Instant::now() - self.created;
         let age = age.as_secs() as f32 + (age.subsec_nanos() as f64 / 1000000000.0) as f32;
 
-        let world_state = WorldState {
-            delta   : if delta.is_nan() || delta == 0.0 { 0.0001 } else { delta },
-            age     : age,
-            inf     : self.inf.clone(),
-        };
+        {
+            let mut world_state = self.world.write_resource::<WorldState>();
 
-        self.planner.wait();
+            *world_state = WorldState {
+                delta   : if delta.is_nan() || delta == 0.0 { 0.0001 } else { delta },
+                age     : age,
+                inf     : self.inf.clone(),
+            };
+        }
+
+        self.dispatcher.dispatch(&mut self.world.res);
 
         let bloom_args = super::post::BloomArgs {
             iterations  : 4,
@@ -185,16 +197,18 @@ impl Level {
             pos -= outbound;
 
             let v_max = (-angle).to_vec2() * 100.0;
-
-            self.planner.mut_world().create_now()
+/*
+            self.world.create_entity()
                 .with(component::Spatial::new(pos, angle, true))
                 .with(component::Visual::new(Some(self.inf.base.clone()), None, self.inf.asteroid.clone(), Color::white(), 30, 1.0))
                 .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 4.0, 1.5))
                 .with(component::Bounding::new(20.0, 2))
                 .with(component::Hitpoints::new(100.))
                 .build();
+*/
         }
 
-        self.planner.dispatch(world_state);
+        //self.planner.dispatch(world_state);
+        self.world.maintain();
     }
 }
