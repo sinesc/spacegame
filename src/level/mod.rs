@@ -1,5 +1,6 @@
 use specs;
 use radiant_rs::*;
+use radiant_rs::math::*;
 use std::sync::Arc;
 use std::time::Instant;
 use std::f32::consts::PI;
@@ -166,7 +167,8 @@ impl Level {
         self.inf.font.write(&self.inf.base,
             &("Player1: Cursor: move, Ctrl-Right: fire, Shift-Right + Up/Down: rotate, Shift-Right + Left/Right: forward/backward\r\n".to_string() +
             "Player2: WASD: move, Ctrl-Left: fire, Shift-Left + WS: rotate, Shift-Left + AD: forward/backward"),
-            Vec2(10.0, 740.0)
+            Vec2(10.0, 740.0),
+            Color::white()
         );
 
         renderer.draw_layer(&self.inf.base, 0);

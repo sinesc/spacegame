@@ -4,6 +4,7 @@
 
 use specs;
 use radiant_rs::*;
+use radiant_rs::math::*;
 use level::component;
 use level::WorldState;
 

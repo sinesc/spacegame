@@ -2,6 +2,7 @@ use specs;
 use level::component;
 use level::WorldState;
 use radiant_rs::*;
+use radiant_rs::math::*;
 
 pub struct Control {
 }
@@ -109,7 +110,7 @@ impl<'a> specs::System<WorldState> for Control {
             lifetimes.insert(shot, component::Lifetime(state.age + 1.0));
             faders.insert(shot, component::Fading::new(state.age + 0.5, state.age + 1.0));
             boundings.insert(shot, component::Bounding::new(5.0, 1));
-            hitpoints.insert(shot, component::Hitpoints::new(5.0));
+            hitpoints.insert(shot, component::Hitpoints::new(10.0));
         };
 
         for (mut position, angle) in projectiles {

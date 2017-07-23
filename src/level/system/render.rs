@@ -3,6 +3,7 @@ use level::component;
 use level::WorldState;
 use radiant_rs::*;
 use radiant_rs::utils;
+use radiant_rs::math::*;
 use std::cmp;
 
 pub struct Render {
@@ -73,6 +74,6 @@ impl<'a> specs::System<WorldState> for Render {
             self.num_frames = 0;
         }
 
-        state.inf.font.write(&state.inf.base, &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, state.delta, num_sprites), Point2(10.0, 10.0));
+        state.inf.font.write(&state.inf.base, &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, state.delta, num_sprites), Point2(10.0, 10.0), Color::white());
 	}
 }

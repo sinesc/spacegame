@@ -2,6 +2,7 @@ use specs;
 use level::component;
 use level::WorldState;
 use radiant_rs::*;
+use radiant_rs::math::*;
 
 pub struct Collider {
 }

@@ -1,5 +1,6 @@
 use specs;
 use radiant_rs::*;
+use radiant_rs::math::*;
 
 #[derive(Clone, Debug)]
 pub struct Spatial {

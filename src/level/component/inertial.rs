@@ -1,5 +1,5 @@
 use specs;
-use radiant_rs::Vec2;
+use radiant_rs::math::Vec2;
 
 #[derive(Clone, Debug)]
 pub struct Inertial {
