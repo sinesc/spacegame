@@ -122,10 +122,10 @@ impl<'a, 'b> Level<'a, 'b> {
 
         let dispatcher = specs::DispatcherBuilder::new()
                 .add(system::Control::new(), "control", &[])
-                .add(system::Inertia::new(), "inertia", &[])
+                .add(system::Inertia::new(), "inertia", &[ "control" ])
                 .add(system::Collider::new(), "collider", &[])
-                .add(system::Render::new(), "render", &[])
-                .add(system::Cleanup::new(), "cleanup", &[])
+                .add(system::Render::new(), "render", &[ "control", "inertia", "collider" ])
+                .add(system::Cleanup::new(), "cleanup", &[ "render" ])
                 .build();
 
         // return level
@@ -197,7 +197,7 @@ impl<'a, 'b> Level<'a, 'b> {
             pos -= outbound;
 
             let v_max = (-angle).to_vec2() * 100.0;
-/*
+
             self.world.create_entity()
                 .with(component::Spatial::new(pos, angle, true))
                 .with(component::Visual::new(Some(self.inf.base.clone()), None, self.inf.asteroid.clone(), Color::white(), 30, 1.0))
@@ -205,7 +205,7 @@ impl<'a, 'b> Level<'a, 'b> {
                 .with(component::Bounding::new(20.0, 2))
                 .with(component::Hitpoints::new(100.))
                 .build();
-*/
+
         }
 
         //self.planner.dispatch(world_state);
