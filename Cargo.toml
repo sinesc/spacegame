@@ -4,11 +4,11 @@ version = "0.1.0"
 authors = ["Dennis Möhlmann <dmo479@gmail.com>"]
 
 [dependencies]
-shred = "*"
-shred-derive = "*"
-specs = "0.9"
-specs-derive = "0.1"
-radiant-rs = { git = "https://github.com/sinesc/radiant-rs" }
+shred = "0.5.1"
+shred-derive = "0.3.0"
+specs = "0.10.0"
+radiant-rs = "0.8"
+#radiant-rs = { git = "https://github.com/sinesc/radiant-rs" }
 
 [profile.dev]
 opt-level = 2
