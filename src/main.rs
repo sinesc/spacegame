@@ -19,7 +19,7 @@ fn main() {
     utils::renderloop(|frame| {
         display.poll_events();
 
-        display.clear_frame(Color::black());
+        display.clear_frame(Color::BLACK);
         level.process(&renderer, frame.delta_f32);
         display.swap_frame();
 

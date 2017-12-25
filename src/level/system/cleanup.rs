@@ -28,7 +28,7 @@ impl<'a> specs::System<'a> for Cleanup {
 
 		for (lifetime, entity) in (&data.lifetime, &*data.entities).join() {
             if lifetime.0 < data.world_state.age {
-                data.entities.delete(entity);
+                data.entities.delete(entity).unwrap();
             }
 		}
 

@@ -58,14 +58,14 @@ impl<'a> specs::System<'a> for Collider {
 
             if a <= 0. {
                 explosions.push((data.spatial.get(entity_a).unwrap().position, data.visual.get(entity_a).unwrap().effect_size));
-                data.entities.delete(entity_a);
+                data.entities.delete(entity_a).unwrap();
             } else {
                 data.hitpoints.get_mut(entity_a).unwrap().0 -= value;
             }
 
             if b <= 0. {
                 explosions.push((data.spatial.get(entity_b).unwrap().position, data.visual.get(entity_b).unwrap().effect_size));
-                data.entities.delete(entity_b);
+                data.entities.delete(entity_b).unwrap();
             } else {
                 data.hitpoints.get_mut(entity_b).unwrap().0 -= value;
             }
@@ -74,7 +74,7 @@ impl<'a> specs::System<'a> for Collider {
         let mut spawn = |origin: Vec2, effect_size: f32| {
             let explosion = data.entities.create();
             data.spatial.insert(explosion, component::Spatial::new(origin, Angle(0.0), false));
-            data.visual.insert(explosion, component::Visual::new(None, Some(data.world_state.inf.effects.clone()), data.world_state.inf.explosion.clone(), Color::white(), 30, effect_size));
+            data.visual.insert(explosion, component::Visual::new(None, Some(data.world_state.inf.effects.clone()), data.world_state.inf.explosion.clone(), Color::WHITE, 30, effect_size));
             data.lifetime.insert(explosion, component::Lifetime(data.world_state.age + 1.0));
             data.fading.insert(explosion, component::Fading::new(data.world_state.age + 0.5, data.world_state.age + 1.0));
         };

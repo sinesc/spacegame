@@ -54,7 +54,7 @@ impl<'a> specs::System<'a> for Control {
 
         let mut projectiles = Vec::new();
 
-		for (mut controlled, mut spatial, mut inertial, mut shooter) in (&mut data.controlled, &mut data.spatial, &mut data.inertial, &mut data.shooter).join() {
+		for (controlled, spatial, inertial, shooter) in (&mut data.controlled, &mut data.spatial, &mut data.inertial, &mut data.shooter).join() {
 
             let (v_fraction, shoot, alternate, strafe) = input(&data.world_state.inf.input, controlled.input_id);
 
@@ -108,7 +108,7 @@ impl<'a> specs::System<'a> for Control {
         let mut spawn = |origin: Vec2, angle: Angle| {
             let shot = data.entities.create();
             data.spatial.insert(shot, component::Spatial::new(origin, angle, false));
-            data.visual.insert(shot, component::Visual::new(Some(data.world_state.inf.effects.clone()), None, data.world_state.inf.sprite.clone(), Color::white(), 30, 0.2));
+            data.visual.insert(shot, component::Visual::new(Some(data.world_state.inf.effects.clone()), None, data.world_state.inf.sprite.clone(), Color::WHITE, 30, 0.2));
             data.inertial.insert(shot, component::Inertial::new(Vec2(1433.0, 1433.0), Vec2::from_angle(angle), 4.0, 1.0));
             data.lifetime.insert(shot, component::Lifetime(data.world_state.age + 1.0));
             data.fading.insert(shot, component::Fading::new(data.world_state.age + 0.5, data.world_state.age + 1.0));
