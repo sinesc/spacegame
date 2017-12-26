@@ -27,7 +27,10 @@ fn input(input: &Input, input_id: u32) -> (Vec2, bool, bool, f32) {
     if input.down(down) { v_fraction.1 += 1.0 }
     if input.down(left) { v_fraction.0 -= 1.0 }
     if input.down(right) { v_fraction.0 += 1.0 }
-    (v_fraction.normalize(), input.down(fire), alternate, if alternate { v_fraction.0 } else { 0.0 })
+    v_fraction = v_fraction.normalize();   
+    v_fraction.0 += input.mouse_delta().0 as f32 / 5.;
+    v_fraction.1 += input.mouse_delta().1 as f32 / 5.;
+    (v_fraction, input.down(fire) || input.down(Mouse1), alternate, if alternate { v_fraction.0 } else { 0.0 })
 }
 
 #[derive(SystemData)]

@@ -208,7 +208,6 @@ impl<'a, 'b> Level<'a, 'b> {
 
         }
 
-        //self.planner.dispatch(world_state);
         self.world.maintain();
     }
 }
