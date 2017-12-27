@@ -6,7 +6,6 @@ extern crate specs;
 use radiant_rs::*;
 
 mod level;
-mod post;
 use level::Level;
 
 fn main() {

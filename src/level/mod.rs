@@ -31,8 +31,9 @@ pub struct Level<'a, 'b> {
     inf         : Arc<Infrastructure>,
     roidspawn   : utils::Periodic,
     rng         : utils::Rng,
-    bloom       : Arc<super::post::Bloom>,
+    bloom       : postprocessors::Bloom,
     created     : Instant,
+    background  : Texture,
 }
 
 impl<'a, 'b> Level<'a, 'b> {
@@ -58,7 +59,7 @@ impl<'a, 'b> Level<'a, 'b> {
         let effects = Layer::new((1600., 900.)).arc();
         //let bloom = Layer::new((1600., 900.)).arc();
 
-        effects.set_blendmode(blendmodes::LIGHTEN);
+        effects.set_blendmode(blendmodes::ADD);
         //bloom.set_blendmode(blendmodes::LIGHTEN);
 
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
@@ -68,6 +69,7 @@ impl<'a, 'b> Level<'a, 'b> {
         let asteroid = Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc();
         let explosion = Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc();
         let laser = Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc();
+        let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
 
         // create test entity
 
@@ -76,7 +78,7 @@ impl<'a, 'b> Level<'a, 'b> {
             .with(component::Visual::new(Some(base.clone()), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 0, 1.0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(1))
-            .with(component::Shooter::new(0.05))
+            .with(component::Shooter::new(0.02))
             .with(component::Bounding::new(20.0, 1))
             .with(component::Hitpoints::new(100.))
             .build();
@@ -86,7 +88,7 @@ impl<'a, 'b> Level<'a, 'b> {
             .with(component::Visual::new(Some(base.clone()), None, friend.clone(), Color(1.0, 0.8, 0.8, 1.0), 0, 1.0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
             .with(component::Controlled::new(2))
-            .with(component::Shooter::new(0.05))
+            .with(component::Shooter::new(0.02))
             .with(component::Bounding::new(20.0, 1))
             .with(component::Hitpoints::new(100.))
             .build();
@@ -97,14 +99,14 @@ impl<'a, 'b> Level<'a, 'b> {
             .with(component::Bounding::new(20.0, 0))
             .with(component::Hitpoints::new(100.))
             .build();
-
+/*
         world.create_entity()
             .with(component::Spatial::new(Vec2(530.0, 450.0), Angle(0.0), true))
             .with(component::Visual::new(Some(effects.clone()), None, powerup.clone(), Color::WHITE, 30, 1.0))
             .with(component::Bounding::new(20.0, 0))
             .with(component::Hitpoints::new(100.))
             .build();
-
+*/
 
         let infrastructure = Arc::new(Infrastructure {
             input       : input.clone(),
@@ -138,13 +140,13 @@ impl<'a, 'b> Level<'a, 'b> {
             created     : created,
             roidspawn   : utils::Periodic::new(0.0, 0.2),
             rng         : utils::Rng::new(123.4),
-            bloom       : Arc::new(super::post::Bloom::new(&context)),
-            inf         : infrastructure
+            bloom       : postprocessors::Bloom::new(&context, 4, 2),
+            inf         : infrastructure,
+            background  : background,
         }
     }
 
     pub fn process(self: &mut Self, renderer: &Renderer, delta: f32) {
-        use std::ops::Deref;
 
         let age = Instant::now() - self.created;
         let age = age.as_secs() as f32 + (age.subsec_nanos() as f64 / 1000000000.0) as f32;
@@ -161,18 +163,14 @@ impl<'a, 'b> Level<'a, 'b> {
 
         self.dispatcher.dispatch(&mut self.world.res);
 
-        let bloom_args = super::post::BloomArgs {
-            iterations  : 4,
-            iter_blend  : blendmodes::COPY,
-            final_blend : blendmodes::LIGHTEN,
-            spread      : 5,
-            color       : Color::alpha_pm(0.25),
-        };
+        //renderer.clear(Color(0.0, 0.0, 0.0, 1.0));
+        renderer.fill().texture(&self.background).blendmode(blendmodes::COPY).draw();
 
-        renderer.clear(Color(0.0, 0.0, 0.0, 1.0));
+        self.bloom.draw_color = Color::alpha_pm(0.5);
+        self.bloom.clear = false;
 
-        renderer.postprocess(self.bloom.deref(), &bloom_args, || {
-            renderer.clear(Color(0.0, 0.0, 0.0, 1.0));
+        renderer.postprocess(&self.bloom, &(), || {
+            renderer.fill().color(Color::alpha_mask(0.5)).draw();
             renderer.draw_layer(&self.inf.effects, 0);
         });
 

@@ -7,7 +7,7 @@ authors = ["Dennis Möhlmann <dmo479@gmail.com>"]
 shred = "0.5.1"
 shred-derive = "0.3.0"
 specs = "0.10.0"
-radiant-rs = "0.9"
+radiant-rs = "0.9.1"
 
 [profile.dev]
 opt-level = 2
