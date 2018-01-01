@@ -14,15 +14,14 @@ impl Control {
     }
 }
 
-fn input(input: &Input, input_id: u32) -> (Vec2, bool, bool, f32) {
+fn input(input: &Input, input_id: u32) -> (Vec2, bool, bool) {
     use radiant_rs::InputId::*;
-    let (up, down, left, right, fire, alternate) = if input_id == 1 {
+    let (up, down, left, right, fire, strafe) = if input_id == 1 {
         (CursorUp, CursorDown, CursorLeft, CursorRight, RControl, RShift)
     } else {
         (W, S, A, D, LControl, LShift)
     };
     let mut v_fraction = Vec2(0.0, 0.0);
-    let alternate = input.down(alternate);
     if input.down(up) { v_fraction.1 -= 1.0 }
     if input.down(down) { v_fraction.1 += 1.0 }
     if input.down(left) { v_fraction.0 -= 1.0 }
@@ -30,7 +29,7 @@ fn input(input: &Input, input_id: u32) -> (Vec2, bool, bool, f32) {
     v_fraction = v_fraction.normalize();   
     v_fraction.0 += input.mouse_delta().0 as f32 / 5.;
     v_fraction.1 += input.mouse_delta().1 as f32 / 5.;
-    (v_fraction, input.down(fire) || input.down(Mouse1), alternate, if alternate { v_fraction.0 } else { 0.0 })
+    (v_fraction, input.down(fire) || input.down(Mouse1), input.down(strafe))
 }
 
 #[derive(SystemData)]
@@ -59,46 +58,36 @@ impl<'a> specs::System<'a> for Control {
 
 		for (controlled, spatial, inertial, shooter) in (&mut data.controlled, &mut data.spatial, &mut data.inertial, &mut data.shooter).join() {
 
-            let (v_fraction, shoot, alternate, strafe) = input(&data.world_state.inf.input, controlled.input_id);
+            let (v_fraction, shoot, strafe) = input(&data.world_state.inf.input, controlled.input_id);
 
-            // set v_fraction for Inertia
-            inertial.v_fraction = if alternate && strafe == 0.0 {
-                Vec2(0.0, 0.0)
-            } else if strafe != 0.0 {
-                utils::approach(&mut controlled.av_current, &0.0, controlled.av_trans * data.world_state.delta); // kill rotation
-                let new_vec = spatial.angle.to_vec2() * strafe; // approach new directional vector
-                utils::approach(&mut inertial.v_current, &new_vec, data.world_state.delta / 100.0);
-                new_vec
-            } else {
-                v_fraction
-            };
+            if strafe {
 
-            // compute target angle and align current angle with it (subtraction will then yield the smallest angle between both)
-            let new_angle = inertial.v_current.to_angle();
-            spatial.angle.align_with(&new_angle);
-            let old_angle = spatial.angle;
+                // lean into strafe direction
+                let current_lean = (inertial.v_current.to_angle() - spatial.angle).to_radians().sin() * v_fraction.len();
+                utils::approach(&mut spatial.lean, &current_lean, 10.0 * data.world_state.delta);
 
-            if alternate {
+            } else if !strafe {
 
-                // accelerating angular velocity (av)
-                utils::approach(&mut controlled.av_current, &(controlled.av_max * v_fraction.1), controlled.av_trans * data.world_state.delta);
+                let target_angle = inertial.v_current.to_angle();
+                spatial.angle.align_with(&target_angle);
+                let old_angle = spatial.angle;
 
-                // change angle based on player input (rotate ship)
-                spatial.angle += Angle(controlled.av_current * data.world_state.delta);
+                if v_fraction.len() > 0.0 { // !todo
 
-            } else if strafe == 0.0 && v_fraction.len() > 0.0 {
+                    // gradually approach the angle computed from flight direction
+                    utils::approach(&mut spatial.angle, &target_angle, 10.0 * data.world_state.delta);
 
-                // gradually approach the angle computed from flight direction
-                utils::approach(&mut spatial.angle, &new_angle, 10.0 * data.world_state.delta);
+                    // and reduce angular velocity of manual rotation to 0
+                    utils::approach(&mut controlled.av_current, &0.0, controlled.av_trans * data.world_state.delta);
+                }
 
-                // and reduce angular velocity of manual rotation to 0
-                utils::approach(&mut controlled.av_current, &0.0, controlled.av_trans * data.world_state.delta);
+                // lean into rotation direction
+
+                let current_lean = (spatial.angle - old_angle).to_radians() / data.world_state.delta / PI;
+                utils::approach(&mut spatial.lean, &current_lean, 10.0 * data.world_state.delta);
             }
 
-            // lean into rotation direction
-
-            let current_lean = (spatial.angle - old_angle).to_radians() / data.world_state.delta / PI;
-            utils::approach(&mut spatial.lean, &current_lean, 10.0 * data.world_state.delta);
+            inertial.v_fraction = v_fraction;
 
             // shoot ?
 

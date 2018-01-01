@@ -82,7 +82,7 @@ impl<'a, 'b> Level<'a, 'b> {
             .with(component::Bounding::new(20.0, 1))
             .with(component::Hitpoints::new(100.))
             .build();
-
+/*
         world.create_entity()
             .with(component::Spatial::new(Vec2(512.0, 384.0), Angle(0.0), true))
             .with(component::Visual::new(Some(base.clone()), None, friend.clone(), Color(1.0, 0.8, 0.8, 1.0), 0, 1.0))
@@ -99,7 +99,7 @@ impl<'a, 'b> Level<'a, 'b> {
             .with(component::Bounding::new(20.0, 0))
             .with(component::Hitpoints::new(100.))
             .build();
-/*
+
         world.create_entity()
             .with(component::Spatial::new(Vec2(530.0, 450.0), Angle(0.0), true))
             .with(component::Visual::new(Some(effects.clone()), None, powerup.clone(), Color::WHITE, 30, 1.0))
@@ -138,7 +138,7 @@ impl<'a, 'b> Level<'a, 'b> {
             world       : world,
             dispatcher  : dispatcher,
             created     : created,
-            roidspawn   : utils::Periodic::new(0.0, 0.2),
+            roidspawn   : utils::Periodic::new(0.0, 0.1),
             rng         : utils::Rng::new(123.4),
             bloom       : postprocessors::Bloom::new(&context, 4, 2),
             inf         : infrastructure,
@@ -166,17 +166,16 @@ impl<'a, 'b> Level<'a, 'b> {
         //renderer.clear(Color(0.0, 0.0, 0.0, 1.0));
         renderer.fill().texture(&self.background).blendmode(blendmodes::COPY).draw();
 
-        self.bloom.draw_color = Color::alpha_pm(0.5);
+        self.bloom.draw_color = Color::alpha_pm(0.15);
         self.bloom.clear = false;
 
         renderer.postprocess(&self.bloom, &(), || {
-            renderer.fill().color(Color::alpha_mask(0.5)).draw();
+            renderer.fill().color(Color::alpha_mask(0.3)).draw();
             renderer.draw_layer(&self.inf.effects, 0);
         });
 
         self.inf.font.write(&self.inf.base,
-            &("Player1: Cursor: move, Ctrl-Right: fire, Shift-Right + Up/Down: rotate, Shift-Right + Left/Right: forward/backward\r\n".to_string() +
-            "Player2: WASD: move, Ctrl-Left: fire, Shift-Left + WS: rotate, Shift-Left + AD: forward/backward"),
+            &("Mouse: move, Shift+Mouse: strafe, Button1: shoot"),
             Vec2(10.0, 740.0),
             Color::WHITE
         );
@@ -200,7 +199,7 @@ impl<'a, 'b> Level<'a, 'b> {
                 .with(component::Spatial::new(pos, angle, true))
                 .with(component::Visual::new(Some(self.inf.base.clone()), None, self.inf.asteroid.clone(), Color::WHITE, 30, 1.0))
                 .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 4.0, 1.5))
-                .with(component::Bounding::new(20.0, 2))
+                .with(component::Bounding::new(20.0, self.rng.range(2., 102.) as u32))
                 .with(component::Hitpoints::new(100.))
                 .build();
 
