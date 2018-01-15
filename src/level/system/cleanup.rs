@@ -16,6 +16,7 @@ impl<'a> Cleanup {
 pub struct CleanupData<'a> {
     world_state: specs::Fetch<'a, WorldState>,
     lifetime: specs::ReadStorage<'a, component::Lifetime>,
+    hitpoints: specs::ReadStorage<'a, component::Hitpoints>,
     entities: specs::Entities<'a>,
 }
 
@@ -32,5 +33,10 @@ impl<'a> specs::System<'a> for Cleanup {
             }
 		}
 
+		for (hitpoints, entity) in (&data.hitpoints, &*data.entities).join() {
+            if hitpoints.0 <= 0. {
+                data.entities.delete(entity).unwrap();
+            }
+		}
 	}
 }

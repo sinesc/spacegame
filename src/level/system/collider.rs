@@ -54,21 +54,17 @@ impl<'a> specs::System<'a> for Collider {
 
             let a = data.hitpoints.get(entity_a).unwrap().0;
             let b = data.hitpoints.get(entity_b).unwrap().0;
-            let value = utils::min(a, b);
 
-            if a <= 0. {
+            if a <= b {
                 explosions.push((data.spatial.get(entity_a).unwrap().position, data.visual.get(entity_a).unwrap().effect_size));
-                data.entities.delete(entity_a).unwrap();
-            } else {
-                data.hitpoints.get_mut(entity_a).unwrap().0 -= value;
             }
 
-            if b <= 0. {
+            if b <= a {
                 explosions.push((data.spatial.get(entity_b).unwrap().position, data.visual.get(entity_b).unwrap().effect_size));
-                data.entities.delete(entity_b).unwrap();
-            } else {
-                data.hitpoints.get_mut(entity_b).unwrap().0 -= value;
             }
+
+            data.hitpoints.get_mut(entity_a).unwrap().0 -= b;
+            data.hitpoints.get_mut(entity_b).unwrap().0 -= a;
         }
 
         let mut spawn = |origin: Vec2, effect_size: f32| {
