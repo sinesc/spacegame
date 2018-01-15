@@ -3,6 +3,7 @@ use level::component;
 use level::WorldState;
 use radiant_rs::*;
 use radiant_rs::math::*;
+use radiant_rs::utils::*;
 
 pub struct Control {
 }
@@ -71,20 +72,18 @@ impl<'a> specs::System<'a> for Control {
                 let target_angle = inertial.v_current.to_angle();
                 spatial.angle.align_with(&target_angle);
                 let old_angle = spatial.angle;
+                let factor = 10.0 * min(1.0, inertial.v_current.len());
 
-                if v_fraction.len() > 0.0 { // !todo
+                // gradually approach the angle computed from flight direction
+                utils::approach(&mut spatial.angle, &target_angle, factor * data.world_state.delta);
 
-                    // gradually approach the angle computed from flight direction
-                    utils::approach(&mut spatial.angle, &target_angle, 10.0 * data.world_state.delta);
-
-                    // and reduce angular velocity of manual rotation to 0
-                    utils::approach(&mut controlled.av_current, &0.0, controlled.av_trans * data.world_state.delta);
-                }
+                // and reduce angular velocity of manual rotation to 0
+                utils::approach(&mut controlled.av_current, &0.0, controlled.av_trans * data.world_state.delta);
 
                 // lean into rotation direction
 
                 let current_lean = (spatial.angle - old_angle).to_radians() / data.world_state.delta / PI;
-                utils::approach(&mut spatial.lean, &current_lean, 10.0 * data.world_state.delta);
+                utils::approach(&mut spatial.lean, &current_lean, factor * data.world_state.delta);
             }
 
             inertial.v_fraction = v_fraction;
@@ -92,7 +91,7 @@ impl<'a> specs::System<'a> for Control {
             // shoot ?
 
             if shoot && shooter.interval.elapsed(data.world_state.age) {
-                inertial.v_fraction -= spatial.angle.to_vec2() * 0.001 / data.world_state.delta;
+                //inertial.v_fraction -= spatial.angle.to_vec2() * 0.001 / data.world_state.delta;
                 projectiles.push((spatial.position, spatial.angle));
             }
 		}
