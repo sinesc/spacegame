@@ -15,6 +15,8 @@ fn main() {
     let input = Input::new(&display);
     let mut level = Level::new(&input, &renderer.context());
 
+    display.grab_cursor();
+
     utils::renderloop(|frame| {
         display.poll_events();
 
