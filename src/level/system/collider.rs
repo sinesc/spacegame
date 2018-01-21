@@ -5,6 +5,12 @@ use radiant_rs::*;
 use radiant_rs::math::*;
 use radiant_rs::utils::*;
 
+/**
+ * Collider system
+ * 
+ * This system detects colliding entities with a Bounding component and applies damage.
+ * todo: move effect of this collision somewhere else. find out how.
+ */
 pub struct Collider {
 }
 
@@ -28,7 +34,7 @@ impl<'a> Collider {
 
     fn spawn<'b>(data: &mut ColliderData<'b>, origin: Vec2, effect_size: f32) {
         let explosion = data.entities.create();
-        data.spatial.insert(explosion, component::Spatial::new(origin, Angle(0.0), false));
+        data.spatial.insert(explosion, component::Spatial::new(origin, Angle(0.0)));
         data.visual.insert(explosion, component::Visual::new(None, Some(data.world_state.inf.effects.clone()), data.world_state.inf.explosion.clone(), Color::WHITE, 1.0, 30, effect_size));
         data.lifetime.insert(explosion, component::Lifetime(data.world_state.age + 1.0));
         data.fading.insert(explosion, component::Fading::new(data.world_state.age + 0.5, data.world_state.age + 1.0));

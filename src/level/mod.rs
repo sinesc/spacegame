@@ -74,9 +74,9 @@ impl<'a, 'b> Level<'a, 'b> {
         // create test entity
 
         world.create_entity()
-            .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0), true))
+            .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0)))
             .with(component::Visual::new(Some(base.clone()), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 1.0, 0, 1.0))
-            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
+            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5, true))
             .with(component::Controlled::new(1))
             .with(component::Shooter::new(0.02))
             .with(component::Bounding::new(20.0, 1))
@@ -193,9 +193,9 @@ impl<'a, 'b> Level<'a, 'b> {
             let v_max = (-angle).to_vec2() * 100.0;
 
             self.world.create_entity()
-                .with(component::Spatial::new(pos, angle, true))
+                .with(component::Spatial::new(pos, angle))
                 .with(component::Visual::new(Some(self.inf.base.clone()), None, self.inf.asteroid.clone(), Color::WHITE, scale, 30, 1.0))
-                .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 4.0, 1.5))
+                .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 4.0, 1.5, true))
                 .with(component::Bounding::new(20.0 * scale, self.rng.range(2., 102.) as u32))
                 .with(component::Hitpoints::new(100. * scale))
                 .build();

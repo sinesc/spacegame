@@ -1,6 +1,11 @@
 use specs;
 use radiant_rs::math::*;
 
+/**
+ * Spatial component
+ * 
+ * Entities with this component have a position and orientation in space.
+ */
 #[derive(Clone, Debug)]
 pub struct Spatial {
     /// Current position
@@ -8,18 +13,15 @@ pub struct Spatial {
     /// Current angle
     pub angle: Angle,
     /// Current lean left/right value
-    pub lean: f32,
-    /// True if the angle should not be updated from inertial.v_current
-    pub angle_locked: bool,
+    pub lean: f32, // todo: this isn't ideal here either
 }
 
 impl Spatial {
-    pub fn new(position: Vec2, angle: Angle, angle_locked: bool) -> Self {
+    pub fn new(position: Vec2, angle: Angle) -> Self {
         Spatial {
             position    : position,
             angle       : angle,
             lean        : 0.0,
-            angle_locked: angle_locked,
         }
     }
 }

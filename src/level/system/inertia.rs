@@ -9,9 +9,12 @@ use radiant_rs::*;
 use radiant_rs::math::*;
 use level::component;
 use level::WorldState;
-//use specs::{Component, DispatcherBuilder, Join, ReadStorage, System, VecStorage,
-            //World, WriteStorage};
 
+/**
+ * Inertia system
+ * 
+ * Applies force to entities with an Inertial and Spatial component.
+ */
 pub struct Inertia;
 
 impl Inertia {
@@ -48,6 +51,7 @@ impl<'a> specs::System<'a> for Inertia {
             inertial.v_current = inertial.v_current * (Vec2(1.0, 1.0) - delta * trans_current) + (v_target * (delta * trans_current));
             spatial.position += inertial.v_current * delta;
 
+            // todo: edge reflection just for fun right now
             if let Some(outbound) = spatial.position.outbound(Rect::new(0.0, 0.0, 1600.0, 900.0)) {
 
                 let edge_normal = -outbound.normalize();
@@ -57,7 +61,7 @@ impl<'a> specs::System<'a> for Inertia {
                 inertial.v_current = reflection;
                 inertial.v_fraction = reflection.normalize() * inertial.v_fraction.len();
 
-                if !spatial.angle_locked {
+                if !inertial.angle_locked {
                     spatial.angle = inertial.v_fraction.to_angle();
                 }
             }
