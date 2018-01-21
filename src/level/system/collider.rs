@@ -3,6 +3,7 @@ use level::component;
 use level::WorldState;
 use radiant_rs::*;
 use radiant_rs::math::*;
+use radiant_rs::utils::*;
 
 pub struct Collider {
 }
@@ -73,8 +74,8 @@ impl<'a> specs::System<'a> for Collider {
                 Self::spawn(&mut data, position, effect_size);
             }
 
-            data.hitpoints.get_mut(entity_a).unwrap().0 -= b;
-            data.hitpoints.get_mut(entity_b).unwrap().0 -= a;
+            data.hitpoints.get_mut(entity_a).unwrap().0 -= min(a, b);
+            data.hitpoints.get_mut(entity_b).unwrap().0 -= min(a, b);
         }
 	}
 }
