@@ -2,6 +2,11 @@ use specs;
 use std::sync::Arc;
 use radiant_rs::*;
 
+/**
+ * Visual component
+ * 
+ * Entities with this component are rendered.
+ */
 #[derive(Clone)]
 pub struct Visual {
     pub layer           : Option<Arc<Layer>>,

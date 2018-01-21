@@ -1,5 +1,10 @@
 use specs;
 
+/**
+ * Explosion component
+ * 
+ * Entities with this component explode on destruction.
+ */
 #[derive(Clone, Debug)]
 pub struct Explosion {
     pub start_time: f32,     // !todo not yes used. overlay multiple explosions for given duration

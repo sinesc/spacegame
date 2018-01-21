@@ -1,5 +1,10 @@
 use specs;
 
+/**
+ * Fading component
+ * 
+ * Entities with this component fade after a certain amount of time.
+ */
 #[derive(Clone, Debug)]
 pub struct Fading {
     //pub value: f32,

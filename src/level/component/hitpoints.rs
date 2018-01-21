@@ -1,5 +1,10 @@
 use specs;
 
+/**
+ * Hitpoints component
+ * 
+ * Entities with this component can die from damage.
+ */
 #[derive(Clone, Debug)]
 pub struct Hitpoints(pub f32);
 

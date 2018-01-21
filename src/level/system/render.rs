@@ -6,6 +6,11 @@ use radiant_rs::utils;
 use radiant_rs::math::*;
 use std::cmp;
 
+/**
+ * Render system
+ * 
+ * Draws entities with a Visual and Spatial component.
+ */
 pub struct Render {
     fps_interval: utils::Periodic,
     num_frames: u32,

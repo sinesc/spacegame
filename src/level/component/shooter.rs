@@ -1,6 +1,11 @@
 use specs;
 use radiant_rs::utils::Periodic;
 
+/**
+ * Shooter component
+ * 
+ * todo: This is a stupid component. I need to find a better solution.
+ */
 #[derive(Clone, Debug)]
 pub struct Shooter {
     pub interval: Periodic,

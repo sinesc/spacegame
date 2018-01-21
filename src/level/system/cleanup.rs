@@ -2,6 +2,11 @@ use specs;
 use level::component;
 use level::WorldState;
 
+/**
+ * Cleanup system
+ * 
+ * This system removes dead/expired entities
+ */
 pub struct Cleanup {
 }
 

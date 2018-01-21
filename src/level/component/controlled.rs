@@ -1,5 +1,10 @@
 use specs;
 
+/**
+ * Controlled component
+ * 
+ * Entities with this component are controlled by a player.
+ */
 #[derive(Clone, Debug)]
 pub struct Controlled {
     /// Input mapping id.
