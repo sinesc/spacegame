@@ -3,9 +3,16 @@ extern crate shred;
 #[macro_use]
 extern crate shred_derive;
 extern crate specs;
-use radiant_rs::*;
+extern crate serde;
+extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 
+mod prelude;
+pub mod def;
 mod level;
+
+use prelude::*;
 use level::Level;
 
 fn main() {

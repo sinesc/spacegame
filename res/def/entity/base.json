@@ -1,0 +1,23 @@
+{
+    "hostile": {
+        "spatial": {
+            "position": [ 0.0, 0.0 ],
+            "angle": 0.0
+        },
+        "bounding": {
+            "radius": 1.0,
+            "faction": "hostile"
+        },
+        "visual": {
+            "layer": "base",
+            "effect_layer": "effect",
+            "effect_size": 1.0,
+            "sprite": "hostile/mine_green_64x64x15.png",
+            "scale": 1.0,
+            "color": [ 1.0, 1.0, 1.0, 1.0 ],
+            "frame_id": 1,
+            "fps": 30
+        },
+        "hitpoints": 100
+    }
+}

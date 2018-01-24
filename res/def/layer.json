@@ -1,0 +1,24 @@
+{
+    "create": [ 
+        {   
+            "name": "base",
+            "scale": 1.0
+        },
+        {
+            "name": "effect",
+            "scale": 1.0
+        }
+    ],
+    "render": [
+        {
+            "name": "base"
+        },
+        {
+            "name": "effect",
+            "filter": "blur"
+        },
+        {
+            "name": "effect"
+        }
+    ]
+}

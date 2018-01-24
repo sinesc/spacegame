@@ -47,7 +47,7 @@ impl<'a> specs::System<'a> for Collider {
     fn run(&mut self, mut data: ColliderData) {
 		use specs::Join;
 
-        // dirty test all against all other entities
+        // test all against all other entities todo: use a grid or quadtree to reduce checks
 
         let mut collisions = Vec::new();
 

@@ -1,15 +1,12 @@
+use prelude::*;
 use specs;
-use radiant_rs::*;
-use radiant_rs::math::*;
-use std::sync::Arc;
-use std::time::Instant;
-use std::f32::consts::PI;
 
 mod component;
 mod system;
 
 pub struct Infrastructure {
     input       : Input,
+    layer       : HashMap<String, Arc<Layer>>,
     effects     : Arc<Layer>,
     base        : Arc<Layer>,
     font        : Arc<Font>,
@@ -108,8 +105,16 @@ impl<'a, 'b> Level<'a, 'b> {
             .build();
 */
 
+        let json = def::parse_layers("res/def/layer.json").unwrap();
+        let mut layer = HashMap::new();
+
+        for info in json.create {
+            layer.insert(info.name, Layer::new((info.scale * 1600., info.scale * 900.)).arc());
+        }
+
         let infrastructure = Arc::new(Infrastructure {
             input       : input.clone(),
+            layer       : HashMap::new(),
             base        : base,
             effects     : effects,
             sprite      : laser,

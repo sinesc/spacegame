@@ -1,0 +1,6 @@
+{
+    "mine-green": {
+        "extends": "hostile",
+        "sprite": "hostile/mine_green_64x64x15.png"        
+    }
+}

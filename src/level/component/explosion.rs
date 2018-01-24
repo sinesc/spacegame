@@ -7,7 +7,7 @@ use specs;
  */
 #[derive(Clone, Debug)]
 pub struct Explosion {
-    pub start_time: f32,     // !todo not yes used. overlay multiple explosions for given duration
+    pub start_time: f32,     // todo: not yes used. overlay multiple explosions for given duration
     pub duration: f32,
 }
 
