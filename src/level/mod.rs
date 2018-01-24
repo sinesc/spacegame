@@ -7,8 +7,6 @@ mod system;
 pub struct Infrastructure {
     input       : Input,
     layer       : HashMap<String, Arc<Layer>>,
-    effects     : Arc<Layer>,
-    base        : Arc<Layer>,
     font        : Arc<Font>,
     sprite      : Arc<Sprite>,
     asteroid    : Arc<Sprite>,
@@ -52,13 +50,6 @@ impl<'a, 'b> Level<'a, 'b> {
 
         // create a scene and a layer
 
-        let base = Layer::new((1600., 900.)).arc();
-        let effects = Layer::new((1600., 900.)).arc();
-        //let bloom = Layer::new((1600., 900.)).arc();
-
-        effects.set_blendmode(blendmodes::ADD);
-        //bloom.set_blendmode(blendmodes::LIGHTEN);
-
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let hostile = Sprite::from_file(context, "res/sprite/hostile/mine_red_64x64x15.png").unwrap().arc();
         let friend = Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc();
@@ -68,11 +59,29 @@ impl<'a, 'b> Level<'a, 'b> {
         let laser = Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc();
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
 
+        // create layers
+
+        let json = def::parse_layers("res/def/layer.json").unwrap();
+        let mut layers = HashMap::new();
+
+        for info in json.create {
+            let mut layer = Layer::new((info.scale * 1600., info.scale * 900.)).arc();
+            // todo: meh, have serde map the json string to the blendmode somehow (enum?)
+            if let Some(blendmode) = info.blendmode {
+                if blendmode == "add" {
+                    layer.set_blendmode(blendmodes::ADD);
+                } else if blendmode == "lighten" {
+                    layer.set_blendmode(blendmodes::LIGHTEN);
+                }
+            }
+            layers.insert(info.name, layer);
+        }
+
         // create test entity
 
         world.create_entity()
             .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0)))
-            .with(component::Visual::new(Some(base.clone()), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 1.0, 0, 1.0))
+            .with(component::Visual::new(Some(layers["base"].clone()), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 1.0, 0, 1.0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5, true))
             .with(component::Controlled::new(1))
             .with(component::Shooter::new(0.02))
@@ -105,18 +114,9 @@ impl<'a, 'b> Level<'a, 'b> {
             .build();
 */
 
-        let json = def::parse_layers("res/def/layer.json").unwrap();
-        let mut layer = HashMap::new();
-
-        for info in json.create {
-            layer.insert(info.name, Layer::new((info.scale * 1600., info.scale * 900.)).arc());
-        }
-
         let infrastructure = Arc::new(Infrastructure {
             input       : input.clone(),
-            layer       : HashMap::new(),
-            base        : base,
-            effects     : effects,
+            layer       : layers,
             sprite      : laser,
             asteroid    : asteroid,
             font        : font,
@@ -172,20 +172,20 @@ impl<'a, 'b> Level<'a, 'b> {
 
         renderer.postprocess(&self.bloom, &(), || {
             renderer.fill().color(Color::alpha_mask(0.3)).draw();
-            renderer.draw_layer(&self.inf.effects, 0);
+            renderer.draw_layer(&self.inf.layer["effects"], 0);
         });
 
-        self.inf.font.write(&self.inf.base,
+        self.inf.font.write(&self.inf.layer["base"],
             &("Mouse: move, Shift+Mouse: strafe, Button1: shoot"),
             Vec2(10.0, 740.0),
             Color::WHITE
         );
 
-        renderer.draw_layer(&self.inf.base, 0);
-        renderer.draw_layer(&self.inf.effects, 0);
+        renderer.draw_layer(&self.inf.layer["base"], 0);
+        renderer.draw_layer(&self.inf.layer["effects"], 0);
 
-        self.inf.base.clear();
-        self.inf.effects.clear();
+        self.inf.layer["base"].clear();
+        self.inf.layer["effects"].clear();
 
         if self.roidspawn.elapsed(age) {
             let angle = Angle(self.rng.range(-PI, PI));
@@ -199,7 +199,7 @@ impl<'a, 'b> Level<'a, 'b> {
 
             self.world.create_entity()
                 .with(component::Spatial::new(pos, angle))
-                .with(component::Visual::new(Some(self.inf.base.clone()), None, self.inf.asteroid.clone(), Color::WHITE, scale, 30, 1.0))
+                .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.asteroid.clone(), Color::WHITE, scale, 30, 1.0))
                 .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 4.0, 1.5, true))
                 .with(component::Bounding::new(20.0 * scale, self.rng.range(2., 102.) as u32))
                 .with(component::Hitpoints::new(100. * scale))

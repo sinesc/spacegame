@@ -13,6 +13,7 @@ pub struct LayerCreate {
     pub name: String,
     #[serde(default = "default_scale")]
     pub scale: f32,
+    pub blendmode: Option<String>,
 }
 
 fn default_scale() -> f32 {

@@ -5,8 +5,9 @@
             "scale": 1.0
         },
         {
-            "name": "effect",
-            "scale": 1.0
+            "name": "effects",
+            "scale": 1.0,
+            "blendmode": "add"
         }
     ],
     "render": [
@@ -14,11 +15,11 @@
             "name": "base"
         },
         {
-            "name": "effect",
+            "name": "effects",
             "filter": "blur"
         },
         {
-            "name": "effect"
+            "name": "effects"
         }
     ]
 }

@@ -84,6 +84,6 @@ impl<'a> specs::System<'a> for Render {
             self.num_frames = 0;
         }
 
-        data.world_state.inf.font.write(&data.world_state.inf.base, &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, data.world_state.delta, num_sprites), Point2(10.0, 10.0), Color::WHITE);
+        data.world_state.inf.font.write(&data.world_state.inf.layer["base"], &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, data.world_state.delta, num_sprites), Point2(10.0, 10.0), Color::WHITE);
 	}
 }
