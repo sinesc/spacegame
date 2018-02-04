@@ -4,7 +4,7 @@ extern crate shred;
 extern crate shred_derive;
 extern crate specs;
 extern crate serde;
-extern crate serde_json;
+extern crate serde_yaml;
 #[macro_use]
 extern crate serde_derive;
 
@@ -17,12 +17,13 @@ use level::Level;
 
 fn main() {
 
-    let display = Display::builder().dimensions((1600, 900)).vsync().transparent().build();
+    let display = Display::builder().dimensions((1920, 1080)).vsync().transparent().build();
     let renderer =  Renderer::new(&display).unwrap();
     let input = Input::new(&display);
     let mut level = Level::new(&input, &renderer.context());
 
     display.grab_cursor();
+    display.set_fullscreen().unwrap();
 
     utils::renderloop(|frame| {
         display.poll_events();

@@ -7,9 +7,9 @@ authors = ["Dennis Möhlmann <dmo479@gmail.com>"]
 shred = "0.5.1"
 shred-derive = "0.3.0"
 specs = "0.10.0"
-radiant-rs = "0.9.1"
+radiant-rs = "0.10.0"
 serde = "1.0"
-serde_json = "1.0"
+serde_yaml = "0.7.3"
 serde_derive = "1.0"
 
 [profile.dev]

@@ -52,7 +52,7 @@ impl<'a> specs::System<'a> for Inertia {
             spatial.position += inertial.v_current * delta;
 
             // todo: edge reflection just for fun right now
-            if let Some(outbound) = spatial.position.outbound(Rect::new(0.0, 0.0, 1600.0, 900.0)) {
+            if let Some(outbound) = spatial.position.outbound(Rect::new(0.0, 0.0, 1920.0, 1080.0)) {
 
                 let edge_normal = -outbound.normalize();
                 let reflection = inertial.v_current - 2.0 * (inertial.v_current.dot(&edge_normal)) * edge_normal;

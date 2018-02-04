@@ -23,11 +23,14 @@ pub struct WorldState {
 pub struct Level<'a, 'b> {
     world       : specs::World,
     dispatcher  : specs::Dispatcher<'a, 'b>,
+    layer_def   : def::LayerDef,
+    created     : Instant,
+
+
     inf         : Arc<Infrastructure>,
     roidspawn   : utils::Periodic,
     rng         : utils::Rng,
     bloom       : postprocessors::Bloom,
-    created     : Instant,
     background  : Texture,
 }
 
@@ -51,9 +54,9 @@ impl<'a, 'b> Level<'a, 'b> {
         // create a scene and a layer
 
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
-        let hostile = Sprite::from_file(context, "res/sprite/hostile/mine_red_64x64x15.png").unwrap().arc();
+        //let hostile = Sprite::from_file(context, "res/sprite/hostile/mine_red_64x64x15.png").unwrap().arc();
         let friend = Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc();
-        let powerup = Sprite::from_file(context, "res/sprite/powerup/ball_v_32x32x18.jpg").unwrap().arc();
+        //let powerup = Sprite::from_file(context, "res/sprite/powerup/ball_v_32x32x18.jpg").unwrap().arc();
         let asteroid = Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc();
         let explosion = Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc();
         let laser = Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc();
@@ -61,20 +64,20 @@ impl<'a, 'b> Level<'a, 'b> {
 
         // create layers
 
-        let json = def::parse_layers("res/def/layer.json").unwrap();
+        let layer_def = def::parse_layers("res/def/layer.yaml").unwrap();
         let mut layers = HashMap::new();
 
-        for info in json.create {
-            let mut layer = Layer::new((info.scale * 1600., info.scale * 900.)).arc();
+        for info in &layer_def.create {
+            let mut layer = Layer::new((info.scale * 1920., info.scale * 1080.)).arc();
             // todo: meh, have serde map the json string to the blendmode somehow (enum?)
-            if let Some(blendmode) = info.blendmode {
+            if let Some(ref blendmode) = info.blendmode {
                 if blendmode == "add" {
                     layer.set_blendmode(blendmodes::ADD);
                 } else if blendmode == "lighten" {
                     layer.set_blendmode(blendmodes::LIGHTEN);
                 }
             }
-            layers.insert(info.name, layer);
+            layers.insert(info.name.clone(), layer);
         }
 
         // create test entity
@@ -142,6 +145,7 @@ impl<'a, 'b> Level<'a, 'b> {
         Level {
             world       : world,
             dispatcher  : dispatcher,
+            layer_def   : layer_def,
             created     : created,
             roidspawn   : utils::Periodic::new(0.0, 0.1),
             rng         : utils::Rng::new(123.4),
@@ -167,30 +171,36 @@ impl<'a, 'b> Level<'a, 'b> {
         //renderer.clear(Color(0.0, 0.0, 0.0, 1.0));
         renderer.fill().texture(&self.background).blendmode(blendmodes::COPY).draw();
 
-        self.bloom.draw_color = Color::alpha_pm(0.15);
-        self.bloom.clear = false;
-
-        renderer.postprocess(&self.bloom, &(), || {
-            renderer.fill().color(Color::alpha_mask(0.3)).draw();
-            renderer.draw_layer(&self.inf.layer["effects"], 0);
-        });
-
         self.inf.font.write(&self.inf.layer["base"],
             &("Mouse: move, Shift+Mouse: strafe, Button1: shoot"),
             Vec2(10.0, 740.0),
             Color::WHITE
         );
 
-        renderer.draw_layer(&self.inf.layer["base"], 0);
-        renderer.draw_layer(&self.inf.layer["effects"], 0);
+        self.bloom.draw_color = Color::alpha_pm(0.15);
+        self.bloom.clear = false;
 
-        self.inf.layer["base"].clear();
-        self.inf.layer["effects"].clear();
+        for info in &self.layer_def.render {
+            if let Some(ref filter) = info.filter {
+                if filter == "bloom" {
+                    renderer.postprocess(&self.bloom, &(), || {
+                        renderer.fill().color(Color::alpha_mask(0.3)).draw();
+                        renderer.draw_layer(&self.inf.layer[&info.name], 0);
+                    });
+                }
+            } else {
+                renderer.draw_layer(&self.inf.layer[&info.name], 0);
+            }
+        }
+
+        for info in &self.layer_def.create {
+            self.inf.layer[&info.name].clear();
+        }
 
         if self.roidspawn.elapsed(age) {
             let angle = Angle(self.rng.range(-PI, PI));
             let mut pos = Vec2(800.0, 450.0) + angle.to_vec2() * 2000.0;
-            let outbound = pos.outbound(Rect::new(0.0, 0.0, 1600.0, 900.0)).unwrap();
+            let outbound = pos.outbound(Rect::new(0.0, 0.0, 1920.0, 1080.0)).unwrap();
             let scale = self.rng.range(0.3, 1.3);
 
             pos -= outbound;

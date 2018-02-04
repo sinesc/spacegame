@@ -1,0 +1,16 @@
+create:
+    -
+        name: base
+        scale: 1.0
+    -
+        name: effects
+        scale: 1.0
+        blendmode: add
+render: 
+    -
+        name: effects
+        filter: bloom
+    -
+        name: base
+    -
+        name: effects

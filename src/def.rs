@@ -1,9 +1,9 @@
 use prelude::*;
 use serde;
-use serde_json;
+use serde_yaml;
 
 #[derive(Deserialize, Debug)]
-pub struct Layers {
+pub struct LayerDef {
     pub create: Vec<LayerCreate>,
     pub render: Vec<LayerRender>,
 }
@@ -26,7 +26,7 @@ pub struct LayerRender {
     pub filter: Option<String>,
 }
 
-pub fn parse_layers(filename: &str) -> Result<Layers, Box<Error>> {
+pub fn parse_layers(filename: &str) -> Result<LayerDef, Box<Error>> {
     parse(filename)
 }
 
@@ -36,7 +36,7 @@ fn parse<T>(filename: &str) -> Result<T, Box<Error>> where T: serde::de::Deseria
     let mut contents = String::new();
     f.read_to_string(&mut contents)?;
 
-    match serde_json::from_str(&contents) {
+    match serde_yaml::from_str(&contents) {
         Ok(value)  => Ok(value),
         Err(msg)     => Err(Box::<Error + Sync + Send>::from(msg))
     }
