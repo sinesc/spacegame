@@ -1,5 +1,5 @@
+use prelude::*;
 use specs;
-use radiant_rs::math::Vec2;
 
 /**
  * Inertial component

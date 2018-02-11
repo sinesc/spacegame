@@ -1,7 +1,7 @@
 use prelude::*;
 use specs;
 
-mod component;
+pub mod component;
 mod system;
 
 pub struct Infrastructure {
@@ -28,8 +28,8 @@ pub struct Level<'a, 'b> {
 
 
     inf         : Arc<Infrastructure>,
-    roidspawn   : utils::Periodic,
-    rng         : utils::Rng,
+    roidspawn   : Periodic,
+    rng         : Rng,
     bloom       : postprocessors::Bloom,
     background  : Texture,
 }
@@ -59,12 +59,17 @@ impl<'a, 'b> Level<'a, 'b> {
         //let powerup = Sprite::from_file(context, "res/sprite/powerup/ball_v_32x32x18.jpg").unwrap().arc();
         let asteroid = Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc();
         let explosion = Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc();
+        // res/sprite/explosion/lightmapped_256x256x40x2.jpg
+        // res/sprite/explosion/default_256x256x40.jpg
+
         let laser = Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc();
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
 
+        let tmp = def::parse_entities().unwrap();
+println!("{:?}", tmp);
         // create layers
 
-        let layer_def = def::parse_layers("res/def/layer.yaml").unwrap();
+        let layer_def = def::parse_layers().unwrap();
         let mut layers = HashMap::new();
 
         for info in &layer_def.create {
@@ -147,8 +152,8 @@ impl<'a, 'b> Level<'a, 'b> {
             dispatcher  : dispatcher,
             layer_def   : layer_def,
             created     : created,
-            roidspawn   : utils::Periodic::new(0.0, 0.1),
-            rng         : utils::Rng::new(123.4),
+            roidspawn   : Periodic::new(0.0, 0.1),
+            rng         : Rng::new(123.4),
             bloom       : postprocessors::Bloom::new(&context, 4, 2),
             inf         : infrastructure,
             background  : background,
@@ -173,7 +178,7 @@ impl<'a, 'b> Level<'a, 'b> {
 
         self.inf.font.write(&self.inf.layer["base"],
             &("Mouse: move, Shift+Mouse: strafe, Button1: shoot"),
-            Vec2(10.0, 740.0),
+            (10.0, 740.0),
             Color::WHITE
         );
 
@@ -185,7 +190,7 @@ impl<'a, 'b> Level<'a, 'b> {
                 if filter == "bloom" {
                     renderer.postprocess(&self.bloom, &(), || {
                         renderer.fill().color(Color::alpha_mask(0.3)).draw();
-                        renderer.draw_layer(&self.inf.layer[&info.name], 0);
+                        renderer.draw_layer(&self.inf.layer[&info.name], info.component);
                     });
                 }
             } else {
@@ -200,7 +205,7 @@ impl<'a, 'b> Level<'a, 'b> {
         if self.roidspawn.elapsed(age) {
             let angle = Angle(self.rng.range(-PI, PI));
             let mut pos = Vec2(800.0, 450.0) + angle.to_vec2() * 2000.0;
-            let outbound = pos.outbound(Rect::new(0.0, 0.0, 1920.0, 1080.0)).unwrap();
+            let outbound = pos.outbound(((0.0, 0.0), (1920.0, 1080.0))).unwrap();
             let scale = self.rng.range(0.3, 1.3);
 
             pos -= outbound;

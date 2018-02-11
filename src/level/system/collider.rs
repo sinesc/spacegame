@@ -1,9 +1,7 @@
+use prelude::*;
 use specs;
 use level::component;
 use level::WorldState;
-use radiant_rs::*;
-use radiant_rs::math::*;
-use radiant_rs::utils::*;
 
 /**
  * Collider system

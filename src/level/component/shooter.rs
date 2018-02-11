@@ -1,6 +1,5 @@
+use prelude::*;
 use specs;
-use radiant_rs::utils::Periodic;
-use radiant_rs::math::*;
 
 /**
  * Shooter component

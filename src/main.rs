@@ -1,10 +1,12 @@
-extern crate radiant_rs;
+extern crate radiant_rs as radiant;
+extern crate radiant_utils;
 extern crate shred;
 #[macro_use]
 extern crate shred_derive;
 extern crate specs;
 extern crate serde;
 extern crate serde_yaml;
+extern crate yaml_merge_keys;
 #[macro_use]
 extern crate serde_derive;
 
@@ -25,7 +27,7 @@ fn main() {
     display.grab_cursor();
     display.set_fullscreen().unwrap();
 
-    utils::renderloop(|frame| {
+    renderloop(|frame| {
         display.poll_events();
 
         display.clear_frame(Color::BLACK);

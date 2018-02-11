@@ -10,6 +10,7 @@ render:
     -
         name: effects
         filter: bloom
+        component: 0
     -
         name: base
     -

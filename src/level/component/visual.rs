@@ -1,6 +1,5 @@
+use prelude::*;
 use specs;
-use std::sync::Arc;
-use radiant_rs::*;
 
 /**
  * Visual component

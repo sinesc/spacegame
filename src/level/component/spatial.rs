@@ -1,18 +1,21 @@
+use prelude::*;
 use specs;
-use radiant_rs::math::*;
 
 /**
  * Spatial component
  * 
  * Entities with this component have a position and orientation in space.
  */
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct Spatial {
     /// Current position
+    #[serde(with = "Vec2Orphan")]
     pub position: Vec2,
     /// Current angle
+    #[serde(with = "AngleOrphan")]
     pub angle: Angle,
     /// Current lean left/right value
+    #[serde(default)]
     pub lean: f32, // todo: this isn't ideal here either
 }
 

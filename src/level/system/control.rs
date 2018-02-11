@@ -1,9 +1,7 @@
+use prelude::*;
 use specs;
 use level::component;
 use level::WorldState;
-use radiant_rs::*;
-use radiant_rs::math::*;
-use radiant_rs::utils::*;
 
 /**
  * Control system
@@ -21,7 +19,7 @@ impl Control {
 }
 
 fn input(input: &Input, input_id: u32) -> (Vec2, bool, bool) {
-    use radiant_rs::InputId::*;
+    use InputId::*;
     let (up, down, left, right, fire, strafe) = if input_id == 1 {
         (CursorUp, CursorDown, CursorLeft, CursorRight, RControl, RShift)
     } else {
@@ -71,7 +69,7 @@ impl<'a> specs::System<'a> for Control {
 
                 // lean into strafe direction
                 let current_lean = (inertial.v_current.to_angle() - spatial.angle).to_radians().sin() * v_fraction.len();
-                utils::approach(&mut spatial.lean, &current_lean, 10.0 * data.world_state.delta);
+                approach(&mut spatial.lean, &current_lean, 10.0 * data.world_state.delta);
 
             } else if !strafe {
 
@@ -81,15 +79,15 @@ impl<'a> specs::System<'a> for Control {
                 let factor = 10.0 * min(1.0, inertial.v_current.len());
 
                 // gradually approach the angle computed from flight direction
-                utils::approach(&mut spatial.angle, &target_angle, factor * data.world_state.delta);
+                approach(&mut spatial.angle, &target_angle, factor * data.world_state.delta);
 
                 // and reduce angular velocity of manual rotation to 0
-                utils::approach(&mut controlled.av_current, &0.0, controlled.av_trans * data.world_state.delta);
+                approach(&mut controlled.av_current, &0.0, controlled.av_trans * data.world_state.delta);
 
                 // lean into rotation direction
 
                 let current_lean = (spatial.angle - old_angle).to_radians() / data.world_state.delta / PI;
-                utils::approach(&mut spatial.lean, &current_lean, factor * data.world_state.delta);
+                approach(&mut spatial.lean, &current_lean, factor * data.world_state.delta);
             }
 
             inertial.v_fraction = v_fraction;

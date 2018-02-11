@@ -1,9 +1,7 @@
+use prelude::*;
 use specs;
 use level::component;
 use level::WorldState;
-use radiant_rs::*;
-use radiant_rs::utils;
-use radiant_rs::math::*;
 use std::cmp;
 
 /**
@@ -12,7 +10,7 @@ use std::cmp;
  * Draws entities with a Visual and Spatial component.
  */
 pub struct Render {
-    fps_interval: utils::Periodic,
+    fps_interval: Periodic,
     num_frames: u32,
     last_num_frames: u32,
 }
@@ -20,7 +18,7 @@ pub struct Render {
 impl<'a> Render {
     pub fn new() -> Self {
         Render {
-            fps_interval: utils::Periodic::new(0.0, 1.0),
+            fps_interval: Periodic::new(0.0, 1.0),
             num_frames: 0,
             last_num_frames: 0,
         }
@@ -61,7 +59,7 @@ impl<'a> specs::System<'a> for Render {
 		for (spatial, visual) in (&data.spatial, &mut data.visual).join() {
 
             if let Some(ref layer) = visual.layer {
-                visual.sprite.draw_transformed(&layer, visual.frame_id as u32, spatial.position, visual.color.to_pm(), spatial.angle.to_radians(), Vec2(visual.scale, visual.scale));
+                visual.sprite.draw_transformed(&layer, visual.frame_id as u32, spatial.position, visual.color.to_pm(), spatial.angle.to_radians(), (visual.scale, visual.scale));
             }
 
             if let Some(ref effect_layer) = visual.effect_layer {
@@ -84,6 +82,6 @@ impl<'a> specs::System<'a> for Render {
             self.num_frames = 0;
         }
 
-        data.world_state.inf.font.write(&data.world_state.inf.layer["base"], &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, data.world_state.delta, num_sprites), Point2(10.0, 10.0), Color::WHITE);
+        data.world_state.inf.font.write(&data.world_state.inf.layer["base"], &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, data.world_state.delta, num_sprites), (10.0, 10.0), Color::WHITE);
 	}
 }
