@@ -2,6 +2,7 @@ use prelude::*;
 use serde;
 use serde_yaml;
 use yaml_merge_keys;
+use std::iter::FromIterator;
 
 mod layer;
 pub use self::layer::*;
@@ -11,12 +12,12 @@ pub use self::entity::*;
 #[derive(Debug)]
 pub struct Error {
     description: String,
-    cause: Box<error::Error>,
+    cause: Option<Box<error::Error>>,
 }
 
 impl From<io::Error> for Error {
     fn from(source: io::Error) -> Self {
-        Error { description: "IO Error".to_string(), cause: Box::new(source) }
+        Error { description: "IO Error".to_string(), cause: Some(Box::new(source)) }
     }
 }
 
@@ -31,22 +32,22 @@ impl error::Error for Error {
         &self.description
     }
     fn cause(self: &Self) -> Option<&error::Error> {
-        Some(&*self.cause)
+        self.cause.as_ref().map(|cause| &**cause)
     }
 }
 
 /// Parses a single yaml file.
-pub fn parse_file<T>(filename: &str) -> Result<T, Error> where T: serde::de::DeserializeOwned {
+pub fn parse_file<T, F>(filename: &str, mut transform: F) -> Result<T, Error> where T: serde::de::DeserializeOwned, F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
 
     let mut f = fs::File::open(&filename)?;
     let mut contents = String::new();
     f.read_to_string(&mut contents)?;
 
-    parse_str(&contents)
+    parse_str(&contents, &mut transform)
 }
 
 /// Parses a directory of yaml files.
-pub fn parse_dir<T>(source: &str, extensions: &[ &str ]) -> Result<T, Error> where T: serde::de::DeserializeOwned {
+pub fn parse_dir<T, F>(source: &str, extensions: &[ &str ], mut transform: F) -> Result<T, Error> where T: serde::de::DeserializeOwned, F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
     
     let files = find(source, extensions)?;
     let mut contents = Vec::new();
@@ -57,19 +58,61 @@ pub fn parse_dir<T>(source: &str, extensions: &[ &str ]) -> Result<T, Error> whe
         contents.push('\n' as u8);
     }
 
-    parse_str(&String::from_utf8(contents).unwrap())
+    parse_str(&String::from_utf8(contents).unwrap(), &mut transform)
+}
+
+fn handle_mapping<F>(mapping: serde_yaml::Mapping, transform: &mut F) -> serde_yaml::Value where F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
+    use serde_yaml::Value::*;
+    let out_mapping = serde_yaml::Mapping::from_iter(mapping.into_iter().map(|pair| { 
+        let (mut key, mut value) = pair;
+        match value {            
+            Sequence(s) => { value = handle_sequence(s, transform); },
+            Mapping(m) => { value = handle_mapping(m, transform); },
+            _ => { transform(&mut value, Some(&mut key)); }
+        }
+        (key, value)
+    }));
+    serde_yaml::Value::Mapping(out_mapping)
+}
+
+fn handle_sequence<F>(sequence: serde_yaml::Sequence, transform: &mut F) -> serde_yaml::Value where F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
+    use serde_yaml::Value::*;
+    sequence.into_iter().map(|mut item| { 
+        match item {            
+            Sequence(s) => { item = handle_sequence(s, transform); },
+            Mapping(m) => { item = handle_mapping(m, transform); },
+            _ => { transform(&mut item, None); }
+        }
+        item 
+    }).collect()
+}
+
+fn apply_transform<F>(mut value: serde_yaml::Value, transform: &mut F) -> Result<serde_yaml::Value, Error> where F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
+    use serde_yaml::Value::*;
+    Ok(match value {
+        Sequence(s) => handle_sequence(s, transform),
+        Mapping(m) => handle_mapping(m, transform),
+        _ => { transform(&mut value, None); value },
+    })
 }
 
 /// Parses a yaml string.
-pub fn parse_str<T>(source: &str) -> Result<T, Error> where T: serde::de::DeserializeOwned {
+pub fn parse_str<T, F>(source: &str, transform: &mut F) -> Result<T, Error> where T: serde::de::DeserializeOwned, F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
     match serde_yaml::from_str(source) {
-        Ok(value)   => {
+        Ok(value) => {
             match yaml_merge_keys::merge_keys_serde(value) {
-                Ok(merged) => Ok(serde_yaml::from_value(merged).unwrap()),
-                Err(error) => Err(Error { description: "Merge failed".to_string(), cause: Box::new(error) })
+                Ok(merged) => { 
+                    match apply_transform(merged, transform) {
+                        Ok(transformed) => { 
+                            Ok(serde_yaml::from_value(transformed).unwrap()) 
+                        }
+                        Err(error) => Err(Error { description: "Transform failed".to_string(), cause: Some(Box::new(error)) })
+                    }
+                }
+                Err(error) => Err(Error { description: "Merge failed".to_string(), cause: Some(Box::new(error)) })
             }
         }
-        Err(error) => Err(Error { description: "Parsing failed".to_string(), cause: Box::new(error) })
+        Err(error) => Err(Error { description: "Parsing failed".to_string(), cause: Some(Box::new(error)) })
     }
 }
 

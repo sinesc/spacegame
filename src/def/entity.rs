@@ -1,6 +1,7 @@
 use prelude::*;
-use super::{parse_dir, Error};
+use ::def::{parse_dir, parse_file, Error};
 use ::level::component::*;
+use serde::de::{Deserialize, Deserializer};
 
 /*
 hostile: &hostile
@@ -28,7 +29,7 @@ pub struct EntityDef (HashMap<String, EntityItem>);
 #[derive(Deserialize, Debug)]
 pub struct EntityItem {
     spatial: Option<Spatial>,
-    //bounding: Option<Bounding>,
+    bounding: Option<Bounding>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -44,6 +45,9 @@ fn default_scale() -> f32 {
 }
 
 pub fn parse_entities() -> Result<EntityDef, Error> {
-    parse_dir("res/def/entity/", &[ "yaml" ])
+    let factions: Vec<String> = parse_file("res/def/faction.yaml", |_, _| {}).unwrap();
+    parse_dir("res/def/entity/", &[ "yaml" ], |ref v, k| {
+        println!("{:?} {:?}", v, k);
+    })
 }
 
