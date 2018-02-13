@@ -2,7 +2,7 @@ use prelude::*;
 use super::{parse_file, Error};
 
 pub fn parse_layers() -> Result<LayerDef, Error> {
-    parse_file("res/def/layer.yaml", |ref v, k| {})
+    parse_file("res/def/layer.yaml", |_, _, _| {})
 }
 
 #[derive(Deserialize, Debug)]

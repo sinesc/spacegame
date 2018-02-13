@@ -37,7 +37,7 @@ impl error::Error for Error {
 }
 
 /// Parses a single yaml file.
-pub fn parse_file<T, F>(filename: &str, mut transform: F) -> Result<T, Error> where T: serde::de::DeserializeOwned, F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
+pub fn parse_file<T, F>(filename: &str, mut transform: F) -> Result<T, Error> where T: serde::de::DeserializeOwned, F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>, Option<&serde_yaml::Value>) {
 
     let mut f = fs::File::open(&filename)?;
     let mut contents = String::new();
@@ -47,7 +47,7 @@ pub fn parse_file<T, F>(filename: &str, mut transform: F) -> Result<T, Error> wh
 }
 
 /// Parses a directory of yaml files.
-pub fn parse_dir<T, F>(source: &str, extensions: &[ &str ], mut transform: F) -> Result<T, Error> where T: serde::de::DeserializeOwned, F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
+pub fn parse_dir<T, F>(source: &str, extensions: &[ &str ], mut transform: F) -> Result<T, Error> where T: serde::de::DeserializeOwned, F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>, Option<&serde_yaml::Value>) {
     
     let files = find(source, extensions)?;
     let mut contents = Vec::new();
@@ -61,43 +61,48 @@ pub fn parse_dir<T, F>(source: &str, extensions: &[ &str ], mut transform: F) ->
     parse_str(&String::from_utf8(contents).unwrap(), &mut transform)
 }
 
-fn handle_mapping<F>(mapping: serde_yaml::Mapping, transform: &mut F) -> serde_yaml::Value where F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
+/// Calls transform for each member of the mapping.
+fn handle_mapping<F>(mapping: serde_yaml::Mapping, parent_key: Option<&serde_yaml::Value>, transform: &mut F) -> serde_yaml::Value where F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>, Option<&serde_yaml::Value>) {
     use serde_yaml::Value::*;
     let out_mapping = serde_yaml::Mapping::from_iter(mapping.into_iter().map(|pair| { 
         let (mut key, mut value) = pair;
         match value {            
-            Sequence(s) => { value = handle_sequence(s, transform); },
-            Mapping(m) => { value = handle_mapping(m, transform); },
-            _ => { transform(&mut value, Some(&mut key)); }
+            Sequence(s) => { value = handle_sequence(s, Some(&key), transform); },
+            Mapping(m) => { value = handle_mapping(m, Some(&key), transform); },
+            _ => { transform(&mut value, Some(&mut key), parent_key); }
         }
         (key, value)
     }));
     serde_yaml::Value::Mapping(out_mapping)
 }
 
-fn handle_sequence<F>(sequence: serde_yaml::Sequence, transform: &mut F) -> serde_yaml::Value where F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
+/// Calls transform for each member of the sequence.
+fn handle_sequence<F>(sequence: serde_yaml::Sequence, parent_key: Option<&serde_yaml::Value>, transform: &mut F) -> serde_yaml::Value where F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>, Option<&serde_yaml::Value>) {
     use serde_yaml::Value::*;
-    sequence.into_iter().map(|mut item| { 
-        match item {            
-            Sequence(s) => { item = handle_sequence(s, transform); },
-            Mapping(m) => { item = handle_mapping(m, transform); },
-            _ => { transform(&mut item, None); }
+    use serde_yaml::Value;
+    sequence.into_iter().enumerate().map(|pair| { 
+        let (index, mut value) = pair;
+        let mut key = Value::Number(index.into());
+        match value {            
+            Sequence(s) => { value = handle_sequence(s, Some(&key), transform); },
+            Mapping(m) => { value = handle_mapping(m, Some(&key), transform); },
+            _ => { transform(&mut value, Some(&mut key), parent_key); } //TODO: index is mutable to be compatible with mapping, but it doesn't make sense here
         }
-        item 
+        value 
     }).collect()
 }
 
-fn apply_transform<F>(mut value: serde_yaml::Value, transform: &mut F) -> Result<serde_yaml::Value, Error> where F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
+fn apply_transform<F>(mut value: serde_yaml::Value, transform: &mut F) -> Result<serde_yaml::Value, Error> where F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>, Option<&serde_yaml::Value>) {
     use serde_yaml::Value::*;
-    Ok(match value {
-        Sequence(s) => handle_sequence(s, transform),
-        Mapping(m) => handle_mapping(m, transform),
-        _ => { transform(&mut value, None); value },
+    Ok(match value { //TODO: Results
+        Sequence(s) => handle_sequence(s, None, transform),
+        Mapping(m) => handle_mapping(m, None, transform),
+        _ => { transform(&mut value, None, None); value },
     })
 }
 
 /// Parses a yaml string.
-pub fn parse_str<T, F>(source: &str, transform: &mut F) -> Result<T, Error> where T: serde::de::DeserializeOwned, F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>) {
+pub fn parse_str<T, F>(source: &str, transform: &mut F) -> Result<T, Error> where T: serde::de::DeserializeOwned, F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>, Option<&serde_yaml::Value>) {
     match serde_yaml::from_str(source) {
         Ok(value) => {
             match yaml_merge_keys::merge_keys_serde(value) {

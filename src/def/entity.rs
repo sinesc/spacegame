@@ -1,7 +1,6 @@
 use prelude::*;
 use ::def::{parse_dir, parse_file, Error};
 use ::level::component::*;
-use serde::de::{Deserialize, Deserializer};
 
 /*
 hostile: &hostile
@@ -45,9 +44,9 @@ fn default_scale() -> f32 {
 }
 
 pub fn parse_entities() -> Result<EntityDef, Error> {
-    let factions: Vec<String> = parse_file("res/def/faction.yaml", |_, _| {}).unwrap();
-    parse_dir("res/def/entity/", &[ "yaml" ], |ref v, k| {
-        println!("{:?} {:?}", v, k);
+    let factions: Vec<String> = parse_file("res/def/faction.yaml", |_, _, _| {}).unwrap();
+    parse_dir("res/def/entity/", &[ "yaml" ], |ref v, k, p| {
+        println!("{:?}.{:?}: {:?} ", p, k, v);
     })
 }
 
