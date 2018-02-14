@@ -61,6 +61,16 @@ pub fn parse_dir<T, F>(source: &str, extensions: &[ &str ], mut transform: F) ->
     parse_str(&String::from_utf8(contents).unwrap(), &mut transform)
 }
 
+/// Looks up the index of search_parent.search_key in the given vector.
+pub fn lookup(search_parent: &str, search_key: &str, dict: &Vec<String>, v: &mut serde_yaml::Value, k: &Option<&mut serde_yaml::Value>, p: &Option<&serde_yaml::Value>) -> Option<usize> {
+    if p.is_some() && k.is_some() && k.as_ref().unwrap().as_str() == Some(search_key) && p.unwrap().as_str() == Some(search_parent) {
+        if let Some(index) = dict.iter().position(|&ref x| x == v.as_str().unwrap()) {
+            return Some(index);
+        }
+    }
+    return None;
+}
+
 /// Calls transform for each member of the mapping.
 fn handle_mapping<F>(mapping: serde_yaml::Mapping, parent_key: Option<&serde_yaml::Value>, transform: &mut F) -> serde_yaml::Value where F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>, Option<&serde_yaml::Value>) {
     use serde_yaml::Value::*;
@@ -92,6 +102,7 @@ fn handle_sequence<F>(sequence: serde_yaml::Sequence, parent_key: Option<&serde_
     }).collect()
 }
 
+/// Recursively applies given transformation callback to the value.
 fn apply_transform<F>(mut value: serde_yaml::Value, transform: &mut F) -> Result<serde_yaml::Value, Error> where F: FnMut(&mut serde_yaml::Value, Option<&mut serde_yaml::Value>, Option<&serde_yaml::Value>) {
     use serde_yaml::Value::*;
     Ok(match value { //TODO: Results
