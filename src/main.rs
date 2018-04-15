@@ -19,7 +19,7 @@ use level::Level;
 
 fn main() {
 
-    let display = Display::builder().dimensions((1920, 1080)).vsync().transparent().build();
+    let display = Display::builder().dimensions((1920, 1080)).vsync().transparent().build().unwrap();
     let renderer =  Renderer::new(&display).unwrap();
     let input = Input::new(&display);
     let mut level = Level::new(&input, &renderer.context());
