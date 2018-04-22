@@ -11,7 +11,6 @@ pub use radiant_utils::maths::{Angle, Vec2, approach, min, max};
 pub use radiant_utils::util::{Periodic, Rng};
 pub use radiant_utils::loops::renderloop;
 pub use radiant::{Layer, Sprite, Color, Input, InputId, Font, Renderer, Texture, RenderContext, Display, blendmodes, postprocessors};
-pub use super::def;
 
 // These are only used to circumvent the crazy orphan rules.
 #[derive(Deserialize)]

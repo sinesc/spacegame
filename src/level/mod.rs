@@ -1,38 +1,11 @@
 use prelude::*;
 use specs;
 use rodio;
+use sound::{Sound, SoundGroup};
+use def;
 
 pub mod component;
 mod system;
-
-use std::io;
-use std::convert::AsRef;
-
-pub struct Sound (Arc<Vec<u8>>);
-
-impl AsRef<[u8]> for Sound {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl Sound {
-    pub fn load(filename: &str) -> io::Result<Sound> {
-        use std::fs::File;
-        //use std::io::BufReader;
-        let mut buf = Vec::new();
-        let mut file = File::open(filename)?;
-        file.read_to_end(&mut buf)?;
-        Ok(Sound(Arc::new(buf)))
-    }
-    pub fn cursor(self: &Self) -> io::Cursor<Sound> {
-        io::Cursor::new(Sound(self.0.clone()))
-    }
-    pub fn decoder(self: &Self) -> rodio::Decoder<io::Cursor<Sound>> {
-        rodio::Decoder::new(self.cursor()).unwrap()
-    }
-}
-
 
 pub struct Infrastructure {
     input       : Input,
@@ -42,8 +15,8 @@ pub struct Infrastructure {
     sprite      : Arc<Sprite>,
     asteroid    : Arc<Sprite>,
     explosion   : Arc<Sprite>,
-    pew         : Sound,
-    boom        : Sound,
+    pew         : SoundGroup,
+    boom        : SoundGroup,
 }
 
 #[derive(Clone)]
@@ -99,8 +72,8 @@ impl<'a, 'b> Level<'a, 'b> {
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
 
         let audio = rodio::default_output_device().unwrap();
-        let pew = Sound::load("res/sound/projectile/pew1a.ogg").unwrap();
-        let boom = Sound::load("res/sound/damage/explosion1.ogg").unwrap();
+        let pew = SoundGroup::load(&["res/sound/projectile/pew1a.ogg", "res/sound/projectile/pew1b.ogg", "res/sound/projectile/pew1c.ogg", "res/sound/projectile/pew2.ogg"]).unwrap();
+        let boom = SoundGroup::load(&["res/sound/damage/explosion_pop1.ogg", "res/sound/damage/explosion_pop2.ogg"]).unwrap();
 
         let tmp = def::parse_entities().unwrap();
 println!("{:?}", tmp);
@@ -192,7 +165,7 @@ println!("{:?}", tmp);
             dispatcher  : dispatcher,
             layer_def   : layer_def,
             created     : created,
-            roidspawn   : Periodic::new(0.0, 0.1),
+            roidspawn   : Periodic::new(0.0, 0.5),
             rng         : Rng::new(123.4),
             bloom       : postprocessors::Bloom::new(&context, 4, 2),
             inf         : infrastructure,

@@ -12,7 +12,8 @@ extern crate serde_derive;
 extern crate rodio;
 
 mod prelude;
-pub mod def;
+mod def;
+mod sound;
 mod level;
 
 use prelude::*;

@@ -99,6 +99,7 @@ impl<'a> specs::System<'a> for Control {
             if shoot && shooter.interval.elapsed(data.world_state.age) {
                 //inertial.v_fraction -= spatial.angle.to_vec2() * 0.001 / data.world_state.delta;
                 projectiles.push((spatial.position, spatial.angle));
+                rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.decoder().convert_samples());
 
                 /*let dir = spatial.angle.to_vec2();
                 let pos = spatial.position - (dir * 10.0);
@@ -116,7 +117,6 @@ impl<'a> specs::System<'a> for Control {
             data.fading.insert(shot, component::Fading::new(data.world_state.age + 0.5, data.world_state.age + 1.0));
             data.bounding.insert(shot, component::Bounding::new(5.0, 1));
             data.hitpoints.insert(shot, component::Hitpoints::new(50.0));
-            rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.decoder().convert_samples());
         };
 
         for (mut position, angle) in projectiles {
