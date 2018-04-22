@@ -115,8 +115,8 @@ impl<'a> specs::System<'a> for Control {
             data.lifetime.insert(shot, component::Lifetime(data.world_state.age + 1.0));
             data.fading.insert(shot, component::Fading::new(data.world_state.age + 0.5, data.world_state.age + 1.0));
             data.bounding.insert(shot, component::Bounding::new(5.0, 1));
-            data.hitpoints.insert(shot, component::Hitpoints::new(5.0));
-            rodio::play_raw(&data.world_state.inf.audio, rodio::Decoder::new(data.world_state.inf.pew.cursor()).unwrap().convert_samples());
+            data.hitpoints.insert(shot, component::Hitpoints::new(50.0));
+            rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.decoder().convert_samples());
         };
 
         for (mut position, angle) in projectiles {

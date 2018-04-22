@@ -28,16 +28,6 @@ fn main() {
     display.grab_cursor();
     display.set_fullscreen().unwrap();
 
-use std::fs::File;
-use std::io::BufReader;
-use rodio::Source;
-
-let endpoint = rodio::default_output_device().unwrap();
-{
-let file = File::open("res/sound/projectile/pew1a.ogg").unwrap();
-let source = rodio::Decoder::new(BufReader::new(file)).unwrap();
-rodio::play_raw(&endpoint, source.convert_samples());
-}
     renderloop(|frame| {
         display.poll_events();
 

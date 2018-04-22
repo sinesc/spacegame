@@ -5,9 +5,8 @@ use rodio;
 pub mod component;
 mod system;
 
-use std;
+use std::io;
 use std::convert::AsRef;
-use std::io::Cursor;
 
 pub struct Sound (Arc<Vec<u8>>);
 
@@ -18,32 +17,33 @@ impl AsRef<[u8]> for Sound {
 }
 
 impl Sound {
-    pub fn load(filename: &str) -> Sound {
+    pub fn load(filename: &str) -> io::Result<Sound> {
         use std::fs::File;
         //use std::io::BufReader;
         let mut buf = Vec::new();
-        let mut file = File::open(filename).unwrap();
-        file.read_to_end(&mut buf);
-        Sound(Arc::new(buf))
+        let mut file = File::open(filename)?;
+        file.read_to_end(&mut buf)?;
+        Ok(Sound(Arc::new(buf)))
     }
-    pub fn cursor(self: &Self) -> Cursor<Sound> {
-        Cursor::new(Sound(self.0.clone()))
+    pub fn cursor(self: &Self) -> io::Cursor<Sound> {
+        io::Cursor::new(Sound(self.0.clone()))
     }
-    /*pub fn decoder(self: &Self) -> rodio::Decoder<Cursor<&Sound>> {
-        rodio::Decoder::new(Cursor::new(self)).unwrap()
-    }*/
+    pub fn decoder(self: &Self) -> rodio::Decoder<io::Cursor<Sound>> {
+        rodio::Decoder::new(self.cursor()).unwrap()
+    }
 }
 
 
 pub struct Infrastructure {
     input       : Input,
+    audio       : rodio::Device,
     layer       : HashMap<String, Arc<Layer>>,
     font        : Arc<Font>,
     sprite      : Arc<Sprite>,
     asteroid    : Arc<Sprite>,
     explosion   : Arc<Sprite>,
     pew         : Sound,
-    audio       : rodio::Device,
+    boom        : Sound,
 }
 
 #[derive(Clone)]
@@ -99,7 +99,8 @@ impl<'a, 'b> Level<'a, 'b> {
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
 
         let audio = rodio::default_output_device().unwrap();
-        let pew = Sound::load("res/sound/projectile/pew1a.ogg");
+        let pew = Sound::load("res/sound/projectile/pew1a.ogg").unwrap();
+        let boom = Sound::load("res/sound/damage/explosion1.ogg").unwrap();
 
         let tmp = def::parse_entities().unwrap();
 println!("{:?}", tmp);
@@ -128,7 +129,7 @@ println!("{:?}", tmp);
             .with(component::Visual::new(Some(layers["base"].clone()), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 1.0, 0, 1.0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5, true))
             .with(component::Controlled::new(1))
-            .with(component::Shooter::new(0.02))
+            .with(component::Shooter::new(0.2))
             .with(component::Bounding::new(20.0, 1))
             .with(component::Hitpoints::new(100.))
             .build();
@@ -167,6 +168,7 @@ println!("{:?}", tmp);
             explosion   : explosion,
             audio       : audio,
             pew         : pew,
+            boom        : boom,
         });
 
         world.add_resource(WorldState { delta: 0.0, age: 0.0, inf: infrastructure.clone() });
