@@ -1,8 +1,39 @@
 use prelude::*;
 use specs;
+use rodio;
 
 pub mod component;
 mod system;
+
+use std;
+use std::convert::AsRef;
+use std::io::Cursor;
+
+pub struct Sound (Arc<Vec<u8>>);
+
+impl AsRef<[u8]> for Sound {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl Sound {
+    pub fn load(filename: &str) -> Sound {
+        use std::fs::File;
+        //use std::io::BufReader;
+        let mut buf = Vec::new();
+        let mut file = File::open(filename).unwrap();
+        file.read_to_end(&mut buf);
+        Sound(Arc::new(buf))
+    }
+    pub fn cursor(self: &Self) -> Cursor<Sound> {
+        Cursor::new(Sound(self.0.clone()))
+    }
+    /*pub fn decoder(self: &Self) -> rodio::Decoder<Cursor<&Sound>> {
+        rodio::Decoder::new(Cursor::new(self)).unwrap()
+    }*/
+}
+
 
 pub struct Infrastructure {
     input       : Input,
@@ -11,6 +42,8 @@ pub struct Infrastructure {
     sprite      : Arc<Sprite>,
     asteroid    : Arc<Sprite>,
     explosion   : Arc<Sprite>,
+    pew         : Sound,
+    audio       : rodio::Device,
 }
 
 #[derive(Clone)]
@@ -64,6 +97,9 @@ impl<'a, 'b> Level<'a, 'b> {
 
         let laser = Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc();
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
+
+        let audio = rodio::default_output_device().unwrap();
+        let pew = Sound::load("res/sound/projectile/pew1a.ogg");
 
         let tmp = def::parse_entities().unwrap();
 println!("{:?}", tmp);
@@ -129,6 +165,8 @@ println!("{:?}", tmp);
             asteroid    : asteroid,
             font        : font,
             explosion   : explosion,
+            audio       : audio,
+            pew         : pew,
         });
 
         world.add_resource(WorldState { delta: 0.0, age: 0.0, inf: infrastructure.clone() });

@@ -1,4 +1,5 @@
 use prelude::*;
+use rodio;
 use specs;
 use level::component;
 use level::WorldState;
@@ -58,6 +59,7 @@ impl<'a> specs::System<'a> for Control {
     fn run(&mut self, mut data: ControlData) {
 		use specs::Join;
         use std::f32::consts::PI;
+        use rodio::Source;
 
         let mut projectiles = Vec::new();
 
@@ -114,6 +116,7 @@ impl<'a> specs::System<'a> for Control {
             data.fading.insert(shot, component::Fading::new(data.world_state.age + 0.5, data.world_state.age + 1.0));
             data.bounding.insert(shot, component::Bounding::new(5.0, 1));
             data.hitpoints.insert(shot, component::Hitpoints::new(5.0));
+            rodio::play_raw(&data.world_state.inf.audio, rodio::Decoder::new(data.world_state.inf.pew.cursor()).unwrap().convert_samples());
         };
 
         for (mut position, angle) in projectiles {
