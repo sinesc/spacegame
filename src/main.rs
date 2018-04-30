@@ -21,6 +21,10 @@ use level::Level;
 
 fn main() {
 
+    let dummy = sound::Sound::load("res/sound/projectile/pew1a.ogg").unwrap();
+    rodio::play_raw(&rodio::default_output_device().unwrap(), dummy.samples());
+
+
     let display = Display::builder().dimensions((1920, 1080)).vsync().transparent().build().unwrap();
     let renderer =  Renderer::new(&display).unwrap();
     let input = Input::new(&display);

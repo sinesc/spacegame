@@ -62,8 +62,6 @@ impl<'a> specs::System<'a> for Collider {
             }
 		}
 
-        use rodio::Source;
-
         for (entity_a, entity_b) in collisions {
 
             let a = data.hitpoints.get(entity_a).unwrap().0;
@@ -73,14 +71,14 @@ impl<'a> specs::System<'a> for Collider {
                 let position = data.spatial.get(entity_a).unwrap().position;    // !todo can directly pass as parameter due to lameness
                 let effect_size = data.visual.get(entity_a).unwrap().effect_size;
                 Self::spawn(&mut data, position, effect_size);
-                rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.boom.decoder().convert_samples());
+                rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.boom.samples());
             }
 
             if b <= a {
                 let position = data.spatial.get(entity_b).unwrap().position;    // !todo can directly pass as parameter due to lameness
                 let effect_size = data.visual.get(entity_b).unwrap().effect_size;
                 Self::spawn(&mut data, position, effect_size);
-                rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.boom.decoder().convert_samples());
+                rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.boom.samples());
             }
 
             data.hitpoints.get_mut(entity_a).unwrap().0 -= min(a, b);

@@ -19,22 +19,22 @@ impl Control {
     }
 }
 
-fn input(input: &Input, input_id: u32) -> (Vec2, bool, bool) {
+fn input(input: &Input, input_id: u32) -> (Vec2, bool, bool, bool) {
     use InputId::*;
-    let (up, down, left, right, fire, strafe) = if input_id == 1 {
-        (CursorUp, CursorDown, CursorLeft, CursorRight, RControl, RShift)
+    let (up, down, left, right, fire1, fire2, strafe, rotate) = if input_id == 1 {
+        (CursorUp, CursorDown, CursorLeft, CursorRight, RControl, Mouse1, RShift, RAlt)
     } else {
-        (W, S, A, D, LControl, LShift)
+        (W, S, A, D, LControl, LControl, LShift, LAlt)
     };
     let mut v_fraction = Vec2(0.0, 0.0);
     if input.down(up) { v_fraction.1 -= 1.0 }
     if input.down(down) { v_fraction.1 += 1.0 }
     if input.down(left) { v_fraction.0 -= 1.0 }
     if input.down(right) { v_fraction.0 += 1.0 }
-    v_fraction = v_fraction.normalize();   
-    v_fraction.0 += input.mouse_delta().0 as f32 / 5.;
+    v_fraction = v_fraction.normalize();
+    v_fraction.0 += input.mouse_delta().0 as f32 / 5.; // FPS dependent
     v_fraction.1 += input.mouse_delta().1 as f32 / 5.;
-    (v_fraction, input.down(fire) || input.down(Mouse1), input.down(strafe))
+    (v_fraction, input.down(fire1) || input.down(fire2), input.down(strafe), input.down(rotate))
 }
 
 #[derive(SystemData)]
@@ -59,13 +59,12 @@ impl<'a> specs::System<'a> for Control {
     fn run(&mut self, mut data: ControlData) {
 		use specs::Join;
         use std::f32::consts::PI;
-        use rodio::Source;
 
         let mut projectiles = Vec::new();
 
 		for (controlled, spatial, inertial, shooter) in (&mut data.controlled, &mut data.spatial, &mut data.inertial, &mut data.shooter).join() {
 
-            let (v_fraction, shoot, strafe) = input(&data.world_state.inf.input, controlled.input_id);
+            let (v_fraction, shoot, strafe, rotate) = input(&data.world_state.inf.input, controlled.input_id);
 
             if strafe {
 
@@ -99,7 +98,7 @@ impl<'a> specs::System<'a> for Control {
             if shoot && shooter.interval.elapsed(data.world_state.age) {
                 //inertial.v_fraction -= spatial.angle.to_vec2() * 0.001 / data.world_state.delta;
                 projectiles.push((spatial.position, spatial.angle));
-                rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.decoder().convert_samples());
+                rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.samples());
 
                 /*let dir = spatial.angle.to_vec2();
                 let pos = spatial.position - (dir * 10.0);
