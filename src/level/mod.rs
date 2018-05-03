@@ -3,6 +3,7 @@ use specs;
 use rodio;
 use sound::{Sound, SoundGroup};
 use def;
+use bloom;
 
 pub mod component;
 mod system;
@@ -15,6 +16,7 @@ pub struct Infrastructure {
     sprite      : Arc<Sprite>,
     asteroid    : Arc<Sprite>,
     explosion   : Arc<Sprite>,
+    mine        : Arc<Sprite>,
     pew         : SoundGroup,
     boom        : SoundGroup,
 }
@@ -35,8 +37,10 @@ pub struct Level<'a, 'b> {
 
     inf         : Arc<Infrastructure>,
     roidspawn   : Periodic,
+    minespawn   : Periodic,
     rng         : Rng,
     bloom       : postprocessors::Bloom,
+    glare       : bloom::Bloom,
     background  : Texture,
 }
 
@@ -51,6 +55,7 @@ impl<'a, 'b> Level<'a, 'b> {
         world.register::<component::Inertial>();
         world.register::<component::Visual>();
         world.register::<component::Controlled>();
+        world.register::<component::Computed>();
         world.register::<component::Lifetime>();
         world.register::<component::Shooter>();
         world.register::<component::Fading>();
@@ -60,7 +65,7 @@ impl<'a, 'b> Level<'a, 'b> {
         // create a scene and a layer
 
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
-        //let hostile = Sprite::from_file(context, "res/sprite/hostile/mine_red_64x64x15.png").unwrap().arc();
+        let mine = Sprite::from_file(context, "res/sprite/hostile/mine_lightmapped_64x64x15x2.png").unwrap().arc();
         let friend = Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc();
         //let powerup = Sprite::from_file(context, "res/sprite/powerup/ball_v_32x32x18.jpg").unwrap().arc();
         let asteroid = Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc();
@@ -100,27 +105,20 @@ println!("{:?}", tmp);
         world.create_entity()
             .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0)))
             .with(component::Visual::new(Some(layers["base"].clone()), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 1.0, 0, 1.0))
-            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5, true))
+            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 6.0))
             .with(component::Controlled::new(1))
             .with(component::Shooter::new(0.2))
             .with(component::Bounding::new(20.0, 1))
-            .with(component::Hitpoints::new(100.))
+            .with(component::Hitpoints::new(10000.))
             .build();
 /*
         world.create_entity()
             .with(component::Spatial::new(Vec2(512.0, 384.0), Angle(0.0), true))
             .with(component::Visual::new(Some(base.clone()), None, friend.clone(), Color(1.0, 0.8, 0.8, 1.0), 0, 1.0))
-            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 4.0, 1.5))
+            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 1.0))
             .with(component::Controlled::new(2))
             .with(component::Shooter::new(0.02))
             .with(component::Bounding::new(20.0, 1))
-            .with(component::Hitpoints::new(100.))
-            .build();
-
-        world.create_entity()
-            .with(component::Spatial::new(Vec2(120.0, 640.0), Angle(0.0), true))
-            .with(component::Visual::new(Some(base.clone()), None, hostile.clone(), Color::WHITE, 30, 1.0))
-            .with(component::Bounding::new(20.0, 0))
             .with(component::Hitpoints::new(100.))
             .build();
 
@@ -137,6 +135,7 @@ println!("{:?}", tmp);
             layer       : layers,
             sprite      : laser,
             asteroid    : asteroid,
+            mine        : mine,
             font        : font,
             explosion   : explosion,
             audio       : audio,
@@ -150,9 +149,10 @@ println!("{:?}", tmp);
 
         let dispatcher = specs::DispatcherBuilder::new()
                 .add(system::Control::new(), "control", &[])
-                .add(system::Inertia::new(), "inertia", &[ "control" ])
+                .add(system::Compute::new(), "compute", &[])
+                .add(system::Inertia::new(), "inertia", &[ "control", "compute" ])
                 .add(system::Collider::new(), "collider", &[])
-                .add(system::Render::new(), "render", &[ "control", "inertia", "collider" ])
+                .add(system::Render::new(), "render", &[ "control", "compute", "inertia", "collider" ])
                 .add(system::Cleanup::new(), "cleanup", &[ "render" ])
                 .build();
 
@@ -160,14 +160,20 @@ println!("{:?}", tmp);
 
         let created = Instant::now();
 
+        let mut bloom = postprocessors::Bloom::new(&context, 4, 2);
+        bloom.clear = false;
+        bloom.draw_color = Color::alpha_pm(0.15);
+
         Level {
             world       : world,
             dispatcher  : dispatcher,
             layer_def   : layer_def,
             created     : created,
             roidspawn   : Periodic::new(0.0, 0.5),
+            minespawn   : Periodic::new(0.0, 5.5),
             rng         : Rng::new(123.4),
-            bloom       : postprocessors::Bloom::new(&context, 4, 2),
+            bloom       : bloom,
+            glare       : bloom::Bloom::new(&context, (1920, 1080), 2, 5, 5.0),
             inf         : infrastructure,
             background  : background,
         }
@@ -186,17 +192,13 @@ println!("{:?}", tmp);
 
         self.dispatcher.dispatch(&mut self.world.res);
 
-        //renderer.clear(Color(0.0, 0.0, 0.0, 1.0));
         renderer.fill().texture(&self.background).blendmode(blendmodes::COPY).draw();
 
-        self.inf.font.write(&self.inf.layer["base"],
+        self.inf.font.write(&self.inf.layer["text"],
             &("Mouse: move, Shift+Mouse: strafe, Button1: shoot"),
             (10.0, 740.0),
             Color::WHITE
         );
-
-        self.bloom.draw_color = Color::alpha_pm(0.15);
-        self.bloom.clear = false;
 
         for info in &self.layer_def.render {
             if let Some(ref filter) = info.filter {
@@ -205,6 +207,13 @@ println!("{:?}", tmp);
                         renderer.fill().color(Color::alpha_mask(0.3)).draw();
                         renderer.draw_layer(&self.inf.layer[&info.name], info.component);
                     });
+                } else if filter == "glare" {
+                    renderer.postprocess(&self.glare, &blendmodes::SCREEN, || {
+                        renderer.fill().color(Color::alpha_mask(0.1)).draw();
+                        renderer.draw_layer(&self.inf.layer[&info.name], info.component);
+                    });
+                } else {
+                    panic!("invalid filter name");
                 }
             } else {
                 renderer.draw_layer(&self.inf.layer[&info.name], 0);
@@ -228,11 +237,30 @@ println!("{:?}", tmp);
             self.world.create_entity()
                 .with(component::Spatial::new(pos, angle))
                 .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.asteroid.clone(), Color::WHITE, scale, 30, 1.0))
-                .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 4.0, 1.5, true))
+                .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 1.0))
                 .with(component::Bounding::new(20.0 * scale, self.rng.range(2., 102.) as u32))
                 .with(component::Hitpoints::new(100. * scale))
                 .build();
 
+        }
+
+        if self.minespawn.elapsed(age) {
+            let angle = Angle(self.rng.range(-PI, PI));
+            let mut pos = Vec2(800.0, 450.0) + angle.to_vec2() * 2000.0;
+            let outbound = pos.outbound(((0.0, 0.0), (1920.0, 1080.0))).unwrap();
+            let scale = self.rng.range(0.9, 1.1);
+
+            pos -= outbound;
+
+            self.world.create_entity()
+                .with(component::Spatial::new(pos, angle))
+                .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.mine.clone(), Color::WHITE, scale, 30, 1.0))
+                .with(component::Bounding::new(20.0, 0))
+                .with(component::Hitpoints::new(100.))
+                .with(component::Shooter::new(1.2))
+                .with(component::Computed::new())
+                .with(component::Inertial::new(Vec2(120.0, 120.0), Vec2(0.0, 0.0), 1.0))
+                .build();
         }
 
         self.world.maintain();

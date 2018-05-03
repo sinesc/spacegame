@@ -7,6 +7,9 @@ pub use self::render::Render;
 mod control;
 pub use self::control::Control;
 
+mod compute;
+pub use self::compute::Compute;
+
 mod cleanup;
 pub use self::cleanup::Cleanup;
 

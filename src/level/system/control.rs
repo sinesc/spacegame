@@ -19,12 +19,21 @@ impl Control {
     }
 }
 
+fn flatten(x: i32) -> f32 {
+    let x = x as f32;
+    if x < 0. {
+        -((-x).sqrt())
+    } else {
+        x.sqrt()
+    }
+}
+
 fn input(input: &Input, input_id: u32) -> (Vec2, bool, bool, bool) {
     use InputId::*;
     let (up, down, left, right, fire1, fire2, strafe, rotate) = if input_id == 1 {
-        (CursorUp, CursorDown, CursorLeft, CursorRight, RControl, Mouse1, RShift, RAlt)
+        (CursorUp, CursorDown, CursorLeft, CursorRight, RControl, Mouse1, RShift, RMenu)
     } else {
-        (W, S, A, D, LControl, LControl, LShift, LAlt)
+        (W, S, A, D, LControl, LControl, LShift, LMenu)
     };
     let mut v_fraction = Vec2(0.0, 0.0);
     if input.down(up) { v_fraction.1 -= 1.0 }
@@ -32,8 +41,9 @@ fn input(input: &Input, input_id: u32) -> (Vec2, bool, bool, bool) {
     if input.down(left) { v_fraction.0 -= 1.0 }
     if input.down(right) { v_fraction.0 += 1.0 }
     v_fraction = v_fraction.normalize();
-    v_fraction.0 += input.mouse_delta().0 as f32 / 5.; // FPS dependent
-    v_fraction.1 += input.mouse_delta().1 as f32 / 5.;
+    // TODO: divider depends on mouse speed. needs to be chose so that moving the mouse reasonably fast equals 1
+    v_fraction.0 += flatten(input.mouse_delta().0) / 4.;
+    v_fraction.1 += flatten(input.mouse_delta().1) / 4.;
     (v_fraction, input.down(fire1) || input.down(fire2), input.down(strafe), input.down(rotate))
 }
 
@@ -62,6 +72,10 @@ impl<'a> specs::System<'a> for Control {
 
         let mut projectiles = Vec::new();
 
+        /*for key in data.world_state.inf.input.iter().down() {
+            println!("{:?}", key);
+        }*/
+
 		for (controlled, spatial, inertial, shooter) in (&mut data.controlled, &mut data.spatial, &mut data.inertial, &mut data.shooter).join() {
 
             let (v_fraction, shoot, strafe, rotate) = input(&data.world_state.inf.input, controlled.input_id);
@@ -72,26 +86,28 @@ impl<'a> specs::System<'a> for Control {
                 let current_lean = (inertial.v_current.to_angle() - spatial.angle).to_radians().sin() * v_fraction.len();
                 approach(&mut spatial.lean, &current_lean, 10.0 * data.world_state.delta);
 
-            } else if !strafe {
+                inertial.v_fraction = v_fraction;
 
-                let target_angle = inertial.v_current.to_angle();
+            } else if rotate {
+/*
+                let target_angle = v_fraction.to_angle();
                 spatial.angle.align_with(&target_angle);
-                let old_angle = spatial.angle;
-                let factor = 10.0 * min(1.0, inertial.v_current.len());
 
                 // gradually approach the angle computed from flight direction
-                approach(&mut spatial.angle, &target_angle, factor * data.world_state.delta);
+                approach(&mut spatial.angle, &target_angle, 10.0 * data.world_state.delta);
 
                 // and reduce angular velocity of manual rotation to 0
-                approach(&mut controlled.av_current, &0.0, controlled.av_trans * data.world_state.delta);
+                approach(&mut inertial.av_current, &0.0, inertial.av_trans * data.world_state.delta);
 
                 // lean into rotation direction
+                approach(&mut spatial.lean, &0.0, data.world_state.delta);
 
-                let current_lean = (spatial.angle - old_angle).to_radians() / data.world_state.delta / PI;
-                approach(&mut spatial.lean, &current_lean, factor * data.world_state.delta);
+                inertial.v_fraction = Vec2(0., 0.);
+*/
+            } else {
+
+                inertial.v_fraction = v_fraction;                
             }
-
-            inertial.v_fraction = v_fraction;
 
             // shoot ?
 
@@ -111,7 +127,7 @@ impl<'a> specs::System<'a> for Control {
             let shot = data.entities.create();
             data.spatial.insert(shot, component::Spatial::new(origin, angle));
             data.visual.insert(shot, component::Visual::new(Some(data.world_state.inf.layer["effects"].clone()), None, data.world_state.inf.sprite.clone(), Color::WHITE, 1.0, 30, 0.2));
-            data.inertial.insert(shot, component::Inertial::new(Vec2(1133.0, 1133.0), Vec2::from_angle(angle), 4.0, 1.0, false));
+            data.inertial.insert(shot, component::Inertial::new(Vec2(1133.0, 1133.0), Vec2::from_angle(angle), 1.0));
             data.lifetime.insert(shot, component::Lifetime(data.world_state.age + 1.0));
             data.fading.insert(shot, component::Fading::new(data.world_state.age + 0.5, data.world_state.age + 1.0));
             data.bounding.insert(shot, component::Bounding::new(5.0, 1));

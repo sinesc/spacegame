@@ -16,7 +16,7 @@ pub struct Spatial {
     pub angle: Angle,
     /// Current lean left/right value
     #[serde(default)]
-    pub lean: f32, // todo: this isn't ideal here either
+    pub lean: f32,
 }
 
 impl Spatial {

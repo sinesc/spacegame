@@ -1,6 +1,13 @@
 use prelude::*;
 use specs;
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum InertialMotionType {
+    FOLLOW_VECTOR,
+    FOLLOW_ANGLE,
+    DETACHED,
+}
+
 /**
  * Inertial component
  * 
@@ -18,12 +25,21 @@ pub struct Inertial {
     pub trans_motion: f32,
     /// Transition speed when trying to stop
     pub trans_rest: f32,
-    /// True if the angle should not be updated from inertial.v_current
-    pub angle_locked: bool, // todo: use a factor here, so it can be set to 0 to lock or anything else to control how fast rotation happens
+
+    /// Maximum angular velocity at v_current = 0
+    pub av_max_v0: f32,
+    /// Maximum angular velocity at v_current = v_max
+    pub av_max_vmax: f32,
+
+    /// Rate of change for lean
+    pub trans_lean: f32,
+
+    /// Motion type
+    pub motion_type: InertialMotionType,
 }
 
 impl Inertial {
-    pub fn new(mut v_max: Vec2, mut v_fraction: Vec2, trans_motion: f32, trans_rest: f32, angle_locked: bool) -> Self {
+    pub fn new(mut v_max: Vec2, mut v_fraction: Vec2, av_max: f32) -> Self {
 
         // Move sign from v_max to v_fraction/v_current.
         // v_max should always be positive with v_fraction pointing into the current
@@ -43,9 +59,12 @@ impl Inertial {
             v_max       : v_max,
             v_fraction  : v_fraction,
             v_current   : v_max * v_fraction,
-            trans_motion: trans_motion,
-            trans_rest  : trans_rest,
-            angle_locked: angle_locked,
+            trans_motion: 6.0,
+            trans_rest  : 3.0,
+            av_max_v0   : av_max,
+            av_max_vmax : av_max * 0.1,
+            trans_lean  : 10.0,
+            motion_type : InertialMotionType::FOLLOW_VECTOR,
         }
     }
 }

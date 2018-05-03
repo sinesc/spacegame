@@ -15,6 +15,7 @@ mod prelude;
 mod def;
 mod sound;
 mod level;
+mod bloom;
 
 use prelude::*;
 use level::Level;

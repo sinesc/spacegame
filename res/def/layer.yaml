@@ -6,7 +6,10 @@ create:
         name: effects
         scale: 1.0
         blendmode: add
-render: 
+    -
+        name: text
+        scale: 1.0
+render:
     -
         name: effects
         filter: bloom
@@ -14,4 +17,10 @@ render:
     -
         name: base
     -
+        name: base
+        filter: glare
+        component: 1
+    -
         name: effects
+    -
+        name: text

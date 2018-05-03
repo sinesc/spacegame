@@ -39,16 +39,39 @@ impl<'a> specs::System<'a> for Inertia {
 
         for (spatial, inertial) in (&mut data.spatial, &mut data.inertial).join() {
 
-            // todo: make this scale linearly between trans_rest and trans_motion based on v_fraction?
-            let trans_current = Vec2(
-                if inertial.v_fraction.0 != 0.0 { inertial.trans_motion } else { inertial.trans_rest },
-                if inertial.v_fraction.1 != 0.0 { inertial.trans_motion } else { inertial.trans_rest },
-            );
+            // compute max inertial angular velocity 
 
-            let v_target = inertial.v_max * inertial.v_fraction;
+            let v_factor = (inertial.v_current.len() / inertial.v_max.len()).powi(2);
+            let av_max = lerp(&inertial.av_max_v0, &inertial.av_max_vmax, v_factor) * delta;
 
-            inertial.v_current = inertial.v_current * (Vec2(1.0, 1.0) - delta * trans_current) + (v_target * (delta * trans_current));
+            // compute inertial velocity
+
+            let v_trans = lerp(&inertial.trans_rest, &inertial.trans_motion, inertial.v_fraction.len());
+            let v_current_target = lerp(&inertial.v_current, &(inertial.v_max * inertial.v_fraction), v_trans * delta);
+
+            // limit change in direction of velocity vector to max angular velocity
+
+            let old_angle = inertial.v_current.to_angle();
+            let mut target_angle = v_current_target.to_angle();
+            target_angle.align_with(&old_angle);
+
+            let mut av_current = (target_angle - old_angle).to_radians();
+
+            inertial.v_current = if av_current.abs() > av_max {
+                v_current_target.len() * (old_angle + Angle(av_max) * av_current.signum()).to_vec2()
+            } else {
+                v_current_target
+            };
+
+            // lean into rotation direction
+
+            let current_lean = clamp(av_current / av_max * (0.1 + v_factor), -1., 1.);
+            approach(&mut spatial.lean, &current_lean, inertial.trans_lean * data.world_state.delta);
+
+            // update spatial position
+
             spatial.position += inertial.v_current * delta;
+            spatial.angle = inertial.v_current.to_angle();
 
             // todo: edge reflection just for fun right now
             if let Some(outbound) = spatial.position.outbound(((0.0, 0.0), (1920.0, 1080.0))) {
@@ -60,10 +83,15 @@ impl<'a> specs::System<'a> for Inertia {
                 inertial.v_current = reflection;
                 inertial.v_fraction = reflection.normalize() * inertial.v_fraction.len();
 
-                if !inertial.angle_locked {
+                if inertial.motion_type != component::InertialMotionType::DETACHED {
                     spatial.angle = inertial.v_fraction.to_angle();
                 }
             }
 		}
 	}
+}
+
+// TODO: move to radiant-utils
+pub fn clamp<T>(a: T, min: T, max: T) -> T where T: PartialOrd {
+    if a.lt(&min) { min } else if a.gt(&max) { max } else { a }
 }

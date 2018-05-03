@@ -6,9 +6,13 @@ pub use self::spatial::Spatial;
 
 mod inertial;
 pub use self::inertial::Inertial;
+pub use self::inertial::InertialMotionType;
 
 mod controlled;
 pub use self::controlled::Controlled;
+
+mod computed;
+pub use self::computed::Computed;
 
 mod lifetime;
 pub use self::lifetime::Lifetime;
@@ -22,8 +26,8 @@ pub use self::fading::Fading;
 mod bounding;
 pub use self::bounding::Bounding;
 
-mod explosion;
-pub use self::explosion::Explosion;
+mod exploding;
+pub use self::exploding::Exploding;
 
 mod hitpoints;
 pub use self::hitpoints::Hitpoints;

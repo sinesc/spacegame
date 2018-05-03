@@ -7,7 +7,7 @@ pub use std::time::Instant;
 pub use std::f32::consts::PI;
 pub use radiant_utils::maths as rm;
 pub use radiant_utils::util as ru;
-pub use radiant_utils::maths::{Angle, Vec2, approach, min, max};
+pub use radiant_utils::maths::{Angle, Vec2, lerp, approach, min, max};
 pub use radiant_utils::util::{Periodic, Rng};
 pub use radiant_utils::loops::renderloop;
 pub use radiant::{Layer, Sprite, Color, Input, InputId, Font, Renderer, Texture, RenderContext, Display, blendmodes, postprocessors};
