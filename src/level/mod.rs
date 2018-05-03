@@ -209,7 +209,7 @@ println!("{:?}", tmp);
                     });
                 } else if filter == "glare" {
                     renderer.postprocess(&self.glare, &blendmodes::SCREEN, || {
-                        renderer.fill().color(Color::alpha_mask(0.1)).draw();
+                        renderer.fill().color(Color::alpha_mask(0.05)).draw();
                         renderer.draw_layer(&self.inf.layer[&info.name], info.component);
                     });
                 } else {
@@ -238,7 +238,7 @@ println!("{:?}", tmp);
                 .with(component::Spatial::new(pos, angle))
                 .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.asteroid.clone(), Color::WHITE, scale, 30, 1.0))
                 .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 1.0))
-                .with(component::Bounding::new(20.0 * scale, self.rng.range(2., 102.) as u32))
+                .with(component::Bounding::new(20.0 * scale, self.rng.range(2., 100.) as u32))
                 .with(component::Hitpoints::new(100. * scale))
                 .build();
 
@@ -255,9 +255,9 @@ println!("{:?}", tmp);
             self.world.create_entity()
                 .with(component::Spatial::new(pos, angle))
                 .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.mine.clone(), Color::WHITE, scale, 30, 1.0))
-                .with(component::Bounding::new(20.0, 0))
+                .with(component::Bounding::new(20.0, self.rng.range(101., 200.) as u32))
                 .with(component::Hitpoints::new(100.))
-                .with(component::Shooter::new(1.2))
+                .with(component::Shooter::new(0.5))
                 .with(component::Computed::new())
                 .with(component::Inertial::new(Vec2(120.0, 120.0), Vec2(0.0, 0.0), 1.0))
                 .build();
