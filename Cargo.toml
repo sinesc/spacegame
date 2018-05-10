@@ -7,13 +7,14 @@ authors = ["Dennis Möhlmann <dmo479@gmail.com>"]
 shred = "0.5.1"
 shred-derive = "0.3.0"
 specs = "0.10.0"
-radiant-rs = "0.12.1"
+radiant-rs = "0.12.2"
 radiant-utils = "0.1.5"
 serde = "1.0"
 serde_yaml = "0.7.3"
 serde_derive = "1.0"
 yaml-merge-keys = { version = "0.2.0", features = [ "serde_yaml" ] }
 rodio = "0.7.0"
+unicode-segmentation = "1.2.1"
 
 [profile.dev]
 opt-level = 2
