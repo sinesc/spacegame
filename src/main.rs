@@ -38,7 +38,12 @@ fn main() {
 
     let mut cmd = cmd::Cmd::new();
     cmd.register("test", Box::new([cmd::Type::Str, cmd::Type::Int]), Box::new(|p| println!("{:?}", p) ));
+    cmd.exec("test \"Hello World!\" 12; test Hello 13");
+    cmd.exec("test \"Hello World!\" 12; test Hello 13;");
+    cmd.exec("test \"Hello World!\" 12;");
     cmd.exec("test \"Hello World!\" 12");
+    cmd.exec("test");
+    //cmd.exec("test Hello 13");
 
     display.grab_cursor();
     display.set_fullscreen().unwrap();

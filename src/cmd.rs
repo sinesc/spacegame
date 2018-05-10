@@ -37,15 +37,17 @@ impl Cmd {
 
     pub fn exec(self: &Self, input: &str) {
 
-        let tokens = Self::tokenize(input);
+        let lines = Self::tokenize(input);
 
-        if tokens.len() > 0 {
-            match self.commands.get(tokens[0]) {
-                Some(command) => {
-                    let params = Self::parse(&tokens[1..tokens.len()], &command.0);
-                    command.1(&params);
+        for tokens in lines.iter() {
+            if tokens.len() > 0 {
+                match self.commands.get(tokens[0]) {
+                    Some(command) => {
+                        let params = Self::parse(&tokens[1..tokens.len()], &command.0);
+                        command.1(&params);
+                    }
+                    None => println!("Unknown command \"{}\".", tokens[0])
                 }
-                None => println!("Unknown command \"{}\".", tokens[0])
             }
         }
     }
@@ -57,7 +59,14 @@ impl Cmd {
         for (index, ptype) in signature.iter().enumerate() {
             result.push(match *ptype {
                 // TODO: all kinds of checks
-                Type::Str => Param::Str(raw_params[index][1..raw_params[index].len()-1].to_string()),
+                Type::Str => {
+                    let param = &raw_params[index];
+                    if &param[0..1] == "\"" {
+                        Param::Str(param[1..param.len()-1].to_string())
+                    } else {
+                        Param::Str(param.to_string())
+                    }
+                },
                 Type::Int => Param::Int(raw_params[index].parse().unwrap()),
                 Type::Float => Param::Float(raw_params[index].parse().unwrap()),
                 Type::Bool => Param::Bool(raw_params[index] == "true"),
@@ -67,17 +76,20 @@ impl Cmd {
         result
     }
 
-    fn tokenize(input: &str) -> Vec<&str> {
+    fn tokenize(input: &str) -> Vec<Vec<&str>> {
 
         let input = input.trim();
         let mut start = 0;
         let mut within_string = false;
-        let mut result = Vec::new();
+        let mut commands = Vec::new();
+        let mut tokens = Vec::new();
+
+        // * is required since start==pos right after a string ends (can't look ahead and skip the space)
 
         for (pos, ref grapheme) in UCS::grapheme_indices(input, true) {
             if within_string {
                 if *grapheme == "\"" {
-                    result.push(&input[start..pos + grapheme.len()]);
+                    tokens.push(&input[start..pos + grapheme.len()]);
                     start = pos + grapheme.len();
                     within_string = false;
                 }
@@ -86,20 +98,28 @@ impl Cmd {
                     start = pos;
                     within_string = true;
                 } else if *grapheme == " " {
-                    if start < pos {
-                        // start==pos right after a string ends
-                        result.push(&input[start..pos]);
+                    if start < pos { // *                        
+                        tokens.push(&input[start..pos]);
                     }
+                    start = pos + grapheme.len();
+                } else if *grapheme == ";" {
+                    if start < pos { // * 
+                        tokens.push(&input[start..pos]);
+                    }
+                    commands.push(::std::mem::replace(&mut tokens, Vec::new()));
                     start = pos + grapheme.len();
                 }
             }
         }
 
-        if start < input.len() {
-            // start==pos right after a string ends
-            result.push(&input[start..input.len()]);
+        if start < input.len() { // * 
+            tokens.push(&input[start..input.len()]);
         }
         
-        result
+        if tokens.len() > 0 {
+            commands.push(tokens);
+        }
+
+        commands
     }
 }
