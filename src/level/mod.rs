@@ -1,7 +1,7 @@
 use prelude::*;
 use specs;
 use rodio;
-use sound::{Sound, SoundGroup};
+use sound::{SoundGroup};
 use def;
 use bloom;
 
@@ -66,10 +66,11 @@ impl<'a, 'b> Level<'a, 'b> {
 
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let mine = Sprite::from_file(context, "res/sprite/hostile/mine_lightmapped_64x64x15x2.png").unwrap().arc();
+        //let mine = Sprite::from_file(context, "res/sprite/hostile/mine_red_64x64x15.png").unwrap().arc();
         let friend = Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc();
-        //let powerup = Sprite::from_file(context, "res/sprite/powerup/ball_v_32x32x18.jpg").unwrap().arc();
         let asteroid = Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc();
         let explosion = Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc();
+        //let powerup = Sprite::from_file(context, "res/sprite/powerup/ball_v_32x32x18.jpg").unwrap().arc();
         // res/sprite/explosion/lightmapped_256x256x40x2.jpg
         // res/sprite/explosion/default_256x256x40.jpg
 
@@ -100,16 +101,16 @@ println!("{:?}", tmp);
             layers.insert(info.name.clone(), layer);
         }
 
-        // create test entity
+        // create player entity
 
         world.create_entity()
             .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0)))
             .with(component::Visual::new(Some(layers["base"].clone()), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 1.0, 0, 1.0))
-            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 6.0))
+            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 7.0))
             .with(component::Controlled::new(1))
             .with(component::Shooter::new(0.2))
             .with(component::Bounding::new(20.0, 1))
-            .with(component::Hitpoints::new(10000.))
+            .with(component::Hitpoints::new(100000.))
             .build();
 /*
         world.create_entity()
@@ -170,7 +171,7 @@ println!("{:?}", tmp);
             layer_def   : layer_def,
             created     : created,
             roidspawn   : Periodic::new(0.0, 0.5),
-            minespawn   : Periodic::new(0.0, 5.5),
+            minespawn   : Periodic::new(0.0, 3.73),
             rng         : Rng::new(123.4),
             bloom       : bloom,
             glare       : bloom::Bloom::new(&context, (1920, 1080), 2, 5, 5.0),

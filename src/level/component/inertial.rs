@@ -3,9 +3,8 @@ use specs;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum InertialMotionType {
-    FOLLOW_VECTOR,
-    FOLLOW_ANGLE,
-    DETACHED,
+    FollowVector,
+    Detached
 }
 
 /**
@@ -62,9 +61,9 @@ impl Inertial {
             trans_motion: 6.0,
             trans_rest  : 3.0,
             av_max_v0   : av_max,
-            av_max_vmax : av_max * 0.1,
+            av_max_vmax : av_max * 0.2,
             trans_lean  : 10.0,
-            motion_type : InertialMotionType::FOLLOW_VECTOR,
+            motion_type : InertialMotionType::FollowVector,
         }
     }
 }

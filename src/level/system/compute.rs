@@ -42,7 +42,7 @@ impl<'a> specs::System<'a> for Compute {
 
     fn run(&mut self, mut data: ComputeData) {
 		use specs::Join;
-        use std::f32::consts::PI;
+        //use std::f32::consts::PI;
 
         let mut projectiles = Vec::new();
         let mut target_pos = Vec2(-1., -1.);
@@ -61,14 +61,23 @@ impl<'a> specs::System<'a> for Compute {
 
 		for (_, spatial, inertial, shooter, bounding) in (&mut data.computed, &mut data.spatial, &mut data.inertial, &mut data.shooter, &data.bounding).join() {
 
-            // turn towards player
+            // approach position 250px offset to the right (direction normal) of the player
 
-            inertial.v_fraction = (target_pos - spatial.position).normalize();
+            let offset = (target_pos - spatial.position).right().normalize() * 1000.;
+            inertial.v_fraction = ((target_pos + offset) - spatial.position).normalize();
 
-            // shoot ?
+            // compute angle between direct vector to player and vector to offset position
+
+            let mut a1 = (target_pos - spatial.position).to_angle();
+            let a2 = inertial.v_fraction.to_angle();
+            //a1.align_with(&a2);
+            let diff = a2 - a1;
+
+            // shoot towards the offset direction (still obeying rotation limits)
 
             if shooter.interval.elapsed(data.world_state.age) {
-                projectiles.push((bounding.faction, spatial.position, spatial.angle));
+                projectiles.push((bounding.faction, spatial.position, spatial.angle - diff));
+                //projectiles.push((bounding.faction, spatial.position, (target_pos - spatial.position).to_angle()));
                 rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.samples());
             }
 		}

@@ -65,13 +65,20 @@ impl<'a> specs::System<'a> for Inertia {
 
             // lean into rotation direction
 
-            let current_lean = clamp(av_current / av_max * (0.1 + v_factor), -1., 1.);
+            let current_lean = clamp(av_current / av_max * (0.3 + v_factor), -1., 1.);
             approach(&mut spatial.lean, &current_lean, inertial.trans_lean * data.world_state.delta);
 
             // update spatial position
 
             spatial.position += inertial.v_current * delta;
-            spatial.angle = inertial.v_current.to_angle();
+
+            if inertial.motion_type != component::InertialMotionType::Detached {
+                spatial.angle = inertial.v_current.to_angle();
+            }
+
+
+
+
 
             // todo: edge reflection just for fun right now
             if let Some(outbound) = spatial.position.outbound(((0.0, 0.0), (1920.0, 1080.0))) {
@@ -83,7 +90,7 @@ impl<'a> specs::System<'a> for Inertia {
                 inertial.v_current = reflection;
                 inertial.v_fraction = reflection.normalize() * inertial.v_fraction.len();
 
-                if inertial.motion_type != component::InertialMotionType::DETACHED {
+                if inertial.motion_type != component::InertialMotionType::Detached {
                     spatial.angle = inertial.v_fraction.to_angle();
                 }
             }
