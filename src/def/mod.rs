@@ -8,6 +8,8 @@ mod layer;
 pub use self::layer::*;
 mod entity;
 pub use self::entity::*;
+mod menu;
+pub use self::menu::*;
 
 #[derive(Debug)]
 pub struct Error {

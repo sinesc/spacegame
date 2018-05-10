@@ -1,0 +1,26 @@
+default: &default
+    top: 0.1
+    left: 0.3
+    stride_y: 0.1
+main:
+    <<: *default
+    items:
+        -
+            label: New Game
+            action: new_game
+        -
+            label: Load Game
+            action: nyi
+        -
+            label: Options
+            action: options
+            stride_y: 0.15
+        -
+            label: Quit Game
+            action: quit
+options:
+    <<: *default
+    items:
+        -
+            label: Fullscreen {state}
+            action: toggle_fullscreen
