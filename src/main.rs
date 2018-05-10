@@ -26,6 +26,8 @@ use menu::Menu;
 
 fn main() {
 
+    use cmd::Type::*;
+
     let dummy = sound::Sound::load("res/sound/projectile/pew1a.ogg").unwrap();
     rodio::play_raw(&rodio::default_output_device().unwrap(), dummy.samples());
 
@@ -37,13 +39,11 @@ fn main() {
     let mut menu = Menu::new(&input, &renderer.context());
 
     let mut cmd = cmd::Cmd::new();
-    cmd.register("test", Box::new([cmd::Type::Str, cmd::Type::Int]), Box::new(|p| println!("{:?}", p) ));
-    cmd.exec("test \"Hello World!\" 12; test Hello 13");
-    cmd.exec("test \"Hello World!\" 12; test Hello 13;");
-    cmd.exec("test \"Hello World!\" 12;");
-    cmd.exec("test \"Hello World!\" 12");
-    cmd.exec("test");
-    //cmd.exec("test Hello 13");
+    cmd.register("test", Box::new([Str, Int]), Box::new(|p| println!("2 args: {:?}", p) ));
+    cmd.register("test", Box::new([Str, Int, Float]), Box::new(|p| println!("3 args: {:?}", p) ));
+
+    cmd.exec("test \"Hello World!\" 12; test Hello 13 15.6");
+    cmd.exec("test \"invalid\"");
 
     display.grab_cursor();
     display.set_fullscreen().unwrap();

@@ -21,7 +21,7 @@ pub type Handler = Box<Fn(&[Param])>;
 pub type Signature = Box<[Type]>;
 
 pub struct Cmd {
-    commands: HashMap<String, (Signature, Handler)>  // TODO: signature length in key to support overloading
+    commands: HashMap<String, HashMap<usize, (Signature, Handler)>>
 }
 
 impl Cmd {
@@ -32,7 +32,8 @@ impl Cmd {
     }
 
     pub fn register(self: &mut Self, name: &str, signature: Signature, handler: Handler) {
-        self.commands.insert(name.to_string(), (signature, handler));
+        let overloads = self.commands.entry(name.to_string()).or_insert(HashMap::new());
+        overloads.insert(signature.len(), (signature, handler));
     }
 
     pub fn exec(self: &Self, input: &str) {
@@ -42,9 +43,13 @@ impl Cmd {
         for tokens in lines.iter() {
             if tokens.len() > 0 {
                 match self.commands.get(tokens[0]) {
-                    Some(command) => {
-                        let params = Self::parse(&tokens[1..tokens.len()], &command.0);
-                        command.1(&params);
+                    Some(overloads) => {
+                        if let Some(command) = overloads.get(&(tokens.len() - 1)) {
+                            let params = Self::parse(&tokens[1..tokens.len()], &command.0);
+                            command.1(&params);
+                        } else {
+                            println!("Command \"{}\" expects on of the following number of arguments: {:?}.", tokens[0], overloads.keys());
+                        }
                     }
                     None => println!("Unknown command \"{}\".", tokens[0])
                 }
