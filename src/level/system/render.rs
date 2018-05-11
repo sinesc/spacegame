@@ -39,12 +39,14 @@ impl<'a> specs::System<'a> for Render {
     fn run(&mut self, mut data: RenderData) {
 		use specs::Join;
 
+        let age = data.world_state.age.elapsed_f32();
+
         // apply fade effects
 
 		for (fading, visual) in (&data.fading, &mut data.visual).join() {
-            if data.world_state.age >= fading.start {
+            if age >= fading.start {
                 let duration = fading.end - fading.start;
-                let progress = data.world_state.age - fading.start;
+                let progress = age - fading.start;
                 let alpha = 1.0 - (progress / duration);
                 if alpha >= 0.0 {
                     visual.color.set_a(alpha);
@@ -77,11 +79,11 @@ impl<'a> specs::System<'a> for Render {
 
         self.num_frames += 1;
 
-        if self.fps_interval.elapsed(data.world_state.age) {
+        if self.fps_interval.elapsed(age) {
             self.last_num_frames = self.num_frames;
             self.num_frames = 0;
         }
 
-        data.world_state.inf.font.write(&data.world_state.inf.layer["text"], &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, data.world_state.delta, num_sprites), (10.0, 10.0), Color::WHITE);
+        data.world_state.inf.font.write(&data.world_state.inf.layer["text"], &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, data.world_state.delta, num_sprites), (10.0, 10.0), Color::alpha_pm(0.4));
 	}
 }

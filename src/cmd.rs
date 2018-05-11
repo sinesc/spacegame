@@ -17,6 +17,13 @@ pub enum Param {
     Bool(bool),
 }
 
+impl Param {
+    pub fn to_string(self: &Self) -> String {
+        if let &Param::Str(ref ret) = self { ret.to_string() } else { "".to_string() }
+    }
+}
+
+
 pub type Handler<T> = Box<Fn(&mut T, &[Param])>;
 pub type Signature = Vec<Type>;
 

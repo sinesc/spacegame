@@ -37,3 +37,6 @@ options:
         -
             label: Fullscreen {state}
             action: video_fullscreen
+        -
+            label: Main Menu
+            action: menu_switch main

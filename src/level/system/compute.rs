@@ -43,9 +43,14 @@ impl<'a> specs::System<'a> for Compute {
     fn run(&mut self, mut data: ComputeData) {
 		use specs::Join;
         //use std::f32::consts::PI;
+        
+        if data.world_state.paused {
+            return;
+        }
 
         let mut projectiles = Vec::new();
         let mut target_pos = Vec2(-1., -1.);
+        let age = data.world_state.age.elapsed_f32();
 
         for (controlled, spatial) in (&data.controlled, &data.spatial).join() {
             if controlled.input_id == 1 {
@@ -75,7 +80,7 @@ impl<'a> specs::System<'a> for Compute {
 
             // shoot towards the offset direction (still obeying rotation limits)
 
-            if shooter.interval.elapsed(data.world_state.age) {
+            if shooter.interval.elapsed(age) {
                 projectiles.push((bounding.faction, spatial.position, spatial.angle - diff));
                 //projectiles.push((bounding.faction, spatial.position, (target_pos - spatial.position).to_angle()));
                 rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.samples());
@@ -87,8 +92,8 @@ impl<'a> specs::System<'a> for Compute {
             data.spatial.insert(shot, component::Spatial::new(origin, angle));
             data.visual.insert(shot, component::Visual::new(Some(data.world_state.inf.layer["effects"].clone()), None, data.world_state.inf.sprite.clone(), Color(2.0, 0.2, 0.2, 1.0), 1.0, 30, 0.2));
             data.inertial.insert(shot, component::Inertial::new(Vec2(1133.0, 1133.0), Vec2::from_angle(angle), 1.0));
-            data.lifetime.insert(shot, component::Lifetime(data.world_state.age + 1.0));
-            data.fading.insert(shot, component::Fading::new(data.world_state.age + 0.5, data.world_state.age + 1.0));
+            data.lifetime.insert(shot, component::Lifetime(age + 1.0));
+            data.fading.insert(shot, component::Fading::new(age + 0.5, age + 1.0));
             data.bounding.insert(shot, component::Bounding::new(5.0, faction));
             data.hitpoints.insert(shot, component::Hitpoints::new(50.0));
         };

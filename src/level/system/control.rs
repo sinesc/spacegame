@@ -68,9 +68,14 @@ impl<'a> specs::System<'a> for Control {
 
     fn run(&mut self, mut data: ControlData) {
 		use specs::Join;
-        use std::f32::consts::PI;
+        //use std::f32::consts::PI;
+
+        if !data.world_state.take_input || data.world_state.paused {
+            return;
+        }
 
         let mut projectiles = Vec::new();
+        let age = data.world_state.age.elapsed_f32();
 
         /*for key in data.world_state.inf.input.iter().down() {
             println!("{:?}", key);
@@ -111,7 +116,7 @@ impl<'a> specs::System<'a> for Control {
 
             // shoot ?
 
-            if shoot && shooter.interval.elapsed(data.world_state.age) {
+            if shoot && shooter.interval.elapsed(age) {
                 //inertial.v_fraction -= spatial.angle.to_vec2() * 0.001 / data.world_state.delta;
                 projectiles.push((spatial.position, spatial.angle));
                 rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.samples());
@@ -128,8 +133,8 @@ impl<'a> specs::System<'a> for Control {
             data.spatial.insert(shot, component::Spatial::new(origin, angle));
             data.visual.insert(shot, component::Visual::new(Some(data.world_state.inf.layer["effects"].clone()), None, data.world_state.inf.sprite.clone(), Color::WHITE, 1.0, 30, 0.2));
             data.inertial.insert(shot, component::Inertial::new(Vec2(1133.0, 1133.0), Vec2::from_angle(angle), 1.0));
-            data.lifetime.insert(shot, component::Lifetime(data.world_state.age + 1.0));
-            data.fading.insert(shot, component::Fading::new(data.world_state.age + 0.5, data.world_state.age + 1.0));
+            data.lifetime.insert(shot, component::Lifetime(age + 1.0));
+            data.fading.insert(shot, component::Fading::new(age + 0.5, age + 1.0));
             data.bounding.insert(shot, component::Bounding::new(5.0, 1));
             data.hitpoints.insert(shot, component::Hitpoints::new(50.0));
         };

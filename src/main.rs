@@ -19,13 +19,17 @@ mod level;
 mod bloom;
 mod menu;
 mod cmd;
+mod timer;
 
 use prelude::*;
 use level::Level;
 use menu::Menu;
+use cmd::Cmd;
+use cmd::Type::*;
 
 struct CommandContext {
-    current_menu: Option<String>,
+    menu            : Rc<Menu>,
+    exit_requested  : bool,
 }
 
 fn main() {
@@ -33,44 +37,46 @@ fn main() {
     let dummy = sound::Sound::load("res/sound/projectile/pew1a.ogg").unwrap();
     rodio::play_raw(&rodio::default_output_device().unwrap(), dummy.samples());
 
-
     let display = Display::builder().dimensions((1920, 1080)).vsync().build().unwrap();
+    display.grab_cursor();
+    display.set_fullscreen().unwrap();
     let renderer =  Renderer::new(&display).unwrap();
     let input = Input::new(&display);
     let mut level = Level::new(&input, &renderer.context());
 
-    let cmd = {
-        use cmd::Type::*;
+    // create menu and command parser
 
-        let mut cmd = cmd::Cmd::new(CommandContext { 
-            current_menu: Some("main".to_string()), 
-        });
+    let menu = Rc::new(Menu::new(&input, &renderer.context()));
+    menu.group("main");
 
-        cmd.register("test", vec![Str, Int], Box::new(|c, p| println!("2 args: {:?}", p) ));
-        cmd.register("menu_close", vec![], Box::new(|c, p| { println!("menu close"); c.current_menu = None; }));
+    let mut cmd = Cmd::new(CommandContext { 
+        menu: menu.clone(),
+        exit_requested: false,
+    });
 
-        Rc::new(cmd)
-    };
+    cmd.register("menu_close", vec![], Box::new(|c, p| { c.menu.hide(); }));
+    cmd.register("menu_switch", vec![Str], Box::new(|c, p| { c.menu.group(&p[0].to_string()); }));
+    cmd.register("exit", vec![], Box::new(|c, p| c.exit_requested = true ));
 
-    let mut menu = Menu::new(&input, &renderer.context(), cmd.clone());
-
-    display.grab_cursor();
-    display.set_fullscreen().unwrap();
+    // game main loop
 
     renderloop(|frame| {
+
         display.poll_events();
 
-        display.clear_frame(Color::BLACK);
-        level.process(&renderer, frame.delta_f32);
-
-        let current_menu = cmd.context().current_menu.clone();
-
-        if current_menu.is_some() {
-            menu.process(&renderer, frame.delta_f32, &current_menu.unwrap());
+        if input.pressed(InputId::Escape, false) {
+            if !menu.visible() {
+                menu.group("main");
+            } else {
+                menu.hide();
+            }
         }
 
+        display.clear_frame(Color::BLACK);        
+        level.process(&renderer, frame.delta_f32, !menu.visible(), menu.visible());
+        menu.process(&renderer, frame.delta_f32, &cmd);
         display.swap_frame();
 
-        !display.was_closed() && !input.down(InputId::Escape)
+        !display.was_closed() && !cmd.context().exit_requested
     });
 }

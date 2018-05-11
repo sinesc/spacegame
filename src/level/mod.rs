@@ -4,6 +4,7 @@ use rodio;
 use sound::{SoundGroup};
 use def;
 use bloom;
+use timer::Timer;
 
 pub mod component;
 mod system;
@@ -23,9 +24,11 @@ pub struct Infrastructure {
 
 #[derive(Clone)]
 pub struct WorldState {
-    delta   : f32,
-    age     : f32,
-    inf     : Arc<Infrastructure>,
+    delta       : f32,
+    age         : Timer,
+    take_input  : bool,
+    paused      : bool,
+    inf         : Arc<Infrastructure>,
 }
 
 pub struct Level<'a, 'b> {
@@ -144,7 +147,13 @@ println!("{:?}", tmp);
             boom        : boom,
         });
 
-        world.add_resource(WorldState { delta: 0.0, age: 0.0, inf: infrastructure.clone() });
+        world.add_resource(WorldState { 
+            delta       : 0.0, 
+            age         : Timer::new(), 
+            take_input  : true,
+            paused      : false,
+            inf         : infrastructure.clone() 
+        });
 
         // create planner and add systems
 
@@ -180,18 +189,28 @@ println!("{:?}", tmp);
         }
     }
 
-    pub fn process(self: &mut Self, renderer: &Renderer, delta: f32) {
+    pub fn process(self: &mut Self, renderer: &Renderer, delta: f32, take_input: bool, paused: bool) {
 
-        let age = Instant::now() - self.created;
-        let age = age.as_secs() as f32 + (age.subsec_nanos() as f64 / 1000000000.0) as f32;
+        let age = {
 
-        {
-            let mut world_state = self.world.write_resource::<WorldState>();
-            world_state.delta = if delta.is_nan() || delta == 0.0 { 0.0001 } else { delta };
-            world_state.age = age;
-        }
+            let mut world_state = self.world.write_resource::<WorldState>();            
+            world_state.take_input = take_input;
+            world_state.paused = paused;
+
+            if !paused {
+                world_state.delta = if delta.is_nan() || delta == 0.0 { 0.0167 } else { delta };
+                world_state.age.resume();
+            } else {
+                world_state.age.pause();
+                world_state.delta = 0.;
+            }
+
+            world_state.age.elapsed_f32()
+        };
 
         self.dispatcher.dispatch(&mut self.world.res);
+
+        // render layers
 
         renderer.fill().texture(&self.background).blendmode(blendmodes::COPY).draw();
 
@@ -224,6 +243,8 @@ println!("{:?}", tmp);
         for info in &self.layer_def.create {
             self.inf.layer[&info.name].clear();
         }
+
+        // some temporary spawning
 
         if self.roidspawn.elapsed(age) {
             let angle = Angle(self.rng.range(-PI, PI));

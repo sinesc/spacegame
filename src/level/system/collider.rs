@@ -33,10 +33,11 @@ impl<'a> Collider {
 
     fn spawn<'b>(data: &mut ColliderData<'b>, origin: Vec2, effect_size: f32) {
         let explosion = data.entities.create();
+        let age = data.world_state.age.elapsed_f32();
         data.spatial.insert(explosion, component::Spatial::new(origin, Angle(0.0)));
         data.visual.insert(explosion, component::Visual::new(None, Some(data.world_state.inf.layer["effects"].clone()), data.world_state.inf.explosion.clone(), Color::WHITE, 1.0, 30, effect_size));
-        data.lifetime.insert(explosion, component::Lifetime(data.world_state.age + 1.0));
-        data.fading.insert(explosion, component::Fading::new(data.world_state.age + 0.5, data.world_state.age + 1.0));
+        data.lifetime.insert(explosion, component::Lifetime(age + 1.0));
+        data.fading.insert(explosion, component::Fading::new(age + 0.5, age + 1.0));
     }
 }
 
@@ -46,6 +47,10 @@ impl<'a> specs::System<'a> for Collider {
     fn run(&mut self, mut data: ColliderData) {
 		use specs::Join;
 
+        if data.world_state.paused {
+            return;
+        }
+        
         // test all against all other entities todo: use a grid or quadtree to reduce checks
 
         let mut collisions = Vec::new();
