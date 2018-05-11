@@ -17,25 +17,51 @@ pub enum Param {
     Bool(bool),
 }
 
-pub type Handler = Box<Fn(&[Param])>;
-pub type Signature = Box<[Type]>;
+pub type Handler<T> = Box<Fn(&mut T, &[Param])>;
+pub type Signature = Vec<Type>;
 
-pub struct Cmd {
-    commands: HashMap<String, HashMap<usize, (Signature, Handler)>>
+pub struct Cmd<T> {
+    commands: HashMap<String, HashMap<usize, (Signature, Handler<T>)>>,
+    context: RefCell<T>,
 }
 
-impl Cmd {
-    pub fn new() -> Self{
+impl<T> Cmd<T> {
+
+    /**
+     * creates a new command parser instance
+     */
+    pub fn new(context: T) -> Self {
         Cmd {
             commands: HashMap::new(),
+            context: RefCell::new(context),
         }
     }
 
-    pub fn register(self: &mut Self, name: &str, signature: Signature, handler: Handler) {
+    /**
+     * returns a reference to the given context
+     */
+    pub fn context(self: &Self) -> ::std::cell::Ref<T> {
+        self.context.borrow()
+    }
+
+    /**
+     * returns a mutable reference to the given context
+     */
+    pub fn context_mut(self: &Self) -> ::std::cell::RefMut<T> {
+        self.context.borrow_mut()
+    }
+
+    /**
+     * registers a command+signature with the command processor
+     */
+    pub fn register(self: &mut Self, name: &str, signature: Signature, handler: Handler<T>) {
         let overloads = self.commands.entry(name.to_string()).or_insert(HashMap::new());
         overloads.insert(signature.len(), (signature, handler));
     }
 
+    /**
+     * attempts to execute the given console commands
+     */
     pub fn exec(self: &Self, input: &str) {
 
         let lines = Self::tokenize(input);
@@ -46,9 +72,10 @@ impl Cmd {
                     Some(overloads) => {
                         if let Some(command) = overloads.get(&(tokens.len() - 1)) {
                             let params = Self::parse(&tokens[1..tokens.len()], &command.0);
-                            command.1(&params);
+                            let mut context = self.context.borrow_mut();
+                            command.1(&mut context, &params);
                         } else {
-                            println!("Command \"{}\" expects on of the following number of arguments: {:?}.", tokens[0], overloads.keys());
+                            println!("Command \"{}\" expects one of the following number of arguments: {:?}.", tokens[0], overloads.keys());
                         }
                     }
                     None => println!("Unknown command \"{}\".", tokens[0])
@@ -57,6 +84,9 @@ impl Cmd {
         }
     }
 
+    /**
+     * parses list of parameter strings into list of typed values
+     */
     fn parse(raw_params: &[&str], signature: &Signature) -> Vec<Param> {
 
         let mut result = Vec::new();
@@ -81,6 +111,9 @@ impl Cmd {
         result
     }
 
+    /**
+     * splits the input string into commands and tokens for each command
+     */
     fn tokenize(input: &str) -> Vec<Vec<&str>> {
 
         let input = input.trim();

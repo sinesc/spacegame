@@ -7,20 +7,33 @@ main:
     items:
         -
             label: New Game
-            action: new_game
+            action: menu_close; level_start 1
         -
             label: Load Game
-            action: nyi
+            action: menu_switch savegames
         -
             label: Options
-            action: options
+            action: menu_switch options
             stride_y: 0.15
         -
             label: Quit Game
-            action: quit
+            action: exit
+ingame:
+    <<: *default
+    items:
+        -
+            label: Resume Game
+            action: menu_close
+            stride_y: 0.15
+        - 
+            label: Options
+            action: menu_switch options
+        -
+            label: Exit to Menu
+            action: level_stop; menu_switch main
 options:
     <<: *default
     items:
         -
             label: Fullscreen {state}
-            action: toggle_fullscreen
+            action: video_fullscreen

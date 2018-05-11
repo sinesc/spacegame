@@ -24,9 +24,11 @@ use prelude::*;
 use level::Level;
 use menu::Menu;
 
-fn main() {
+struct CommandContext {
+    current_menu: Option<String>,
+}
 
-    use cmd::Type::*;
+fn main() {
 
     let dummy = sound::Sound::load("res/sound/projectile/pew1a.ogg").unwrap();
     rodio::play_raw(&rodio::default_output_device().unwrap(), dummy.samples());
@@ -36,14 +38,21 @@ fn main() {
     let renderer =  Renderer::new(&display).unwrap();
     let input = Input::new(&display);
     let mut level = Level::new(&input, &renderer.context());
-    let mut menu = Menu::new(&input, &renderer.context());
 
-    let mut cmd = cmd::Cmd::new();
-    cmd.register("test", Box::new([Str, Int]), Box::new(|p| println!("2 args: {:?}", p) ));
-    cmd.register("test", Box::new([Str, Int, Float]), Box::new(|p| println!("3 args: {:?}", p) ));
+    let cmd = {
+        use cmd::Type::*;
 
-    cmd.exec("test \"Hello World!\" 12; test Hello 13 15.6");
-    cmd.exec("test \"invalid\"");
+        let mut cmd = cmd::Cmd::new(CommandContext { 
+            current_menu: Some("main".to_string()), 
+        });
+
+        cmd.register("test", vec![Str, Int], Box::new(|c, p| println!("2 args: {:?}", p) ));
+        cmd.register("menu_close", vec![], Box::new(|c, p| { println!("menu close"); c.current_menu = None; }));
+
+        Rc::new(cmd)
+    };
+
+    let mut menu = Menu::new(&input, &renderer.context(), cmd.clone());
 
     display.grab_cursor();
     display.set_fullscreen().unwrap();
@@ -53,7 +62,13 @@ fn main() {
 
         display.clear_frame(Color::BLACK);
         level.process(&renderer, frame.delta_f32);
-        menu.process(&renderer, frame.delta_f32);
+
+        let current_menu = cmd.context().current_menu.clone();
+
+        if current_menu.is_some() {
+            menu.process(&renderer, frame.delta_f32, &current_menu.unwrap());
+        }
+
         display.swap_frame();
 
         !display.was_closed() && !input.down(InputId::Escape)
