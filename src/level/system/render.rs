@@ -6,7 +6,7 @@ use std::cmp;
 
 /**
  * Render system
- * 
+ *
  * Draws entities with a Visual and Spatial component.
  */
 pub struct Render {
@@ -84,6 +84,6 @@ impl<'a> specs::System<'a> for Render {
             self.num_frames = 0;
         }
 
-        data.world_state.inf.font.write(&data.world_state.inf.layer["text"], &format!("FPS: {:?}\r\ndelta: {:?}\r\nentities: {:?}", self.last_num_frames, data.world_state.delta, num_sprites), (10.0, 10.0), Color::alpha_pm(0.4));
+        data.world_state.inf.font.write(&data.world_state.inf.layer["text"], &format!("Entities: {:?}", num_sprites), (10.0, 72.0), Color::alpha_pm(0.4));
 	}
 }

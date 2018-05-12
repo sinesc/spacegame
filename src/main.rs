@@ -58,6 +58,9 @@ fn main() {
     cmd.register("menu_switch", vec![Str], Box::new(|c, p| { c.menu.group(&p[0].to_string()); }));
     cmd.register("exit", vec![], Box::new(|c, p| c.exit_requested = true ));
 
+    let debug_layer = Layer::new((1920., 1080.));
+    let debug_font = Font::builder(&renderer.context()).family("Arial").size(20.0).build().unwrap().arc();
+
     // game main loop
 
     renderloop(|frame| {
@@ -73,8 +76,14 @@ fn main() {
         }
 
         display.clear_frame(Color::BLACK);
+
         level.process(&renderer, !menu.visible(), menu.visible());
         menu.process(&renderer, &cmd);
+
+        debug_font.write(&debug_layer, &format!("Renderer\nFPS: {}\nDelta: {:.4}", frame.fps, frame.delta_f32), (10.0, 10.0), Color::alpha_pm(0.4));
+        renderer.draw_layer(&debug_layer, 0);
+        debug_layer.clear();
+
         display.swap_frame();
 
         !display.was_closed() && !cmd.context().exit_requested
