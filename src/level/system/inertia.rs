@@ -35,9 +35,6 @@ impl<'a> specs::System<'a> for Inertia {
     fn run(&mut self, mut data: Self::SystemData) {
 		use specs::Join;
 
-        if data.world_state.paused {
-            return;
-        }
         
         let delta = data.world_state.delta;
 

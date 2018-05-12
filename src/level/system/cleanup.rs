@@ -32,10 +32,6 @@ impl<'a> specs::System<'a> for Cleanup {
     fn run(&mut self, data: CleanupData) {
 		use specs::Join;
 
-        if data.world_state.paused {
-            return;
-        }
-
 		for (lifetime, entity) in (&data.lifetime, &*data.entities).join() {
             if lifetime.0 < data.world_state.age.elapsed_f32() {
                 data.entities.delete(entity).unwrap();

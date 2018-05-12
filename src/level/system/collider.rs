@@ -46,10 +46,6 @@ impl<'a> specs::System<'a> for Collider {
 
     fn run(&mut self, mut data: ColliderData) {
 		use specs::Join;
-
-        if data.world_state.paused {
-            return;
-        }
         
         // test all against all other entities todo: use a grid or quadtree to reduce checks
 

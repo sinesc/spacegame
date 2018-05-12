@@ -19,7 +19,7 @@ mod level;
 mod bloom;
 mod menu;
 mod cmd;
-mod timer;
+mod timeframe;
 
 use prelude::*;
 use level::Level;
@@ -49,7 +49,7 @@ fn main() {
     let menu = Rc::new(Menu::new(&input, &renderer.context()));
     menu.group("main");
 
-    let mut cmd = Cmd::new(CommandContext { 
+    let mut cmd = Cmd::new(CommandContext {
         menu: menu.clone(),
         exit_requested: false,
     });
@@ -72,9 +72,9 @@ fn main() {
             }
         }
 
-        display.clear_frame(Color::BLACK);        
-        level.process(&renderer, frame.delta_f32, !menu.visible(), menu.visible());
-        menu.process(&renderer, frame.delta_f32, &cmd);
+        display.clear_frame(Color::BLACK);
+        level.process(&renderer, !menu.visible(), menu.visible());
+        menu.process(&renderer, &cmd);
         display.swap_frame();
 
         !display.was_closed() && !cmd.context().exit_requested

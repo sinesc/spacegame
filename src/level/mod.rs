@@ -4,7 +4,7 @@ use rodio;
 use sound::{SoundGroup};
 use def;
 use bloom;
-use timer::Timer;
+use timeframe::Timeframe;
 
 pub mod component;
 mod system;
@@ -24,8 +24,9 @@ pub struct Infrastructure {
 
 #[derive(Clone)]
 pub struct WorldState {
+    last_age    : Duration,
+    age         : Timeframe,
     delta       : f32,
-    age         : Timer,
     take_input  : bool,
     paused      : bool,
     inf         : Arc<Infrastructure>,
@@ -35,7 +36,6 @@ pub struct Level<'a, 'b> {
     world       : specs::World,
     dispatcher  : specs::Dispatcher<'a, 'b>,
     layer_def   : def::LayerDef,
-    created     : Instant,
 
 
     inf         : Arc<Infrastructure>,
@@ -147,12 +147,13 @@ println!("{:?}", tmp);
             boom        : boom,
         });
 
-        world.add_resource(WorldState { 
-            delta       : 0.0, 
-            age         : Timer::new(), 
+        world.add_resource(WorldState {
+            delta       : 0.0,
+            last_age    : Duration::new(0, 0),
+            age         : Timeframe::new(),
             take_input  : true,
             paused      : false,
-            inf         : infrastructure.clone() 
+            inf         : infrastructure.clone()
         });
 
         // create planner and add systems
@@ -178,7 +179,6 @@ println!("{:?}", tmp);
             world       : world,
             dispatcher  : dispatcher,
             layer_def   : layer_def,
-            created     : created,
             roidspawn   : Periodic::new(0.0, 0.5),
             minespawn   : Periodic::new(0.0, 3.73),
             rng         : Rng::new(123.4),
@@ -189,23 +189,23 @@ println!("{:?}", tmp);
         }
     }
 
-    pub fn process(self: &mut Self, renderer: &Renderer, delta: f32, take_input: bool, paused: bool) {
+    pub fn process(self: &mut Self, renderer: &Renderer, take_input: bool, paused: bool) {
 
         let age = {
 
-            let mut world_state = self.world.write_resource::<WorldState>();            
+            let mut world_state = self.world.write_resource::<WorldState>();
+            world_state.delta = Timeframe::duration_as_secs(world_state.age.elapsed() - world_state.last_age) as f32;
+            world_state.last_age = world_state.age.elapsed();
             world_state.take_input = take_input;
             world_state.paused = paused;
 
             if !paused {
-                world_state.delta = if delta.is_nan() || delta == 0.0 { 0.0167 } else { delta };
-                world_state.age.resume();
+                world_state.age.rate(1.);
             } else {
-                world_state.age.pause();
-                world_state.delta = 0.;
+                world_state.age.rate(0.02);
             }
 
-            world_state.age.elapsed_f32()
+            Timeframe::duration_as_secs(world_state.last_age) as f32
         };
 
         self.dispatcher.dispatch(&mut self.world.res);

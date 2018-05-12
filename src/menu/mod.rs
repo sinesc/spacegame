@@ -51,13 +51,13 @@ impl Menu {
         }
     }
 
-    pub fn process<T>(self: &Self, renderer: &Renderer, delta: f32, cmd: &Cmd<T>) {
+    pub fn process<T>(self: &Self, renderer: &Renderer, cmd: &Cmd<T>) {
 
         use InputId::*;
 
         let mut action = None;
 
-        {            
+        {
             let mut state = self.state.borrow_mut();
 
             if state.group != None {
@@ -76,7 +76,7 @@ impl Menu {
                 }
 
                 for ref item in &def.items {
-                    
+
                     self.font.write(&self.layer,
                         &item.label,
                         (pos_x * 1920., pos_y * 1080.),
@@ -96,7 +96,7 @@ impl Menu {
 
         // perform action, if any (can't do above since the action might have to borrow state as well)
 
-        if let Some(action) = action {        
+        if let Some(action) = action {
             cmd.exec(action);
         }
     }

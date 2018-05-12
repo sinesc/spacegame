@@ -42,11 +42,6 @@ impl<'a> specs::System<'a> for Compute {
 
     fn run(&mut self, mut data: ComputeData) {
 		use specs::Join;
-        //use std::f32::consts::PI;
-        
-        if data.world_state.paused {
-            return;
-        }
 
         let mut projectiles = Vec::new();
         let mut target_pos = Vec2(-1., -1.);

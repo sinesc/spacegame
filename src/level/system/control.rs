@@ -6,7 +6,7 @@ use level::WorldState;
 
 /**
  * Control system
- * 
+ *
  * This system handles player controlled entities.
  */
 pub struct Control {
@@ -28,23 +28,32 @@ fn flatten(x: i32) -> f32 {
     }
 }
 
-fn input(input: &Input, input_id: u32) -> (Vec2, bool, bool, bool) {
+fn input(input: &Input, input_id: Option<u32>) -> (Vec2, bool, bool, bool) {
     use InputId::*;
-    let (up, down, left, right, fire1, fire2, strafe, rotate) = if input_id == 1 {
-        (CursorUp, CursorDown, CursorLeft, CursorRight, RControl, Mouse1, RShift, RMenu)
+    if let Some(input_id) = input_id {
+        let (up, down, left, right, fire1, fire2, strafe, rotate) = if input_id == 1 {
+            (CursorUp, CursorDown, CursorLeft, CursorRight, RControl, Mouse1, RShift, RMenu)
+        } else {
+            (W, S, A, D, LControl, LControl, LShift, LMenu)
+        };
+        let mut v_fraction = Vec2(0.0, 0.0);
+        if input.down(up) { v_fraction.1 -= 1.0 }
+        if input.down(down) { v_fraction.1 += 1.0 }
+        if input.down(left) { v_fraction.0 -= 1.0 }
+        if input.down(right) { v_fraction.0 += 1.0 }
+        v_fraction = v_fraction.normalize();
+        // TODO: divider depends on mouse speed. needs to be chose so that moving the mouse reasonably fast equals 1
+        v_fraction.0 += flatten(input.mouse_delta().0) / 4.;
+        v_fraction.1 += flatten(input.mouse_delta().1) / 4.;
+        /*if v_fraction.len() > 1.0 {
+            println!("exceeeded! {:?}", v_fraction.len());
+            v_fraction /= v_fraction.len();
+        }
+        println!("len: {:?}", v_fraction.len());*/
+        (v_fraction, input.down(fire1) || input.down(fire2), input.down(strafe), input.down(rotate))
     } else {
-        (W, S, A, D, LControl, LControl, LShift, LMenu)
-    };
-    let mut v_fraction = Vec2(0.0, 0.0);
-    if input.down(up) { v_fraction.1 -= 1.0 }
-    if input.down(down) { v_fraction.1 += 1.0 }
-    if input.down(left) { v_fraction.0 -= 1.0 }
-    if input.down(right) { v_fraction.0 += 1.0 }
-    v_fraction = v_fraction.normalize();
-    // TODO: divider depends on mouse speed. needs to be chose so that moving the mouse reasonably fast equals 1
-    v_fraction.0 += flatten(input.mouse_delta().0) / 4.;
-    v_fraction.1 += flatten(input.mouse_delta().1) / 4.;
-    (v_fraction, input.down(fire1) || input.down(fire2), input.down(strafe), input.down(rotate))
+        (Vec2(0., 0.), false, false, false)
+    }
 }
 
 #[derive(SystemData)]
@@ -68,11 +77,6 @@ impl<'a> specs::System<'a> for Control {
 
     fn run(&mut self, mut data: ControlData) {
 		use specs::Join;
-        //use std::f32::consts::PI;
-
-        if !data.world_state.take_input || data.world_state.paused {
-            return;
-        }
 
         let mut projectiles = Vec::new();
         let age = data.world_state.age.elapsed_f32();
@@ -83,7 +87,8 @@ impl<'a> specs::System<'a> for Control {
 
 		for (controlled, spatial, inertial, shooter) in (&mut data.controlled, &mut data.spatial, &mut data.inertial, &mut data.shooter).join() {
 
-            let (v_fraction, shoot, strafe, rotate) = input(&data.world_state.inf.input, controlled.input_id);
+            let input_id = if data.world_state.take_input { Some(controlled.input_id) } else { None };
+            let (v_fraction, shoot, strafe, rotate) = input(&data.world_state.inf.input, input_id);
 
             if strafe {
 
@@ -111,7 +116,7 @@ impl<'a> specs::System<'a> for Control {
 */
             } else {
 
-                inertial.v_fraction = v_fraction;                
+                inertial.v_fraction = v_fraction;
             }
 
             // shoot ?
