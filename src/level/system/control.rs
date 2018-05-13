@@ -32,7 +32,7 @@ fn input(input: &Input, input_id: Option<u32>) -> (Vec2, bool, bool, bool) {
     use InputId::*;
     if let Some(input_id) = input_id {
         let (up, down, left, right, fire1, fire2, strafe, rotate) = if input_id == 1 {
-            (CursorUp, CursorDown, CursorLeft, CursorRight, RControl, Mouse1, RShift, RMenu)
+            (CursorUp, CursorDown, CursorLeft, CursorRight, RMenu, Mouse1, RShift, RControl)
         } else {
             (W, S, A, D, LControl, LControl, LShift, LMenu)
         };
@@ -90,33 +90,29 @@ impl<'a> specs::System<'a> for Control {
             let input_id = if data.world_state.take_input { Some(controlled.input_id) } else { None };
             let (v_fraction, shoot, strafe, rotate) = input(&data.world_state.inf.input, input_id);
 
+            if controlled.input_id == 1 {
+                data.world_state.inf.font.write(
+                    &data.world_state.inf.layer["text"],
+                    &format!("Input\nv_fraction: ({:.3} {:.3})\nshoot: {:?}\nstrafe: {:?}\nrotate: {:?}", v_fraction.0, v_fraction.1, shoot, strafe, rotate),
+                    (10.0, 300.0),
+                    Color::alpha_pm(0.4)
+                );
+            }
+
             if strafe {
 
-                // lean into strafe direction
-                let current_lean = (inertial.v_current.to_angle() - spatial.angle).to_radians().sin() * v_fraction.len();
-                approach(&mut spatial.lean, &current_lean, 10.0 * data.world_state.delta);
-
                 inertial.v_fraction = v_fraction;
+                inertial.motion_type = component::InertialMotionType::StrafeVector;
 
             } else if rotate {
-/*
-                let target_angle = v_fraction.to_angle();
-                spatial.angle.align_with(&target_angle);
 
-                // gradually approach the angle computed from flight direction
-                approach(&mut spatial.angle, &target_angle, 10.0 * data.world_state.delta);
+                inertial.v_fraction = v_fraction;
+                inertial.motion_type = component::InertialMotionType::Detached;
 
-                // and reduce angular velocity of manual rotation to 0
-                approach(&mut inertial.av_current, &0.0, inertial.av_trans * data.world_state.delta);
-
-                // lean into rotation direction
-                approach(&mut spatial.lean, &0.0, data.world_state.delta);
-
-                inertial.v_fraction = Vec2(0., 0.);
-*/
             } else {
 
                 inertial.v_fraction = v_fraction;
+                inertial.motion_type = component::InertialMotionType::FollowVector;
             }
 
             // shoot ?

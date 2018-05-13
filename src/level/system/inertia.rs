@@ -11,7 +11,7 @@ use level::WorldState;
 
 /**
  * Inertia system
- * 
+ *
  * Applies force to entities with an Inertial and Spatial component.
  */
 pub struct Inertia;
@@ -35,50 +35,95 @@ impl<'a> specs::System<'a> for Inertia {
     fn run(&mut self, mut data: Self::SystemData) {
 		use specs::Join;
 
-        
         let delta = data.world_state.delta;
 
         for (spatial, inertial) in (&mut data.spatial, &mut data.inertial).join() {
 
-            // compute max inertial angular velocity 
-
-            let v_factor = (inertial.v_current.len() / inertial.v_max.len()).powi(2);
-            let av_max = lerp(&inertial.av_max_v0, &inertial.av_max_vmax, v_factor) * delta;
-
-            // compute inertial velocity
+            // trans-factor for current velocity
 
             let v_trans = lerp(&inertial.trans_rest, &inertial.trans_motion, inertial.v_fraction.len());
-            let v_current_target = lerp(&inertial.v_current, &(inertial.v_max * inertial.v_fraction), v_trans * delta);
 
-            // limit change in direction of velocity vector to max angular velocity
+            if inertial.motion_type == component::InertialMotionType::FollowVector {
 
-            let old_angle = inertial.v_current.to_angle();
-            let mut target_angle = v_current_target.to_angle();
-            target_angle.align_with(&old_angle);
+                // compute max inertial angular velocity
 
-            let mut av_current = (target_angle - old_angle).to_radians();
+                let v_factor = (inertial.v_current.len() / inertial.v_max.len()).powi(2);
+                let av_max = lerp(&inertial.av_max_v0, &inertial.av_max_vmax, v_factor) * delta;
 
-            inertial.v_current = if av_current.abs() > av_max {
-                v_current_target.len() * (old_angle + Angle(av_max) * av_current.signum()).to_vec2()
+                // limit change in direction of velocity vector to max angular velocity
+
+                let v_current_target = lerp(&inertial.v_current, &(inertial.v_max * inertial.v_fraction), v_trans * delta);
+                let old_angle = inertial.v_current.to_angle();
+                let mut target_angle = v_current_target.to_angle();
+                target_angle.align_with(&old_angle);
+
+                let mut av_current = (target_angle - old_angle).to_radians();
+
+                inertial.v_current = if av_current.abs() > av_max {
+                    v_current_target.len() * (old_angle + Angle(av_max) * av_current.signum()).to_vec2()
+                } else {
+                    v_current_target
+                };
+
+                // lean into rotation direction
+
+                if av_max > 0. {
+                    let current_lean = clamp(av_current / av_max * (0.4 + v_factor), -1., 1.);
+                    approach(&mut spatial.lean, &current_lean, inertial.trans_lean * delta);
+                }
+
+                // update spatial angle
+
+                spatial.angle = inertial.v_current.to_angle();
+
+            } else if inertial.motion_type == component::InertialMotionType::StrafeVector {
+
+                // approach strafe vector
+
+                approach(&mut inertial.v_current, &(inertial.v_max * inertial.v_fraction), v_trans * delta);
+
+                // lean into strafe direction
+
+                let current_lean = (inertial.v_current.to_angle() - spatial.angle).to_radians().sin() * inertial.v_fraction.len();
+                approach(&mut spatial.lean, &current_lean, 10.0 * data.world_state.delta);
+
             } else {
-                v_current_target
-            };
 
-            // lean into rotation direction
+                // approach full stop
 
-            let current_lean = clamp(av_current / av_max * (0.3 + v_factor), -1., 1.);
-            approach(&mut spatial.lean, &current_lean, inertial.trans_lean * data.world_state.delta);
+                approach(&mut inertial.v_current, &Vec2(0., 0.), v_trans * delta);
+
+                // compute max inertial angular velocity
+
+                let av_max = inertial.av_max_v0 * delta;
+
+                // limit change in direction of velocity vector to max angular velocity
+
+                let old_angle = spatial.angle;
+                let mut target_angle = if inertial.v_fraction.len() > 0. { inertial.v_fraction.to_angle() } else { spatial.angle };
+                target_angle.align_with(&old_angle);
+
+                let mut av_current = (target_angle - old_angle).to_radians();
+
+                if av_current.abs() > av_max {
+                    spatial.angle += Angle(av_max) * av_current.signum();
+                    spatial.angle.normalize();
+                } else {
+                    spatial.angle = target_angle;
+                }
+
+                // lean into rotation direction
+
+                if av_max > 0. {
+                    let v_factor = 1.0;
+                    let current_lean = clamp(av_current / av_max * (0.4 + v_factor), -1., 1.);
+                    approach(&mut spatial.lean, &current_lean, inertial.trans_lean * delta);
+                }
+            }
 
             // update spatial position
 
             spatial.position += inertial.v_current * delta;
-
-            if inertial.motion_type != component::InertialMotionType::Detached {
-                spatial.angle = inertial.v_current.to_angle();
-            }
-
-
-
 
 
             // todo: edge reflection just for fun right now

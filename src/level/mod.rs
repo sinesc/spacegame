@@ -203,12 +203,11 @@ println!("{:?}", tmp);
                 world_state.age.lerp_rate(0., Duration::from_millis(500));
             }
 
-
-        self.inf.font.write(&self.inf.layer["text"],
-            &format!("Time\nRate: {:.3}\nElapsed: {:.2}", world_state.age.rate(), Timeframe::duration_to_secs(world_state.age.elapsed())),
-            (10.0, 140.0),
-            Color::alpha_pm(0.4)
-        );
+            self.inf.font.write(&self.inf.layer["text"],
+                &format!("Time\nRate: {:.3}\nElapsed: {:.2}", world_state.age.rate(), Timeframe::duration_to_secs(world_state.age.elapsed())),
+                (10.0, 140.0),
+                Color::alpha_pm(0.4)
+            );
 
             Timeframe::duration_to_secs(world_state.last_age) as f32
         };
@@ -220,7 +219,7 @@ println!("{:?}", tmp);
         renderer.fill().texture(&self.background).blendmode(blendmodes::COPY).draw();
 
         self.inf.font.write(&self.inf.layer["text"],
-            "Mouse: move, Shift+Mouse: strafe, Button1: shoot",
+            "Mouse: move, R-Shift+Mouse: strafe, R-Ctrl+Mouse: rotate, Button1: shoot",
             (10.0, 740.0),
             Color::WHITE
         );

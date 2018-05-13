@@ -4,12 +4,13 @@ use specs;
 #[derive(Clone, Debug, PartialEq)]
 pub enum InertialMotionType {
     FollowVector,
+    StrafeVector,
     Detached
 }
 
 /**
  * Inertial component
- * 
+ *
  * Entities with this component accellerate/rotate towards given vector according to trans_motion/rest values.
  */
 #[derive(Clone, Debug)]
