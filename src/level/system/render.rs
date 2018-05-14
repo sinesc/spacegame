@@ -39,7 +39,7 @@ impl<'a> specs::System<'a> for Render {
     fn run(&mut self, mut data: RenderData) {
 		use specs::Join;
 
-        let age = data.world_state.age.elapsed_f32();
+        let age = data.world_state.age;
 
         // apply fade effects
 

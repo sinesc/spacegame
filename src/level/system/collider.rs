@@ -6,7 +6,7 @@ use level::WorldState;
 
 /**
  * Collider system
- * 
+ *
  * This system detects colliding entities with a Bounding component and applies damage.
  * todo: move effect of this collision somewhere else. find out how.
  */
@@ -33,7 +33,7 @@ impl<'a> Collider {
 
     fn spawn<'b>(data: &mut ColliderData<'b>, origin: Vec2, effect_size: f32) {
         let explosion = data.entities.create();
-        let age = data.world_state.age.elapsed_f32();
+        let age = data.world_state.age;
         data.spatial.insert(explosion, component::Spatial::new(origin, Angle(0.0)));
         data.visual.insert(explosion, component::Visual::new(None, Some(data.world_state.inf.layer["effects"].clone()), data.world_state.inf.explosion.clone(), Color::WHITE, 1.0, 30, effect_size));
         data.lifetime.insert(explosion, component::Lifetime(age + 1.0));
@@ -46,7 +46,7 @@ impl<'a> specs::System<'a> for Collider {
 
     fn run(&mut self, mut data: ColliderData) {
 		use specs::Join;
-        
+
         // test all against all other entities todo: use a grid or quadtree to reduce checks
 
         let mut collisions = Vec::new();

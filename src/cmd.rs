@@ -1,7 +1,8 @@
 use prelude::*;
 use unicode_segmentation::UnicodeSegmentation as UCS;
+use error::Error;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Type {
     Str,
     Int,
@@ -9,7 +10,7 @@ pub enum Type {
     Bool,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Param {
     Str(String),
     Int(i32),
@@ -23,12 +24,37 @@ impl Param {
     }
 }
 
+#[derive(Debug)]
+pub enum CmdError {
+    UnknownCommand,
+    UnknownOverload(u32, Vec<u32>),
+    InvalidArgument(u32, Type),
+}
 
-pub type Handler<T> = Box<Fn(&mut T, &[Param])>;
-pub type Signature = Vec<Type>;
+impl fmt::Display for CmdError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{}", self.description(), match self {
+            CmdError::UnknownOverload(got, expected) => format!(". Got {}, expected {:?}", got, expected),
+            CmdError::InvalidArgument(index, ty) => format!(". Expected {:?} as argument {}", ty, index),
+            _ => "".to_string(),
+        })
+    }
+}
+
+impl error::Error for CmdError {
+    fn description(&self) -> &str {
+        match self {
+            CmdError::UnknownCommand => "Unknown command",
+            CmdError::UnknownOverload(_, _) => "Invalid number of arguments for given command",
+            CmdError::InvalidArgument(_, _) => "Invalid argument type",
+        }
+    }
+}
+
+pub type Handler<T> = Box<Fn(&Cmd<T>, &[Param])>;
 
 pub struct Cmd<T> {
-    commands: HashMap<String, HashMap<usize, (Signature, Handler<T>)>>,
+    commands: HashMap<String, HashMap<usize, (Vec<Type>, Handler<T>)>>,
     context: RefCell<T>,
 }
 
@@ -61,13 +87,13 @@ impl<T> Cmd<T> {
     /**
      * registers a command+signature with the command processor
      */
-    pub fn register(self: &mut Self, name: &str, signature: Signature, handler: Handler<T>) {
+    pub fn register(self: &mut Self, name: &str, signature: &[Type], handler: Handler<T>) {
         let overloads = self.commands.entry(name.to_string()).or_insert(HashMap::new());
-        overloads.insert(signature.len(), (signature, handler));
+        overloads.insert(signature.len(), (signature.to_vec(), handler));
     }
 
     /**
-     * attempts to execute the given console commands
+     * attempts to execute the console commands in the given string
      */
     pub fn exec(self: &Self, input: &str) {
 
@@ -78,9 +104,10 @@ impl<T> Cmd<T> {
                 match self.commands.get(tokens[0]) {
                     Some(overloads) => {
                         if let Some(command) = overloads.get(&(tokens.len() - 1)) {
-                            let params = Self::parse(&tokens[1..tokens.len()], &command.0);
-                            let mut context = self.context.borrow_mut();
-                            command.1(&mut context, &params);
+                            match Self::parse(&tokens[1..tokens.len()], &command.0) {
+                                Ok(params) => command.1(self, &params),
+                                Err(error) => println!("{}.", error),
+                            }
                         } else {
                             println!("Command \"{}\" expects one of the following number of arguments: {:?}.", tokens[0], overloads.keys());
                         }
@@ -92,15 +119,32 @@ impl<T> Cmd<T> {
     }
 
     /**
+     * execute the given (single) console command using typed parameters
+     */
+    pub fn call(self: &Self, command: &str, params: &[Param]) {
+
+        match self.commands.get(command) {
+            Some(overloads) => {
+                if let Some(command) = overloads.get(&params.len()) {
+                    command.1(self, params);
+                } else {
+                    panic!("Command \"{}\" expects one of the following number of arguments: {:?}.", command, overloads.keys());
+                }
+            }
+            None => panic!("Unknown command \"{}\".", command)
+        }
+    }
+
+    /**
      * parses list of parameter strings into list of typed values
      */
-    fn parse(raw_params: &[&str], signature: &Signature) -> Vec<Param> {
+    fn parse(raw_params: &[&str], signature: &[Type]) -> Result<Vec<Param>, CmdError> {
 
         let mut result = Vec::new();
 
         for (index, ptype) in signature.iter().enumerate() {
             result.push(match *ptype {
-                // TODO: all kinds of checks
+                // TODO: ugly
                 Type::Str => {
                     let param = &raw_params[index];
                     if &param[0..1] == "\"" {
@@ -109,13 +153,33 @@ impl<T> Cmd<T> {
                         Param::Str(param.to_string())
                     }
                 },
-                Type::Int => Param::Int(raw_params[index].parse().unwrap()),
-                Type::Float => Param::Float(raw_params[index].parse().unwrap()),
-                Type::Bool => Param::Bool(raw_params[index] == "true"),
-            })
+                Type::Int => {
+                    if let Ok(result) = raw_params[index].parse() {
+                        Param::Int(result)
+                    } else {
+                        return Err(CmdError::InvalidArgument(index as u32 + 1, Type::Int))
+                    }
+                },
+                Type::Float => {
+                    if let Ok(result) = raw_params[index].parse() {
+                        Param::Float(result)
+                    } else {
+                        return Err(CmdError::InvalidArgument(index as u32 + 1, Type::Float))
+                    }
+                },
+                Type::Bool => {
+                    if raw_params[index] == "true" {
+                        Param::Bool(true)
+                    } else if raw_params[index] == "false" {
+                        Param::Bool(false)
+                    } else {
+                        return Err(CmdError::InvalidArgument(index as u32 + 1, Type::Bool))
+                    }
+                }
+            });
         }
-        
-        result
+
+        Ok(result)
     }
 
     /**
@@ -130,6 +194,7 @@ impl<T> Cmd<T> {
         let mut tokens = Vec::new();
 
         // * is required since start==pos right after a string ends (can't look ahead and skip the space)
+        // TODO: handle escaped "
 
         for (pos, ref grapheme) in UCS::grapheme_indices(input, true) {
             if within_string {
@@ -143,12 +208,12 @@ impl<T> Cmd<T> {
                     start = pos;
                     within_string = true;
                 } else if *grapheme == " " {
-                    if start < pos { // *                        
+                    if start < pos { // *
                         tokens.push(&input[start..pos]);
                     }
                     start = pos + grapheme.len();
                 } else if *grapheme == ";" {
-                    if start < pos { // * 
+                    if start < pos { // *
                         tokens.push(&input[start..pos]);
                     }
                     commands.push(::std::mem::replace(&mut tokens, Vec::new()));
@@ -157,10 +222,10 @@ impl<T> Cmd<T> {
             }
         }
 
-        if start < input.len() { // * 
+        if start < input.len() { // *
             tokens.push(&input[start..input.len()]);
         }
-        
+
         if tokens.len() > 0 {
             commands.push(tokens);
         }

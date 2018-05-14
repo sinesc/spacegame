@@ -79,7 +79,7 @@ impl<'a> specs::System<'a> for Control {
 		use specs::Join;
 
         let mut projectiles = Vec::new();
-        let age = data.world_state.age.elapsed_f32();
+        let age = data.world_state.age;
 
         /*for key in data.world_state.inf.input.iter().down() {
             println!("{:?}", key);

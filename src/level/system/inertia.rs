@@ -55,7 +55,7 @@ impl<'a> specs::System<'a> for Inertia {
                 let v_current_target = lerp(&inertial.v_current, &(inertial.v_max * inertial.v_fraction), v_trans * delta);
                 let old_angle = inertial.v_current.to_angle();
                 let mut target_angle = v_current_target.to_angle();
-                target_angle.align_with(&old_angle);
+                target_angle.align_with(old_angle);
 
                 let mut av_current = (target_angle - old_angle).to_radians();
 
@@ -101,13 +101,21 @@ impl<'a> specs::System<'a> for Inertia {
 
                 let old_angle = spatial.angle;
                 let mut target_angle = if inertial.v_fraction.len() > 0. { inertial.v_fraction.to_angle() } else { spatial.angle };
-                target_angle.align_with(&old_angle);
+                target_angle.align_with(old_angle);
 
                 let mut av_current = (target_angle - old_angle).to_radians();
 
+                data.world_state.inf.font.write(
+                    &data.world_state.inf.layer["text"],
+                    &format!("old_angle: {:.3}\ntarget_angle: {:.3}\nav_current: {:.3}\nav_max: {:.3}",
+                    old_angle.to_degrees(), target_angle.to_degrees(), (target_angle - old_angle).to_radians().signum(), Angle(av_max).to_degrees()),
+                    (10.0, 500.0),
+                    Color::alpha_pm(0.4)
+                );
+
                 if av_current.abs() > av_max {
                     spatial.angle += Angle(av_max) * av_current.signum();
-                    spatial.angle.normalize();
+                    spatial.angle = spatial.angle.normalize();
                 } else {
                     spatial.angle = target_angle;
                 }

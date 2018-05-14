@@ -4,7 +4,7 @@ use level::WorldState;
 
 /**
  * Cleanup system
- * 
+ *
  * This system removes dead/expired entities
  */
 pub struct Cleanup {
@@ -33,7 +33,7 @@ impl<'a> specs::System<'a> for Cleanup {
 		use specs::Join;
 
 		for (lifetime, entity) in (&data.lifetime, &*data.entities).join() {
-            if lifetime.0 < data.world_state.age.elapsed_f32() {
+            if lifetime.0 < data.world_state.age {
                 data.entities.delete(entity).unwrap();
             }
 		}

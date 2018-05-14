@@ -20,17 +20,13 @@ mod bloom;
 mod menu;
 mod cmd;
 mod timeframe;
+mod console;
 
 use prelude::*;
 use level::Level;
 use menu::Menu;
-use cmd::Cmd;
-use cmd::Type::*;
+use timeframe::Timeframe;
 
-struct CommandContext {
-    menu            : Rc<Menu>,
-    exit_requested  : bool,
-}
 
 fn main() {
 
@@ -41,46 +37,48 @@ fn main() {
     display.grab_cursor();
     display.set_fullscreen().unwrap();
     let renderer =  Renderer::new(&display).unwrap();
+    let debug_layer = Layer::new((1920., 1080.));
+    let debug_font = Font::builder(&renderer.context()).family("Arial").size(20.0).build().unwrap().arc();
     let input = Input::new(&display);
+
     let mut level = Level::new(&input, &renderer.context());
 
     // create menu and command parser
 
     let menu = Rc::new(Menu::new(&input, &renderer.context()));
-    menu.group("main");
-
-    let mut cmd = Cmd::new(CommandContext {
-        menu: menu.clone(),
-        exit_requested: false,
-    });
-
-    cmd.register("menu_close", vec![], Box::new(|c, p| { c.menu.hide(); }));
-    cmd.register("menu_switch", vec![Str], Box::new(|c, p| { c.menu.group(&p[0].to_string()); }));
-    cmd.register("exit", vec![], Box::new(|c, p| c.exit_requested = true ));
-
-    let debug_layer = Layer::new((1920., 1080.));
-    let debug_font = Font::builder(&renderer.context()).family("Arial").size(20.0).build().unwrap().arc();
+    let cmd = console::init_cmd(&menu);
 
     // game main loop
+
+    let mut last_age = 0.;
 
     renderloop(|frame| {
 
         display.poll_events();
 
+        // ingame time and delta
+
+        let age = Timeframe::duration_to_secs(cmd.context().timeframe.elapsed());
+        let rate = cmd.context().timeframe.rate();
+        let delta = age - last_age;
+        last_age = age;
+
         if input.pressed(InputId::Escape, false) {
-            if !menu.visible() {
-                menu.group("main");
-            } else {
-                menu.hide();
-            }
+            cmd.call("menu_toggle", &[]);
         }
 
         display.clear_frame(Color::BLACK);
 
-        level.process(&renderer, !menu.visible(), menu.visible());
+        level.process(&renderer, age as f32, delta as f32, !menu.visible(), menu.visible());
         menu.process(&renderer, &cmd);
 
         debug_font.write(&debug_layer, &format!("Renderer\nFPS: {}\nDelta: {:.4}", frame.fps, frame.delta_f32), (10.0, 10.0), Color::alpha_pm(0.4));
+        debug_font.write(&debug_layer,
+            &format!("Time\nRate: {:.3}\nElapsed: {:.2}\nDelta: {:.4}", rate, age, delta),
+            (10.0, 140.0),
+            Color::alpha_pm(0.4)
+        );
+
         renderer.draw_layer(&debug_layer, 0);
         debug_layer.clear();
 

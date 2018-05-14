@@ -6,7 +6,7 @@ use level::WorldState;
 
 /**
  * Compute system
- * 
+ *
  * This system handles game controlled entities.
  */
 pub struct Compute {
@@ -45,7 +45,7 @@ impl<'a> specs::System<'a> for Compute {
 
         let mut projectiles = Vec::new();
         let mut target_pos = Vec2(-1., -1.);
-        let age = data.world_state.age.elapsed_f32();
+        let age = data.world_state.age;
 
         for (controlled, spatial) in (&data.controlled, &data.spatial).join() {
             if controlled.input_id == 1 {
@@ -63,7 +63,15 @@ impl<'a> specs::System<'a> for Compute {
 
             // approach position 250px offset to the right (direction normal) of the player
 
-            let offset = (target_pos - spatial.position).right().normalize() * 1000.;
+            let right = (target_pos - spatial.position).right().normalize() * 1000.;
+            let left = (target_pos - spatial.position).left().normalize() * 1000.;
+            let angle = inertial.v_fraction.to_angle();
+
+            let offset = if angle.diff(right.to_angle()).to_radians().abs() > angle.diff(left.to_angle()).to_radians().abs() {
+                left
+            } else {
+                right
+            };
             inertial.v_fraction = ((target_pos + offset) - spatial.position).normalize();
 
             // compute angle between direct vector to player and vector to offset position

@@ -23,9 +23,9 @@ ingame:
     items:
         -
             label: Resume Game
-            action: menu_close
+            action: menu_close; resume
             stride_y: 0.15
-        - 
+        -
             label: Options
             action: menu_switch options
         -

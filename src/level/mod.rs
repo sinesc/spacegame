@@ -4,7 +4,6 @@ use rodio;
 use sound::{SoundGroup};
 use def;
 use bloom;
-use timeframe::Timeframe;
 
 pub mod component;
 mod system;
@@ -24,8 +23,7 @@ pub struct Infrastructure {
 
 #[derive(Clone)]
 pub struct WorldState {
-    last_age    : Duration,
-    age         : Timeframe,
+    age         : f32,
     delta       : f32,
     take_input  : bool,
     paused      : bool,
@@ -36,20 +34,19 @@ pub struct Level<'a, 'b> {
     world       : specs::World,
     dispatcher  : specs::Dispatcher<'a, 'b>,
     layer_def   : def::LayerDef,
-
-
     inf         : Arc<Infrastructure>,
+    bloom       : postprocessors::Bloom,
+    glare       : bloom::Bloom,
+
     roidspawn   : Periodic,
     minespawn   : Periodic,
     rng         : Rng,
-    bloom       : postprocessors::Bloom,
-    glare       : bloom::Bloom,
     background  : Texture,
 }
 
 impl<'a, 'b> Level<'a, 'b> {
 
-    pub fn new(input: &Input, context: &RenderContext) -> Level<'a, 'b> {
+    pub fn new(input: &Input, context: &RenderContext) -> Self {
 
         // create world and register components
 
@@ -85,7 +82,7 @@ impl<'a, 'b> Level<'a, 'b> {
         let boom = SoundGroup::load(&["res/sound/damage/explosion_pop1.ogg", "res/sound/damage/explosion_pop2.ogg"]).unwrap();
 
         let tmp = def::parse_entities().unwrap();
-println!("{:?}", tmp);
+        println!("{:?}", tmp);
         // create layers
 
         let layer_def = def::parse_layers().unwrap();
@@ -115,24 +112,6 @@ println!("{:?}", tmp);
             .with(component::Bounding::new(20.0, 1))
             .with(component::Hitpoints::new(100000.))
             .build();
-/*
-        world.create_entity()
-            .with(component::Spatial::new(Vec2(512.0, 384.0), Angle(0.0), true))
-            .with(component::Visual::new(Some(base.clone()), None, friend.clone(), Color(1.0, 0.8, 0.8, 1.0), 0, 1.0))
-            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 1.0))
-            .with(component::Controlled::new(2))
-            .with(component::Shooter::new(0.02))
-            .with(component::Bounding::new(20.0, 1))
-            .with(component::Hitpoints::new(100.))
-            .build();
-
-        world.create_entity()
-            .with(component::Spatial::new(Vec2(530.0, 450.0), Angle(0.0), true))
-            .with(component::Visual::new(Some(effects.clone()), None, powerup.clone(), Color::WHITE, 30, 1.0))
-            .with(component::Bounding::new(20.0, 0))
-            .with(component::Hitpoints::new(100.))
-            .build();
-*/
 
         let infrastructure = Arc::new(Infrastructure {
             input       : input.clone(),
@@ -149,8 +128,7 @@ println!("{:?}", tmp);
 
         world.add_resource(WorldState {
             delta       : 0.0,
-            last_age    : Duration::new(0, 0),
-            age         : Timeframe::new(),
+            age         : 0.0,
             take_input  : true,
             paused      : false,
             inf         : infrastructure.clone()
@@ -187,29 +165,15 @@ println!("{:?}", tmp);
         }
     }
 
-    pub fn process(self: &mut Self, renderer: &Renderer, take_input: bool, paused: bool) {
+    pub fn process(self: &mut Self, renderer: &Renderer, age: f32, delta: f32, take_input: bool, paused: bool) {
 
-        let age = {
+        {
 
             let mut world_state = self.world.write_resource::<WorldState>();
-            world_state.delta = Timeframe::duration_to_secs(world_state.age.elapsed() - world_state.last_age) as f32;
-            world_state.last_age = world_state.age.elapsed();
+            world_state.age = age;
+            world_state.delta = delta;
             world_state.take_input = take_input;
             world_state.paused = paused;
-
-            if !paused {
-                world_state.age.lerp_rate(1., Duration::from_millis(500));
-            } else {
-                world_state.age.lerp_rate(0., Duration::from_millis(500));
-            }
-
-            self.inf.font.write(&self.inf.layer["text"],
-                &format!("Time\nRate: {:.3}\nElapsed: {:.2}", world_state.age.rate(), Timeframe::duration_to_secs(world_state.age.elapsed())),
-                (10.0, 140.0),
-                Color::alpha_pm(0.4)
-            );
-
-            Timeframe::duration_to_secs(world_state.last_age) as f32
         };
 
         self.dispatcher.dispatch(&mut self.world.res);
@@ -282,7 +246,7 @@ println!("{:?}", tmp);
                 .with(component::Spatial::new(pos, angle))
                 .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.mine.clone(), Color::WHITE, scale, 30, 1.0))
                 .with(component::Bounding::new(20.0, self.rng.range(101., 200.) as u32))
-                .with(component::Hitpoints::new(100.))
+                .with(component::Hitpoints::new(1000.))
                 .with(component::Shooter::new(0.5))
                 .with(component::Computed::new())
                 .with(component::Inertial::new(Vec2(120.0, 120.0), Vec2(0.0, 0.0), 1.0))
