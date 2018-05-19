@@ -1,56 +1,51 @@
 use prelude::*;
-use ::def::{parse_dir, parse_file, lookup, Error};
-use ::level::component::*;
-
-/*
-hostile: &hostile
-    spatial:
-        position: [ 0.0, 0.0 ]
-        angle: 0.0
-    bounding:
-        radius: 1.0
-        faction: hostile
-    visual:
-        layer: base
-        effect_layer: effect
-        effect_size: 1.0
-        sprite: hostile/mine_green_64x64x15.png
-        scale: 1.0
-        color: [ 1.0, 1.0, 1.0, 1.0 ]
-        frame_id: 1
-        fps: 30
-    hitpoints: 100
-*/
+use ::def::{parse_dir, parse_file, Error};
+use level::component::*;
+use serde::de::{self, Deserializer, Deserialize};
 
 #[derive(Deserialize, Debug)]
 pub struct EntityDef (HashMap<String, EntityItem>);
 
 #[derive(Deserialize, Debug)]
-pub struct EntityItem {
-    spatial: Option<Spatial>,
-    bounding: Option<Bounding>,
+pub struct VisualDescriptor {
+    pub layer           : Option<String>,
+    pub effect_layer    : Option<String>,
+    pub effect_size     : f32,
+    pub sprite          : String,
+    pub scale           : f32,
+    pub color           : Color,
+    pub frame_id        : f32,
+    pub fps             : u32,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct LayerCreate {
-    pub name: String,
-    #[serde(default = "default_scale")]
-    pub scale: f32,
-    pub blendmode: Option<String>,
+pub struct EntityItem {
+    bounding    : Option<Bounding>,
+    exploding   : Option<Exploding>,
+    fading      : Option<Fading>,
+    hitpoints   : Option<Hitpoints>,
+    inertial    : Option<Inertial>,
+    lifetime    : Option<Lifetime>,
+    shooter     : Option<Shooter>,
+    spatial     : Option<Spatial>,
+    visual      : Option<VisualDescriptor>,
 }
 
-fn default_scale() -> f32 {
-    1.0
+lazy_mut! {
+    static mut FACTIONS: Vec<String> = Vec::new();
+}
+
+pub fn faction_deserialize<'de, D>(deserializer: D) -> Result<u32, D::Error> where D: Deserializer<'de>, {
+    let faction_name = String::deserialize(deserializer)?;
+    if let Some(index) = unsafe { FACTIONS.iter().position(|x: &String| x == &faction_name)} {
+        Ok(index as u32)
+    } else {
+        Err(de::Error::unknown_variant(&faction_name, &[ "<valid factions>" ]))
+    }
 }
 
 pub fn parse_entities() -> Result<EntityDef, Error> {
-    let factions: Vec<String> = parse_file("res/def/faction.yaml", |_, _, _| {}).unwrap();
-    parse_dir("res/def/entity/", &[ "yaml" ], |v, k, p| {
-        use serde_yaml::Value::Number;      
-
-        if let Some(index) = lookup(&"bounding", &"faction", &factions, v, &k, &p) {
-            *v = Number(index.into());
-        }
-    })
+    unsafe { *FACTIONS = parse_file("res/def/faction.yaml").unwrap(); }
+    parse_dir("res/def/entity/", &[ "yaml" ])
 }
 

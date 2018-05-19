@@ -11,6 +11,8 @@ extern crate yaml_merge_keys;
 #[macro_use]
 extern crate serde_derive;
 extern crate unicode_segmentation;
+#[macro_use]
+extern crate lazy_mut;
 
 mod prelude;
 mod def;
@@ -41,12 +43,11 @@ fn main() {
     let debug_font = Font::builder(&renderer.context()).family("Arial").size(20.0).build().unwrap().arc();
     let input = Input::new(&display);
 
-    let mut level = Level::new(&input, &renderer.context());
-
     // create menu and command parser
 
+    let level = Rc::new(RefCell::new(Level::new(&input, &renderer.context())));
     let menu = Rc::new(Menu::new(&input, &renderer.context()));
-    let cmd = console::init_cmd(&menu);
+    let cmd = console::init_cmd(&menu, &level);
 
     // game main loop
 
@@ -67,9 +68,13 @@ fn main() {
             cmd.call("menu_toggle", &[]);
         }
 
+        if input.pressed(InputId::U, false) {
+            cmd.exec("level_start bad_argument");
+        }
+
         display.clear_frame(Color::BLACK);
 
-        level.process(&renderer, age as f32, delta as f32, !menu.visible(), menu.visible());
+        level.borrow_mut().process(&renderer, age as f32, delta as f32, !menu.visible(), menu.visible());
         menu.process(&renderer, &cmd);
 
         debug_font.write(&debug_layer, &format!("Renderer\nFPS: {}\nDelta: {:.4}", frame.fps, frame.delta_f32), (10.0, 10.0), Color::alpha_pm(0.4));

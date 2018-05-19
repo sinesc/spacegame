@@ -7,13 +7,13 @@ main:
     items:
         -
             label: New Game
-            action: menu_close; level_start 1
+            action: menu_hide; level_start 1
         -
             label: Load Game
-            action: menu_switch savegames
+            action: menu_show savegames
         -
             label: Options
-            action: menu_switch options
+            action: menu_show options
             stride_y: 0.15
         -
             label: Quit Game
@@ -23,11 +23,11 @@ ingame:
     items:
         -
             label: Resume Game
-            action: menu_close; resume
+            action: menu_hide
             stride_y: 0.15
         -
             label: Options
-            action: menu_switch options
+            action: menu_show options
         -
             label: Exit to Menu
             action: level_stop; menu_switch main
@@ -39,4 +39,4 @@ options:
             action: video_fullscreen
         -
             label: Main Menu
-            action: menu_switch main
+            action: menu_show main

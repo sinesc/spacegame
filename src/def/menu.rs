@@ -3,7 +3,7 @@ use super::{parse_file, Error};
 use std::ops::Deref;
 
 pub fn parse_menu() -> Result<MenuDef, Error> {
-    parse_file("res/def/menu.yaml", |_, _, _| {})
+    parse_file("res/def/menu.yaml")
 }
 
 #[derive(Deserialize, Debug)]

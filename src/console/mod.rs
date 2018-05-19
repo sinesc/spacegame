@@ -1,19 +1,23 @@
 use prelude::*;
 use cmd::Cmd;
 use cmd::Type::*;
+use cmd::Param;
 use menu::Menu;
+use level::Level;
 use timeframe::Timeframe;
 
-pub struct CommandContext {
+pub struct CommandContext<'a, 'b> {
     pub menu            : Rc<Menu>,
+    pub level           : Rc<RefCell<Level<'a, 'b>>>,
     pub timeframe       : Timeframe,
     pub exit_requested  : bool,
 }
 
-pub fn init_cmd(menu: &Rc<Menu>) -> Cmd<CommandContext> {
+pub fn init_cmd<'a, 'b>(menu: &Rc<Menu>, level: &Rc<RefCell<Level<'a, 'b>>>) -> Cmd<CommandContext<'a, 'b>> {
 
     let mut cmd = Cmd::new(CommandContext {
         menu            : menu.clone(),
+        level           : level.clone(),
         timeframe       : Timeframe::new(),
         exit_requested  : false,
     });
@@ -28,16 +32,20 @@ pub fn init_cmd(menu: &Rc<Menu>) -> Cmd<CommandContext> {
 
     cmd.register("menu_toggle", &[], Box::new(|cmd, p| {
         if cmd.context().menu.visible() {
-            cmd.call("resume", &[]);
-            cmd.context().menu.hide();
+            cmd.call("menu_hide", &[]);
         } else {
-            cmd.call("pause", &[]);
-            cmd.context().menu.group("main");
+            cmd.call("menu_show", &[Param::Str("main".to_string())]);
         }
     }));
 
-    cmd.register("menu_switch", &[Str], Box::new(|cmd, p| {
-        cmd.context_mut().menu.group(&p[0].to_string());
+    cmd.register("menu_show", &[Str], Box::new(|cmd, p| {
+        cmd.call("pause", &[]);
+        cmd.context().menu.group(&p[0].to_string());
+    }));
+
+    cmd.register("menu_hide", &[], Box::new(|cmd, p| {
+        cmd.call("resume", &[]);
+        cmd.context().menu.hide();
     }));
 
     cmd.register("level_start", &[Int], Box::new(|cmd, p| {

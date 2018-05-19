@@ -3,7 +3,7 @@ use specs;
 
 /**
  * Visual component
- * 
+ *
  * Entities with this component are rendered.
  */
 #[derive(Clone)]

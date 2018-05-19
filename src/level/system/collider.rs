@@ -35,7 +35,7 @@ impl<'a> Collider {
         let explosion = data.entities.create();
         let age = data.world_state.age;
         data.spatial.insert(explosion, component::Spatial::new(origin, Angle(0.0)));
-        data.visual.insert(explosion, component::Visual::new(None, Some(data.world_state.inf.layer["effects"].clone()), data.world_state.inf.explosion.clone(), Color::WHITE, 1.0, 30, effect_size));
+        data.visual.insert(explosion, component::Visual::new(None, Some(data.world_state.inf.layer["effects"].clone()), data.world_state.inf.sprite["explosion"].clone(), Color::WHITE, 1.0, 30, effect_size));
         data.lifetime.insert(explosion, component::Lifetime(age + 1.0));
         data.fading.insert(explosion, component::Fading::new(age + 0.5, age + 1.0));
     }

@@ -12,11 +12,9 @@ pub struct Infrastructure {
     input       : Input,
     audio       : rodio::Device,
     layer       : HashMap<String, Arc<Layer>>,
+    sprite      : HashMap<String, Arc<Sprite>>,
+
     font        : Arc<Font>,
-    sprite      : Arc<Sprite>,
-    asteroid    : Arc<Sprite>,
-    explosion   : Arc<Sprite>,
-    mine        : Arc<Sprite>,
     pew         : SoundGroup,
     boom        : SoundGroup,
 }
@@ -64,17 +62,14 @@ impl<'a, 'b> Level<'a, 'b> {
 
         // create a scene and a layer
 
-        let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
-        let mine = Sprite::from_file(context, "res/sprite/hostile/mine_lightmapped_64x64x15x2.png").unwrap().arc();
-        //let mine = Sprite::from_file(context, "res/sprite/hostile/mine_red_64x64x15.png").unwrap().arc();
-        let friend = Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc();
-        let asteroid = Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc();
-        let explosion = Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc();
-        //let powerup = Sprite::from_file(context, "res/sprite/powerup/ball_v_32x32x18.jpg").unwrap().arc();
-        // res/sprite/explosion/lightmapped_256x256x40x2.jpg
-        // res/sprite/explosion/default_256x256x40.jpg
+        let mut sprites = HashMap::new();
+        sprites.insert("mine".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_lightmapped_64x64x15x2.png").unwrap().arc());
+        sprites.insert("friend".to_string(), Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc());
+        sprites.insert("asteroid".to_string(), Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc());
+        sprites.insert("explosion".to_string(), Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc());
+        sprites.insert("laser".to_string(), Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc());
 
-        let laser = Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc();
+        let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
 
         let audio = rodio::default_output_device().unwrap();
@@ -82,7 +77,7 @@ impl<'a, 'b> Level<'a, 'b> {
         let boom = SoundGroup::load(&["res/sound/damage/explosion_pop1.ogg", "res/sound/damage/explosion_pop2.ogg"]).unwrap();
 
         let tmp = def::parse_entities().unwrap();
-        println!("{:?}", tmp);
+        println!("{:#?}", tmp);
         // create layers
 
         let layer_def = def::parse_layers().unwrap();
@@ -105,7 +100,7 @@ impl<'a, 'b> Level<'a, 'b> {
 
         world.create_entity()
             .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0)))
-            .with(component::Visual::new(Some(layers["base"].clone()), None, friend.clone(), Color(0.8, 0.8, 1.0, 1.0), 1.0, 0, 1.0))
+            .with(component::Visual::new(Some(layers["base"].clone()), None, sprites["friend"].clone(), Color(0.8, 0.8, 1.0, 1.0), 1.0, 0, 1.0))
             .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 7.0))
             .with(component::Controlled::new(1))
             .with(component::Shooter::new(0.2))
@@ -116,11 +111,8 @@ impl<'a, 'b> Level<'a, 'b> {
         let infrastructure = Arc::new(Infrastructure {
             input       : input.clone(),
             layer       : layers,
-            sprite      : laser,
-            asteroid    : asteroid,
-            mine        : mine,
+            sprite      : sprites,
             font        : font,
-            explosion   : explosion,
             audio       : audio,
             pew         : pew,
             boom        : boom,
@@ -168,7 +160,6 @@ impl<'a, 'b> Level<'a, 'b> {
     pub fn process(self: &mut Self, renderer: &Renderer, age: f32, delta: f32, take_input: bool, paused: bool) {
 
         {
-
             let mut world_state = self.world.write_resource::<WorldState>();
             world_state.age = age;
             world_state.delta = delta;
@@ -226,7 +217,7 @@ impl<'a, 'b> Level<'a, 'b> {
 
             self.world.create_entity()
                 .with(component::Spatial::new(pos, angle))
-                .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.asteroid.clone(), Color::WHITE, scale, 30, 1.0))
+                .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.sprite["asteroid"].clone(), Color::WHITE, scale, 30, 1.0))
                 .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 1.0))
                 .with(component::Bounding::new(20.0 * scale, self.rng.range(2., 100.) as u32))
                 .with(component::Hitpoints::new(100. * scale))
@@ -244,7 +235,7 @@ impl<'a, 'b> Level<'a, 'b> {
 
             self.world.create_entity()
                 .with(component::Spatial::new(pos, angle))
-                .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.mine.clone(), Color::WHITE, scale, 30, 1.0))
+                .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.sprite["mine"].clone(), Color::WHITE, scale, 30, 1.0))
                 .with(component::Bounding::new(20.0, self.rng.range(101., 200.) as u32))
                 .with(component::Hitpoints::new(1000.))
                 .with(component::Shooter::new(0.5))

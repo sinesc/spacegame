@@ -1,11 +1,17 @@
 use prelude::*;
 use specs;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub enum InertialMotionType {
     FollowVector,
     StrafeVector,
     Detached
+}
+
+impl Default for InertialMotionType {
+    fn default() -> InertialMotionType {
+        InertialMotionType::FollowVector
+    }
 }
 
 /**
@@ -13,7 +19,8 @@ pub enum InertialMotionType {
  *
  * Entities with this component accellerate/rotate towards given vector according to trans_motion/rest values.
  */
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Default)]
+#[serde(default)]
 pub struct Inertial {
     /// Maximum velocity, needs to be positive.
     pub v_max: Vec2,
