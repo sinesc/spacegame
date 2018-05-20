@@ -2,12 +2,22 @@ hostile: &hostile
     spatial:
         position: [ 0.0, 0.0 ]
         angle: 0.0
+    inertial:
+        v_max: [ 100.0, 100.0 ]
+        v_fraction: [ 1.0, 1.0 ]
+        v_current: [ 0.0, 0.0 ]
+        trans_motion: 6.0
+        trans_rest: 3.0
+        av_max_v0: 7.0
+        av_max_vmax: 1.4
+        trans_lean: 10
+        motion_type: FollowVector
     bounding:
         radius: 1.0
         faction: hostile
     visual:
         layer: base
-        effect_layer: effect
+        effect_layer: effects
         effect_size: 1.0
         sprite: hostile/mine_green_64x64x15.png
         scale: 1.0

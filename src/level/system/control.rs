@@ -85,7 +85,7 @@ impl<'a> specs::System<'a> for Control {
             println!("{:?}", key);
         }*/
 
-		for (controlled, spatial, inertial, shooter) in (&mut data.controlled, &mut data.spatial, &mut data.inertial, &mut data.shooter).join() {
+		for (controlled, spatial, inertial, shooter, bounding) in (&mut data.controlled, &mut data.spatial, &mut data.inertial, &mut data.shooter, &mut data.bounding).join() {
 
             let input_id = if data.world_state.take_input { Some(controlled.input_id) } else { None };
             let (v_fraction, shoot, strafe, rotate) = input(&data.world_state.inf.input, input_id);
@@ -119,7 +119,7 @@ impl<'a> specs::System<'a> for Control {
 
             if shoot && shooter.interval.elapsed(age) {
                 //inertial.v_fraction -= spatial.angle.to_vec2() * 0.001 / data.world_state.delta;
-                projectiles.push((spatial.position, spatial.angle));
+                projectiles.push((spatial.position, spatial.angle, bounding.faction));
                 rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.samples());
 
                 /*let dir = spatial.angle.to_vec2();
@@ -129,22 +129,22 @@ impl<'a> specs::System<'a> for Control {
             }
 		}
 
-        let mut spawn = |origin: Vec2, angle: Angle| {
+        let mut spawn = |origin: Vec2, angle: Angle, faction: u32| {
             let shot = data.entities.create();
             data.spatial.insert(shot, component::Spatial::new(origin, angle));
             data.visual.insert(shot, component::Visual::new(Some(data.world_state.inf.layer["effects"].clone()), None, data.world_state.inf.sprite["laser"].clone(), Color::WHITE, 1.0, 30, 0.2));
             data.inertial.insert(shot, component::Inertial::new(Vec2(1133.0, 1133.0), Vec2::from_angle(angle), 1.0));
             data.lifetime.insert(shot, component::Lifetime(age + 1.0));
             data.fading.insert(shot, component::Fading::new(age + 0.5, age + 1.0));
-            data.bounding.insert(shot, component::Bounding::new(5.0, 1));
+            data.bounding.insert(shot, component::Bounding::new(5.0, faction));
             data.hitpoints.insert(shot, component::Hitpoints::new(50.0));
         };
 
-        for (mut position, angle) in projectiles {
+        for (mut position, angle, faction) in projectiles {
             let dir = angle.to_vec2();
             position -= dir * 10.0;
-            spawn(position + (dir.right() * 30.0), angle);
-            spawn(position + (dir.left() * 30.0), angle);
+            spawn(position + (dir.right() * 30.0), angle, faction);
+            spawn(position + (dir.left() * 30.0), angle, faction);
         }
 
 	}

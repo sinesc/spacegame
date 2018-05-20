@@ -8,7 +8,7 @@ use specs;
 #[derive(Clone, Debug, Deserialize, Default)]
 pub struct Bounding {
     pub radius: f32, // !todo starting out simple
-    #[serde(deserialize_with = "::def::entity::faction_deserialize")]
+    #[serde(deserialize_with = "::def::faction_deserialize")]
     pub faction: u32,
 }
 

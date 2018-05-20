@@ -60,7 +60,7 @@ impl<'a, 'b> Level<'a, 'b> {
         world.register::<component::Bounding>();
         world.register::<component::Hitpoints>();
 
-        // create a scene and a layer
+        // create a scene and a layer TODO: temporary, load from def
 
         let mut sprites = HashMap::new();
         sprites.insert("mine".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_lightmapped_64x64x15x2.png").unwrap().arc());
@@ -69,6 +69,9 @@ impl<'a, 'b> Level<'a, 'b> {
         sprites.insert("explosion".to_string(), Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc());
         sprites.insert("laser".to_string(), Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc());
 
+        sprites.insert("hostile/mine_green_64x64x15.png".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_green_64x64x15.png").unwrap().arc());
+        sprites.insert("player/speedy_98x72x30.png".to_string(), Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc());
+
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
 
@@ -76,8 +79,6 @@ impl<'a, 'b> Level<'a, 'b> {
         let pew = SoundGroup::load(&["res/sound/projectile/pew1a.ogg", "res/sound/projectile/pew1b.ogg", "res/sound/projectile/pew1c.ogg", "res/sound/projectile/pew2.ogg"]).unwrap();
         let boom = SoundGroup::load(&["res/sound/damage/explosion_pop1.ogg", "res/sound/damage/explosion_pop2.ogg"]).unwrap();
 
-        let tmp = def::parse_entities().unwrap();
-        println!("{:#?}", tmp);
         // create layers
 
         let layer_def = def::parse_layers().unwrap();
@@ -96,17 +97,15 @@ impl<'a, 'b> Level<'a, 'b> {
             layers.insert(info.name.clone(), layer);
         }
 
+        let factions = def::parse_factions().unwrap();
+        let entities = def::parse_entities(&factions, &sprites, &layers).unwrap();
+
+        //test
+        entities["mine-green"].spawn(&mut world, (100., 100.));
+
         // create player entity
 
-        world.create_entity()
-            .with(component::Spatial::new(Vec2(230.0, 350.0), Angle(0.0)))
-            .with(component::Visual::new(Some(layers["base"].clone()), None, sprites["friend"].clone(), Color(0.8, 0.8, 1.0, 1.0), 1.0, 0, 1.0))
-            .with(component::Inertial::new(Vec2(1200.0, 1200.0), Vec2(0.0, 0.0), 7.0))
-            .with(component::Controlled::new(1))
-            .with(component::Shooter::new(0.2))
-            .with(component::Bounding::new(20.0, 1))
-            .with(component::Hitpoints::new(100000.))
-            .build();
+        entities["player-1"].spawn(&mut world, (230., 350.));
 
         let infrastructure = Arc::new(Infrastructure {
             input       : input.clone(),

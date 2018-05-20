@@ -8,8 +8,8 @@ use specs;
  */
 #[derive(Clone, Debug, Deserialize)]
 pub struct Shooter {
-    #[serde(deserialize_with = "::def::shared::periodic_deserialize")]
-    #[serde(default = "::def::shared::periodic_default")]
+    #[serde(deserialize_with = "::def::periodic_deserialize")]
+    #[serde(default = "::def::periodic_default")]
     pub interval: Periodic,
 }
 

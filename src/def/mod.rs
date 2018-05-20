@@ -3,7 +3,8 @@ use serde;
 use serde_yaml;
 use yaml_merge_keys;
 
-pub mod shared;
+pub mod misc;
+pub use self::misc::*;
 pub mod layer;
 pub use self::layer::*;
 pub mod entity;
@@ -39,7 +40,7 @@ impl error::Error for Error {
 }
 
 /// Parses a single yaml file.
-pub fn parse_file<T>(filename: &str) -> Result<T, Error> where T: serde::de::DeserializeOwned {
+fn parse_file<T>(filename: &str) -> Result<T, Error> where T: serde::de::DeserializeOwned {
 
     let mut f = fs::File::open(&filename)?;
     let mut contents = String::new();
@@ -49,7 +50,7 @@ pub fn parse_file<T>(filename: &str) -> Result<T, Error> where T: serde::de::Des
 }
 
 /// Parses a directory of yaml files.
-pub fn parse_dir<T>(source: &str, extensions: &[ &str ]) -> Result<T, Error> where T: serde::de::DeserializeOwned {
+fn parse_dir<T>(source: &str, extensions: &[ &str ]) -> Result<T, Error> where T: serde::de::DeserializeOwned {
 
     let files = find(source, extensions)?;
     let mut contents = Vec::new();
@@ -64,7 +65,7 @@ pub fn parse_dir<T>(source: &str, extensions: &[ &str ]) -> Result<T, Error> whe
 }
 
 /// Parses a yaml string.
-pub fn parse_str<T>(source: &str) -> Result<T, Error> where T: serde::de::DeserializeOwned {
+fn parse_str<T>(source: &str) -> Result<T, Error> where T: serde::de::DeserializeOwned {
     match serde_yaml::from_str(source) {
         Ok(value) => {
             match yaml_merge_keys::merge_keys_serde(value) {

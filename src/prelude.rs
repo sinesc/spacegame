@@ -7,6 +7,7 @@ pub use std::time::{Duration, Instant};
 pub use std::f32::consts::PI;
 pub use std::rc::Rc;
 pub use std::cell::RefCell;
+pub use std::fmt::Debug;
 pub use radiant_utils::maths as rm;
 pub use radiant_utils::util as ru;
 pub use radiant_utils::maths::{Angle, Vec2, lerp, approach, min, max};
