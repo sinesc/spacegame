@@ -22,15 +22,15 @@ pub fn init_cmd<'a, 'b>(menu: &Rc<Menu>, level: &Rc<RefCell<Level<'a, 'b>>>) -> 
         exit_requested  : false,
     });
 
-    cmd.register("pause", &[], Box::new(|cmd, p| {
+    cmd.register("pause", &[], Box::new(|cmd, _| {
         cmd.context_mut().timeframe.lerp_rate(0.0, Duration::from_millis(500));
     }));
 
-    cmd.register("resume", &[], Box::new(|cmd, p| {
+    cmd.register("resume", &[], Box::new(|cmd, _| {
         cmd.context_mut().timeframe.lerp_rate(1.0, Duration::from_millis(500));
     }));
 
-    cmd.register("menu_toggle", &[], Box::new(|cmd, p| {
+    cmd.register("menu_toggle", &[], Box::new(|cmd, _| {
         if cmd.context().menu.visible() {
             cmd.call("menu_hide", &[]);
         } else {
@@ -43,7 +43,7 @@ pub fn init_cmd<'a, 'b>(menu: &Rc<Menu>, level: &Rc<RefCell<Level<'a, 'b>>>) -> 
         cmd.context().menu.group(&p[0].to_string());
     }));
 
-    cmd.register("menu_hide", &[], Box::new(|cmd, p| {
+    cmd.register("menu_hide", &[], Box::new(|cmd, _| {
         cmd.call("resume", &[]);
         cmd.context().menu.hide();
     }));
@@ -52,7 +52,7 @@ pub fn init_cmd<'a, 'b>(menu: &Rc<Menu>, level: &Rc<RefCell<Level<'a, 'b>>>) -> 
 
     }));
 
-    cmd.register("exit", &[], Box::new(|cmd, p| {
+    cmd.register("exit", &[], Box::new(|cmd, _| {
         cmd.context_mut().exit_requested = true
     }));
 
