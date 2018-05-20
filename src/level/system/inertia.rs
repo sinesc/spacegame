@@ -24,7 +24,7 @@ impl Inertia {
 
 #[derive(SystemData)]
 pub struct InertiaData<'a> {
-    world_state: specs::Fetch<'a, WorldState>,
+    world_state: specs::ReadExpect<'a, WorldState>,
     spatial: specs::WriteStorage<'a, component::Spatial>,
     inertial: specs::WriteStorage<'a, component::Inertial>,
 }

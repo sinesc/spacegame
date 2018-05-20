@@ -33,13 +33,41 @@ pub struct EntityDescriptor {
     visual      : Option<Visual>,
 }
 
+pub trait Builder {
+    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self;
+    fn build(self) -> specs::Entity;
+}
+
+pub struct EntityBuilder<'a>(specs::EntityBuilder<'a>);
+
+impl<'a> Builder for EntityBuilder<'a> {
+    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self {
+        EntityBuilder(self.0.with(c))
+    }
+    fn build(self) -> specs::Entity {
+        self.0.build()
+    }
+}
+
+pub struct LazyBuilder<'a>(specs::world::LazyBuilder<'a>);
+
+impl<'a> Builder for LazyBuilder<'a> {
+    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self {
+        LazyBuilder(self.0.with(c))
+    }
+    fn build(self) -> specs::Entity {
+        self.0.build()
+    }
+}
+
 impl EntityDescriptor {
-    pub fn spawn<T>(self: &Self, world: &mut specs::World, position: T) where T: Into<Vec2> {
-
-        let mut ent = world.create_entity();
-
-        if let Some(bounding) = &self.bounding { // todo: use rtti here
-            ent = ent.with(bounding.clone());
+    fn configure<T>(self: &Self, mut ent: T, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) where T: Builder {
+        if let Some(bounding) = &self.bounding {
+            let mut bounding_clone = bounding.clone();
+            if let Some(faction) = faction {
+                bounding_clone.faction = faction;
+            }
+            ent = ent.with(bounding_clone);
         }
         if let Some(computed) = &self.computed {
             ent = ent.with(computed.clone());
@@ -51,30 +79,49 @@ impl EntityDescriptor {
             ent = ent.with(exploding.clone());
         }
         if let Some(fading) = &self.fading {
-            ent = ent.with(fading.clone());
+            let mut fading_clone = fading.clone();
+            fading_clone.start += age;
+            fading_clone.end += age;
+            ent = ent.with(fading_clone);
         }
         if let Some(hitpoints) = &self.hitpoints {
             ent = ent.with(hitpoints.clone());
         }
         if let Some(inertial) = &self.inertial {
-            ent = ent.with(inertial.clone());
+            let mut inertial_clone = inertial.clone();
+            if let Some(angle) = angle {
+                inertial_clone.v_fraction = angle.to_vec2();
+            }
+            ent = ent.with(inertial_clone);
         }
         if let Some(lifetime) = &self.lifetime {
-            ent = ent.with(lifetime.clone());
+            let mut lifetime_clone = lifetime.clone();
+            lifetime_clone.0 += age;
+            ent = ent.with(lifetime_clone);
         }
         if let Some(shooter) = &self.shooter {
             ent = ent.with(shooter.clone());
         }
         if let Some(spatial) = &self.spatial {
             let mut spatial_clone = spatial.clone();
-            spatial_clone.position = position.into();
+            if let Some(position) = position {
+                spatial_clone.position = position.into();
+            }
+            if let Some(angle) = angle {
+                spatial_clone.angle = angle;
+            }
             ent = ent.with(spatial_clone);
         }
         if let Some(visual) = &self.visual {
             ent = ent.with(visual.clone());
         }
-
         ent.build();
+    }
+    pub fn spawn_lazy(self: &Self, lazy: &specs::LazyUpdate, entities: &specs::world::EntitiesRes, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+        self.configure(LazyBuilder(lazy.create_entity(entities)), age, position, angle, faction);
+    }
+    pub fn spawn(self: &Self, world: &mut specs::World, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+        self.configure(EntityBuilder(world.create_entity()), age, position, angle, faction);
     }
 }
 
@@ -98,7 +145,9 @@ pub fn sprite_deserialize<'de, D>(deserializer: D) -> Result<Arc<Sprite>, D::Err
 
 pub fn layer_deserialize<'de, D>(deserializer: D) -> Result<Option<Arc<Layer>>, D::Error> where D: Deserializer<'de>, {
     let name = String::deserialize(deserializer)?;
-    if let Some(layer) = unsafe { (*LAYERS).get(&name) } {
+    if name == "none" {
+        Ok(None)
+    } else if let Some(layer) = unsafe { (*LAYERS).get(&name) } {
         Ok(Some(layer.clone()))
     } else {
         Err(de::Error::unknown_variant(&name, &[ "<valid layers>" ]))

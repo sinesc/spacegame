@@ -58,7 +58,7 @@ fn input(input: &Input, input_id: Option<u32>) -> (Vec2, bool, bool, bool) {
 
 #[derive(SystemData)]
 pub struct ControlData<'a> {
-    world_state: specs::Fetch<'a, WorldState>,
+    world_state: specs::ReadExpect<'a, WorldState>,
     controlled: specs::WriteStorage<'a, component::Controlled>,
     spatial: specs::WriteStorage<'a, component::Spatial>,
     inertial: specs::WriteStorage<'a, component::Inertial>,
@@ -69,7 +69,7 @@ pub struct ControlData<'a> {
     hitpoints: specs::WriteStorage<'a, component::Hitpoints>,
     shooter: specs::WriteStorage<'a, component::Shooter>,
     entities: specs::Entities<'a>,
-    lazy: specs::Fetch<'a, specs::LazyUpdate>,
+    lazy: specs::Read<'a, specs::LazyUpdate>,
 }
 
 impl<'a> specs::System<'a> for Control {

@@ -1,13 +1,45 @@
 mine-green:
     <<: *hostile
-    sprite: hostile/mine_green_64x64x15.png
+    visual:
+        <<: *hostile_visual
+        sprite: hostile/mine_green_lm_64x64x15x2.png
     computed: { }
     shooter:
         interval: 1.0
     hitpoints: 10000
-mine-test:
-    <<: *hostile
-    sprite: hostile/mine_green_64x64x15.png
     bounding:
-        radius: 1.0
-        faction: friendly
+        radius: 28.0
+        faction: hostile
+
+mine-green-shot:
+    <<: *projectile
+    visual:
+        <<: *projectile_visual
+        sprite: projectile/bolt_white_60x36x1.jpg
+        color: [ 0.2, 2.0, 0.2, 1.0 ]
+    bounding:
+        radius: 5.0
+        faction: hostile
+
+mine-red:
+    <<: *hostile
+    visual:
+        <<: *hostile_visual
+        sprite: hostile/mine_red_lm_64x64x15x2.png
+    computed: { }
+    shooter:
+        interval: 1.0
+    hitpoints: 10000
+    bounding:
+        radius: 28.0
+        faction: hostile
+
+mine-red-shot:
+    <<: *projectile
+    visual:
+        <<: *projectile_visual
+        sprite: projectile/bolt_white_60x36x1.jpg
+        color: [ 2.0, 0.2, 0.2, 1.0 ]
+    bounding:
+        radius: 5.0
+        faction: hostile

@@ -27,7 +27,7 @@ impl<'a> Render {
 
 #[derive(SystemData)]
 pub struct RenderData<'a> {
-    world_state: specs::Fetch<'a, WorldState>,
+    world_state: specs::ReadExpect<'a, WorldState>,
     spatial: specs::ReadStorage<'a, component::Spatial>,
     visual: specs::WriteStorage<'a, component::Visual>,
     fading: specs::ReadStorage<'a, component::Fading>,

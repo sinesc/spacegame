@@ -22,7 +22,7 @@ impl Compute {
 
 #[derive(SystemData)]
 pub struct ComputeData<'a> {
-    world_state: specs::Fetch<'a, WorldState>,
+    world_state: specs::ReadExpect<'a, WorldState>,
     controlled: specs::ReadStorage<'a, component::Controlled>,
     computed: specs::WriteStorage<'a, component::Computed>,
     spatial: specs::WriteStorage<'a, component::Spatial>,
@@ -34,7 +34,7 @@ pub struct ComputeData<'a> {
     hitpoints: specs::WriteStorage<'a, component::Hitpoints>,
     shooter: specs::WriteStorage<'a, component::Shooter>,
     entities: specs::Entities<'a>,
-    lazy: specs::Fetch<'a, specs::LazyUpdate>,
+    lazy: specs::Read<'a, specs::LazyUpdate>,
 }
 
 impl<'a> specs::System<'a> for Compute {
@@ -86,24 +86,12 @@ impl<'a> specs::System<'a> for Compute {
             if shooter.interval.elapsed(age) {
                 projectiles.push((bounding.faction, spatial.position, spatial.angle - diff));
                 //projectiles.push((bounding.faction, spatial.position, (target_pos - spatial.position).to_angle()));
-                rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.samples());
+                //rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.samples());
             }
 		}
 
-        let mut spawn = |faction: u32, origin: Vec2, angle: Angle| {
-            let shot = data.entities.create();
-            data.spatial.insert(shot, component::Spatial::new(origin, angle));
-            data.visual.insert(shot, component::Visual::new(Some(data.world_state.inf.layer["effects"].clone()), None, data.world_state.inf.sprite["laser"].clone(), Color(2.0, 0.2, 0.2, 1.0), 1.0, 30, 0.2));
-            data.inertial.insert(shot, component::Inertial::new(Vec2(1133.0, 1133.0), Vec2::from_angle(angle), 1.0));
-            data.lifetime.insert(shot, component::Lifetime(age + 1.0));
-            data.fading.insert(shot, component::Fading::new(age + 0.5, age + 1.0));
-            data.bounding.insert(shot, component::Bounding::new(5.0, faction));
-            data.hitpoints.insert(shot, component::Hitpoints::new(50.0));
-        };
-
         for (faction, position, angle) in projectiles {
-            spawn(faction, position, angle);
+            data.world_state.spawn_lazy(&data.lazy, &data.entities, "mine-green-shot", Some(position), Some(angle), Some(faction));
         }
-
 	}
 }

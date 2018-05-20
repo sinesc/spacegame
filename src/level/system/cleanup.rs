@@ -19,7 +19,7 @@ impl<'a> Cleanup {
 
 #[derive(SystemData)]
 pub struct CleanupData<'a> {
-    world_state: specs::Fetch<'a, WorldState>,
+    world_state: specs::ReadExpect<'a, WorldState>,
     lifetime: specs::ReadStorage<'a, component::Lifetime>,
     hitpoints: specs::ReadStorage<'a, component::Hitpoints>,
     entities: specs::Entities<'a>,

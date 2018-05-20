@@ -13,7 +13,7 @@ pub struct Infrastructure {
     audio       : rodio::Device,
     layer       : HashMap<String, Arc<Layer>>,
     sprite      : HashMap<String, Arc<Sprite>>,
-
+    repository  : HashMap<String, def::EntityDescriptor>,
     font        : Arc<Font>,
     pew         : SoundGroup,
     boom        : SoundGroup,
@@ -26,6 +26,12 @@ pub struct WorldState {
     take_input  : bool,
     paused      : bool,
     inf         : Arc<Infrastructure>,
+}
+
+impl WorldState {
+    pub fn spawn_lazy(self: &Self, lazy: &specs::LazyUpdate, entities: &specs::world::EntitiesRes, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+        self.inf.repository[name].spawn_lazy(lazy, entities, self.age, position, angle, faction);
+    }
 }
 
 pub struct Level<'a, 'b> {
@@ -43,6 +49,10 @@ pub struct Level<'a, 'b> {
 }
 
 impl<'a, 'b> Level<'a, 'b> {
+
+    pub fn spawn(self: &mut Self, name: &str, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+        self.inf.repository[name].spawn(&mut self.world, age, position, angle, faction);
+    }
 
     pub fn new(input: &Input, context: &RenderContext) -> Self {
 
@@ -63,14 +73,20 @@ impl<'a, 'b> Level<'a, 'b> {
         // create a scene and a layer TODO: temporary, load from def
 
         let mut sprites = HashMap::new();
-        sprites.insert("mine".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_lightmapped_64x64x15x2.png").unwrap().arc());
+        sprites.insert("mine".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_red_lm_64x64x15x2.png").unwrap().arc());
         sprites.insert("friend".to_string(), Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc());
         sprites.insert("asteroid".to_string(), Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc());
         sprites.insert("explosion".to_string(), Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc());
         sprites.insert("laser".to_string(), Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc());
 
-        sprites.insert("hostile/mine_green_64x64x15.png".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_green_64x64x15.png").unwrap().arc());
+        sprites.insert("hostile/mine_green_lm_64x64x15x2.png".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_green_lm_64x64x15x2.png").unwrap().arc());
         sprites.insert("player/speedy_98x72x30.png".to_string(), Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc());
+        sprites.insert("placeholder_16x16x1.png".to_string(), Sprite::from_file(context, "res/sprite/placeholder_16x16x1.png").unwrap().arc());
+        sprites.insert("projectile/bolt_white_60x36x1.jpg".to_string(), Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc());
+        sprites.insert("explosion/default_256x256x40.jpg".to_string(), Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc());
+        sprites.insert("hostile/mine_red_lm_64x64x15x2.png".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_red_lm_64x64x15x2.png").unwrap().arc());
+        sprites.insert("asteroid/type1_64x64x60.png".to_string(), Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc());
+
 
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
@@ -101,16 +117,17 @@ impl<'a, 'b> Level<'a, 'b> {
         let entities = def::parse_entities(&factions, &sprites, &layers).unwrap();
 
         //test
-        entities["mine-green"].spawn(&mut world, (100., 100.));
+        entities["mine-green"].spawn(&mut world, 0., Some(Vec2(100., 100.)), None, None);
 
         // create player entity
 
-        entities["player-1"].spawn(&mut world, (230., 350.));
+        entities["player-1"].spawn(&mut world, 0., Some(Vec2(230., 350.)), None, None);
 
         let infrastructure = Arc::new(Infrastructure {
             input       : input.clone(),
             layer       : layers,
             sprite      : sprites,
+            repository  : entities,
             font        : font,
             audio       : audio,
             pew         : pew,
@@ -128,12 +145,12 @@ impl<'a, 'b> Level<'a, 'b> {
         // create planner and add systems
 
         let dispatcher = specs::DispatcherBuilder::new()
-                .add(system::Control::new(), "control", &[])
-                .add(system::Compute::new(), "compute", &[])
-                .add(system::Inertia::new(), "inertia", &[ "control", "compute" ])
-                .add(system::Collider::new(), "collider", &[])
-                .add(system::Render::new(), "render", &[ "control", "compute", "inertia", "collider" ])
-                .add(system::Cleanup::new(), "cleanup", &[ "render" ])
+                .with(system::Control::new(), "control", &[])
+                .with(system::Compute::new(), "compute", &[])
+                .with(system::Inertia::new(), "inertia", &[ "control", "compute" ])
+                .with(system::Collider::new(), "collider", &[])
+                .with(system::Render::new(), "render", &[ "control", "compute", "inertia", "collider" ])
+                .with(system::Cleanup::new(), "cleanup", &[ "render" ])
                 .build();
 
         // return level
@@ -213,34 +230,30 @@ impl<'a, 'b> Level<'a, 'b> {
             pos -= outbound;
 
             let v_max = (-angle).to_vec2() * 100.0;
+            let faction = self.rng.range(2., 100.) as u32;
 
-            self.world.create_entity()
+            self.spawn("asteroid", age, Some(pos), Some(v_max.to_angle()), Some(faction));
+            /*self.world.create_entity()
                 .with(component::Spatial::new(pos, angle))
                 .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.sprite["asteroid"].clone(), Color::WHITE, scale, 30, 1.0))
                 .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 1.0))
                 .with(component::Bounding::new(20.0 * scale, self.rng.range(2., 100.) as u32))
                 .with(component::Hitpoints::new(100. * scale))
-                .build();
+                .build();*/
 
         }
 
         if self.minespawn.elapsed(age) {
+
             let angle = Angle(self.rng.range(-PI, PI));
             let mut pos = Vec2(800.0, 450.0) + angle.to_vec2() * 2000.0;
             let outbound = pos.outbound(((0.0, 0.0), (1920.0, 1080.0))).unwrap();
             let scale = self.rng.range(0.9, 1.1);
+            let faction = self.rng.range(101., 200.) as u32;
 
             pos -= outbound;
 
-            self.world.create_entity()
-                .with(component::Spatial::new(pos, angle))
-                .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.sprite["mine"].clone(), Color::WHITE, scale, 30, 1.0))
-                .with(component::Bounding::new(20.0, self.rng.range(101., 200.) as u32))
-                .with(component::Hitpoints::new(1000.))
-                .with(component::Shooter::new(0.5))
-                .with(component::Computed::new())
-                .with(component::Inertial::new(Vec2(120.0, 120.0), Vec2(0.0, 0.0), 1.0))
-                .build();
+            self.spawn("mine-red", age, Some(pos), Some(angle), Some(faction));
         }
 
         self.world.maintain();
