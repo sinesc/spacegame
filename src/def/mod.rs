@@ -9,6 +9,8 @@ pub mod layer;
 pub use self::layer::*;
 pub mod entity;
 pub use self::entity::*;
+pub mod spawner;
+pub use self::spawner::*;
 pub mod menu;
 pub use self::menu::*;
 

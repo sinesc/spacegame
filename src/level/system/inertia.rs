@@ -1,11 +1,5 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
-#![allow(unused_imports)]
-
 use prelude::*;
 use specs;
-use specs::Join;
-use specs::SystemData;
 use level::component;
 use level::WorldState;
 
@@ -87,7 +81,7 @@ impl<'a> specs::System<'a> for Inertia {
                 let current_lean = (inertial.v_current.to_angle() - spatial.angle).to_radians().sin() * inertial.v_fraction.len();
                 approach(&mut spatial.lean, &current_lean, 10.0 * data.world_state.delta);
 
-            } else {
+            } else if inertial.motion_type == component::InertialMotionType::Detached {
 
                 // approach full stop
 
@@ -127,6 +121,10 @@ impl<'a> specs::System<'a> for Inertia {
                     let current_lean = clamp(av_current / av_max * (0.4 + v_factor), -1., 1.);
                     approach(&mut spatial.lean, &current_lean, inertial.trans_lean * delta);
                 }
+
+            } else if inertial.motion_type == component::InertialMotionType::Const {
+
+                //inertial.v_current = inertial.v_max * inertial.v_fraction;
             }
 
             // update spatial position
@@ -150,9 +148,4 @@ impl<'a> specs::System<'a> for Inertia {
             }
 		}
 	}
-}
-
-// TODO: move to radiant-utils
-pub fn clamp<T>(a: T, min: T, max: T) -> T where T: PartialOrd {
-    if a.lt(&min) { min } else if a.gt(&max) { max } else { a }
 }

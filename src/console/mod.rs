@@ -48,9 +48,9 @@ pub fn init_cmd<'a, 'b>(menu: &Rc<Menu>, level: &Rc<RefCell<Level<'a, 'b>>>) -> 
         cmd.context().menu.hide();
     }));
 
-    cmd.register("level_start", &[Int], Box::new(|cmd, p| {
+    /*cmd.register("level_start", &[Int], Box::new(|cmd, p| {
 
-    }));
+    }));*/
 
     cmd.register("exit", &[], Box::new(|cmd, _| {
         cmd.context_mut().exit_requested = true

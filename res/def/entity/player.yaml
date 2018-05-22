@@ -26,8 +26,19 @@ player: &player
     hitpoints: 10000
     shooter:
         interval: 0.2
+        spawner: weapon
 
 player-1:
     <<: *player
     controlled:
         input_id: 1
+
+player-shot:
+    <<: *projectile
+    visual:
+        <<: *projectile_visual
+        sprite: projectile/bolt_white_60x36x1.jpg
+        color: [ 1.0, 1.0, 1.0, 1.0 ]
+    bounding:
+        radius: 5.0
+        faction: friendly

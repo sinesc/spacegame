@@ -4,6 +4,7 @@ use rodio;
 use sound::{SoundGroup};
 use def;
 use bloom;
+use repository::Repository;
 
 pub mod component;
 mod system;
@@ -11,9 +12,10 @@ mod system;
 pub struct Infrastructure {
     input       : Input,
     audio       : rodio::Device,
-    layer       : HashMap<String, Arc<Layer>>,
-    sprite      : HashMap<String, Arc<Sprite>>,
-    repository  : HashMap<String, def::EntityDescriptor>,
+    layer       : Repository<String, Arc<Layer>>,
+    sprite      : Repository<String, Arc<Sprite>>,
+    repository  : Repository<String, def::EntityDescriptor>,
+    spawner     : Repository<String, def::SpawnerDescriptor>,
     font        : Arc<Font>,
     pew         : SoundGroup,
     boom        : SoundGroup,
@@ -72,7 +74,7 @@ impl<'a, 'b> Level<'a, 'b> {
 
         // create a scene and a layer TODO: temporary, load from def
 
-        let mut sprites = HashMap::new();
+        let mut sprites = Repository::new();
         sprites.insert("mine".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_red_lm_64x64x15x2.png").unwrap().arc());
         sprites.insert("friend".to_string(), Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc());
         sprites.insert("asteroid".to_string(), Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc());
@@ -98,7 +100,7 @@ impl<'a, 'b> Level<'a, 'b> {
         // create layers
 
         let layer_def = def::parse_layers().unwrap();
-        let mut layers = HashMap::new();
+        let mut layers = Repository::new();
 
         for info in &layer_def.create {
             let mut layer = Layer::new((info.scale * 1920., info.scale * 1080.)).arc();
@@ -114,7 +116,9 @@ impl<'a, 'b> Level<'a, 'b> {
         }
 
         let factions = def::parse_factions().unwrap();
-        let entities = def::parse_entities(&factions, &sprites, &layers).unwrap();
+        let spawners = def::parse_spawners().unwrap();
+        let entities = def::parse_entities(&factions, &spawners, &sprites, &layers).unwrap();
+        println!("{:#?}", spawners);
 
         //test
         entities["mine-green"].spawn(&mut world, 0., Some(Vec2(100., 100.)), None, None);
@@ -128,6 +132,7 @@ impl<'a, 'b> Level<'a, 'b> {
             layer       : layers,
             sprite      : sprites,
             repository  : entities,
+            spawner     : spawners,
             font        : font,
             audio       : audio,
             pew         : pew,
@@ -181,7 +186,7 @@ impl<'a, 'b> Level<'a, 'b> {
             world_state.delta = delta;
             world_state.take_input = take_input;
             world_state.paused = paused;
-        };
+        }
 
         self.dispatcher.dispatch(&mut self.world.res);
 

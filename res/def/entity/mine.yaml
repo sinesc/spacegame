@@ -6,6 +6,7 @@ mine-green:
     computed: { }
     shooter:
         interval: 1.0
+        spawner: weapon
     hitpoints: 10000
     bounding:
         radius: 28.0
@@ -29,6 +30,7 @@ mine-red:
     computed: { }
     shooter:
         interval: 1.0
+        spawner: weapon
     hitpoints: 10000
     bounding:
         radius: 28.0

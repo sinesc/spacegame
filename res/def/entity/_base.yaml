@@ -4,7 +4,7 @@ hostile: &hostile
         angle: 0.0
     inertial: &hostile_inertial
         v_max: [ 100.0, 100.0 ]
-        v_fraction: [ 1.0, 1.0 ]
+        v_fraction: [ 0.0, 0.0 ]
         v_current: [ 0.0, 0.0 ]
         trans_motion: 6.0
         trans_rest: 3.0
@@ -37,7 +37,8 @@ projectile: &projectile
     inertial:
         <<: *hostile_inertial
         v_max: [ 1000.0, 1000.0 ]
-    lifetime: 5.0
+        motion_type: Const
+    lifetime: 1.0
     fading:
         start: 0.5
         end: 1.0

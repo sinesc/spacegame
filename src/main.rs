@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 extern crate radiant_rs as radiant;
 extern crate radiant_utils;
 extern crate rodio;
@@ -23,6 +26,7 @@ mod menu;
 mod cmd;
 mod timeframe;
 mod console;
+mod repository;
 
 use prelude::*;
 use level::Level;
