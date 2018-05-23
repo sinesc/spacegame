@@ -17,10 +17,11 @@ player: &player
         faction: friendly
     visual:
         layer: base
-        effect_size: 1.0
         sprite: player/speedy_98x72x30.png
         scale: 1.0
+        effect_scale: 1.0
         color: [ 0.8, 0.8, 1.0, 1.0 ]
+        effect_color: [ 1.0, 1.0, 1.0, 1.0 ]
         frame_id: 0
         fps: 0
     hitpoints: 10000
@@ -35,10 +36,11 @@ player-1:
 
 player-shot:
     <<: *projectile
+    hitpoints: 10
     visual:
         <<: *projectile_visual
         sprite: projectile/bolt_white_60x36x1.jpg
-        color: [ 1.0, 1.0, 1.0, 1.0 ]
+        color: [ 1.0, 1.0, 1.5, 1.0 ]
     bounding:
         radius: 5.0
         faction: friendly

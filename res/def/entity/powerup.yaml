@@ -1,0 +1,6 @@
+dual-weapon:
+    <<: *powerup
+    visual:
+        <<: *powerup_visual
+        sprite: powerup/ball_v_32x32x18.jpg
+        color: [ 1.2, 1.2, 1.8, 1.0 ]

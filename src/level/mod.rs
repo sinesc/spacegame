@@ -17,7 +17,7 @@ pub struct Infrastructure {
     layer       : Repository<String, Arc<Layer>>,
     sprite      : Repository<String, Arc<Sprite>>,
     repository  : Repository<String, def::EntityDescriptor>,
-    spawner     : Repository<String, def::SpawnerDescriptor>,
+    spawner     : Repository<String, def::SpawnerDescriptor, def::SpawnerId>,
     font        : Arc<Font>,
     pew         : SoundGroup,
     boom        : SoundGroup,
@@ -36,16 +36,20 @@ impl WorldState {
     pub fn spawn_lazy(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
         self.inf.repository[name].spawn_lazy(lazy, entities, self.age, position, angle, faction);
     }
-    pub fn spawner(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, spawner_id: usize, parent_angle: Angle, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+    pub fn spawner(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, spawner_id: def::SpawnerId, parent_angle: Angle, parent_position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
         let spawner = &self.inf.spawner.index(spawner_id);
         for ref spawn in &spawner.entities {
+            let pos = match parent_position {
+                Some(parent_position) => parent_position + spawn.position.rotate(parent_angle),
+                None => spawn.position.rotate(parent_angle),
+            };
             self.spawn_lazy(
                 lazy,
                 entities,
                 &spawn.entity,
-                Some(position.unwrap() + spawn.position.rotate(parent_angle)),
-                Some(angle.unwrap()),
-                Some(faction.unwrap())
+                Some(pos),
+                angle,
+                faction
             );
         }
     }
@@ -68,9 +72,9 @@ pub struct Level<'a, 'b> {
 
 impl<'a, 'b> Level<'a, 'b> {
 
-    pub fn spawn(self: &mut Self, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+    /*pub fn spawn(self: &mut Self, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
         self.inf.repository[name].spawn(&mut self.world, self.age, position, angle, faction);
-    }
+    }*/
 
     pub fn new(input: &Input, context: &RenderContext) -> Self {
 
@@ -87,6 +91,7 @@ impl<'a, 'b> Level<'a, 'b> {
         world.register::<component::Fading>();
         world.register::<component::Bounding>();
         world.register::<component::Hitpoints>();
+        world.register::<component::Exploding>();
 
         // create a scene and a layer TODO: temporary, load from def
 
@@ -104,6 +109,7 @@ impl<'a, 'b> Level<'a, 'b> {
         sprites.insert("explosion/default_256x256x40.jpg".to_string(), Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc());
         sprites.insert("hostile/mine_red_lm_64x64x15x2.png".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_red_lm_64x64x15x2.png").unwrap().arc());
         sprites.insert("asteroid/type1_64x64x60.png".to_string(), Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc());
+        sprites.insert("powerup/ball_v_32x32x18.jpg".to_string(), Sprite::from_file(context, "res/sprite/powerup/ball_v_32x32x18.jpg").unwrap().arc());
 
 
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
@@ -134,7 +140,6 @@ impl<'a, 'b> Level<'a, 'b> {
         let factions = def::parse_factions().unwrap();
         let spawners = def::parse_spawners().unwrap();
         let entities = def::parse_entities(&factions, &spawners, &sprites, &layers).unwrap();
-        println!("{:#?}", spawners);
 
         //test
         entities["mine-green"].spawn(&mut world, 0., Some(Vec2(100., 100.)), None, None);
@@ -255,7 +260,7 @@ impl<'a, 'b> Level<'a, 'b> {
             let v_max = Vec2::from(-angle) * 100.0;
             let faction = self.rng.range(2., 100.) as u32;
 
-            self.spawn("asteroid", Some(pos), Some(Angle::from(v_max)), Some(faction));
+            self.inf.repository["asteroid"].spawn(&mut self.world, self.age, Some(pos), Some(Angle::from(v_max)), Some(faction));
             /*self.world.create_entity()
                 .with(component::Spatial::new(pos, angle))
                 .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.sprite["asteroid"].clone(), Color::WHITE, scale, 30, 1.0))
@@ -273,10 +278,12 @@ impl<'a, 'b> Level<'a, 'b> {
             let outbound = pos.outbound(((0.0, 0.0), (1920.0, 1080.0))).unwrap();
             let scale = self.rng.range(0.9, 1.1);
             let faction = self.rng.range(101., 200.) as u32;
+            let pw_y = self.rng.range(0., 1080.);
 
             pos -= outbound;
 
-            self.spawn("mine-red", Some(pos), Some(angle), Some(faction));
+            self.inf.repository["mine-red"].spawn(&mut self.world, self.age, Some(pos), Some(angle), Some(faction));
+            self.inf.repository["dual-weapon"].spawn(&mut self.world, self.age, Some(Vec2(1920., pw_y)), None, None);
         }
 
         self.world.maintain();

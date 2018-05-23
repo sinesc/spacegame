@@ -65,7 +65,7 @@ impl<'a> specs::System<'a> for Render {
             }
 
             if let Some(ref effect_layer) = visual.effect_layer {
-                visual.sprite.draw_transformed(&effect_layer, visual.frame_id as u32, spatial.position, visual.color.to_pm(), spatial.angle.to_radians(), (visual.effect_size, visual.effect_size));
+                visual.sprite.draw_transformed(&effect_layer, visual.frame_id as u32, spatial.position, visual.effect_color.to_pm(), spatial.angle.to_radians(), (visual.effect_scale, visual.effect_scale));
             }
 
             visual.frame_id = if visual.fps == 0 {

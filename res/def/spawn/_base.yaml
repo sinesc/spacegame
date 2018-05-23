@@ -1,7 +1,0 @@
-weapon: &weapon
-    dispatch: All
-    entities:
-        -
-            position: [ 0., 0. ]
-            angle: 0.
-            entity: projectile

@@ -1,15 +1,15 @@
-mine-red-weapon:
-    <<: *weapon
+exploder-green:
+    dispatch: All
     entities:
         -
             position: [ 0., 0. ]
             angle: 0.
-            entity: mine-red-shot
+            entity: explosion-green
 
-mine-green-weapon:
-    <<: *weapon
+exploder-red:
+    dispatch: All
     entities:
         -
             position: [ 0., 0. ]
             angle: 0.
-            entity: mine-green-shot
+            entity: explosion-red

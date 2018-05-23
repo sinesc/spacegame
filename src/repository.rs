@@ -95,7 +95,7 @@ impl<'de, K, V, I> Visitor<'de> for RepositoryVisitor<K, V, I>
 where
     K: Deserialize<'de> + Eq + Hash,
     V: Deserialize<'de>,
-    I: Deserialize<'de> + Copy + Into<usize> + From<usize>,
+    I: Copy + Into<usize> + From<usize>,
 {
     type Value = Repository<K, V, I>;
 
@@ -119,7 +119,7 @@ impl<'de, K, V, I> Deserialize<'de> for Repository<K, V, I>
 where
     K: Deserialize<'de> + Eq + Hash,
     V: Deserialize<'de>,
-    I: Deserialize<'de> + Copy + Into<usize> + From<usize>,
+    I: Copy + Into<usize> + From<usize>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         deserializer.deserialize_map(RepositoryVisitor::new())

@@ -9,15 +9,15 @@ use def::spawner::*;
 static mut FACTIONS: *const Vec<String> = 0 as _;
 static mut SPRITES: *const Repository<String, Arc<Sprite>> = 0 as _;
 static mut LAYERS: *const Repository<String, Arc<Layer>> = 0 as _;
-static mut SPAWNERS: *const Repository<String, SpawnerDescriptor> = 0 as _;
+static mut SPAWNERS: *const Repository<String, SpawnerDescriptor, SpawnerId> = 0 as _;
 
-pub fn parse_entities(factions: &Vec<String>, spawners: &Repository<String, SpawnerDescriptor>, sprites: &Repository<String, Arc<Sprite>>, layers: &Repository<String, Arc<Layer>>) -> Result<Repository<String, EntityDescriptor>, Error> {
+pub fn parse_entities(factions: &Vec<String>, spawners: &Repository<String, SpawnerDescriptor, SpawnerId>, sprites: &Repository<String, Arc<Sprite>>, layers: &Repository<String, Arc<Layer>>) -> Result<Repository<String, EntityDescriptor>, Error> {
     unsafe {
         // set up some ugly unsafe global state to work around missing DeserializeSeed in Serde-Yaml
         FACTIONS = factions as *const Vec<String>;
         SPRITES = sprites as *const Repository<String, Arc<Sprite>>;
         LAYERS = layers as *const Repository<String, Arc<Layer>>;
-        SPAWNERS = spawners as *const Repository<String, SpawnerDescriptor>;
+        SPAWNERS = spawners as *const Repository<String, SpawnerDescriptor, SpawnerId>;
     }
     parse_dir("res/def/entity/", &[ "yaml" ])
 }
@@ -159,7 +159,7 @@ pub fn layer_deserialize<'de, D>(deserializer: D) -> Result<Option<Arc<Layer>>, 
     }
 }
 
-pub fn spawner_deserialize<'de, D>(deserializer: D) -> Result<usize, D::Error> where D: Deserializer<'de>, {
+pub fn spawner_deserialize<'de, D>(deserializer: D) -> Result<SpawnerId, D::Error> where D: Deserializer<'de>, {
     let name = String::deserialize(deserializer)?;
     if let Some(spawner_id) = unsafe { (*SPAWNERS).index_of(&name) } {
         Ok(spawner_id)

@@ -13,18 +13,21 @@ hostile: &hostile
         trans_lean: 10
         motion_type: FollowVector
     bounding:
-        radius: 1.0
+        radius: 16.0
         faction: hostile
     visual: &hostile_visual
         layer: base
         effect_layer: effects
-        effect_size: 1.0
         sprite: placeholder_16x16x1.png
         scale: 1.0
+        effect_scale: 1.0
         color: [ 1.0, 1.0, 1.0, 1.0 ]
+        effect_color: [ 1.0, 1.0, 1.0, 1.0 ]
         frame_id: 0
         fps: 30
     hitpoints: 100
+    exploding:
+        spawner: exploder
 
 projectile: &projectile
     <<: *hostile
@@ -32,7 +35,6 @@ projectile: &projectile
         <<: *hostile_visual
         layer: effects
         effect_layer: none
-        effect_size: 0.2
         fps: 0
     inertial:
         <<: *hostile_inertial
@@ -42,21 +44,31 @@ projectile: &projectile
     fading:
         start: 0.5
         end: 1.0
+    exploding:
+        spawner: exploder-small
 
-explosion:
+explosion: &explosion
     spatial:
         position: [ 0.0, 0.0 ]
         angle: 0.0
-    visual:
+    visual: &explosion_visual
+        <<: *hostile_visual
         layer: none
         effect_layer: effects
-        effect_size: 1.0
         sprite: explosion/default_256x256x40.jpg
-        scale: 1.0
-        color: [ 1.0, 1.0, 1.0, 1.0 ]
-        frame_id: 0
-        fps: 30
-    lifetime: 1.0
-    fading:
-        start: 0.5
-        end: 1.5
+    lifetime: 1.3
+
+powerup: &powerup
+    <<: *hostile
+    visual: &powerup_visual
+        <<: *hostile_visual
+        layer: effects
+        effect_layer: none
+    inertial:
+        <<: *hostile_inertial
+        v_current: [ -100.0, 0.0 ]
+        motion_type: Const
+    lifetime: 60.0
+    bounding:
+        radius: 16.0
+        faction: powerup

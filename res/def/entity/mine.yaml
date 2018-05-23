@@ -6,11 +6,20 @@ mine-green:
     computed: { }
     shooter:
         interval: 1.0
-        spawner: mine-green-weapon
+        spawner: weapon-green
     hitpoints: 1000
     bounding:
         radius: 28.0
         faction: hostile
+    exploding:
+        spawner: exploder-green
+    inertial:
+        <<: *hostile_inertial
+        v_max: [ 100.0, 100.0 ]
+        trans_motion: 6.0
+        trans_rest: 3.0
+        av_max_v0: 0.5
+        av_max_vmax: 0.1
 
 mine-green-shot:
     <<: *projectile
@@ -30,11 +39,13 @@ mine-red:
     computed: { }
     shooter:
         interval: 1.0
-        spawner: mine-red-weapon
+        spawner: weapon-red
     hitpoints: 1000
     bounding:
         radius: 28.0
         faction: hostile
+    exploding:
+        spawner: exploder-red
 
 mine-red-shot:
     <<: *projectile

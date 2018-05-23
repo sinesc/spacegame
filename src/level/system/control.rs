@@ -86,14 +86,14 @@ impl<'a> specs::System<'a> for Control {
             let input_id = if data.world_state.take_input { Some(controlled.input_id) } else { None };
             let (v_fraction, shoot, strafe, rotate) = input(&data.world_state.inf.input, input_id);
 
-            if controlled.input_id == 1 {
+            /*if controlled.input_id == 1 {
                 data.world_state.inf.font.write(
                     &data.world_state.inf.layer["text"],
                     &format!("Input\nv_fraction: ({:.3} {:.3})\nshoot: {:?}\nstrafe: {:?}\nrotate: {:?}", v_fraction.0, v_fraction.1, shoot, strafe, rotate),
                     (10.0, 300.0),
                     Color::alpha_pm(0.4)
                 );
-            }
+            }*/
 
             if strafe {
 

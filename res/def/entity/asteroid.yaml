@@ -4,5 +4,5 @@ asteroid:
         <<: *hostile_visual
         sprite: asteroid/type1_64x64x60.png
     bounding:
-        radius: 28.0
+        radius: 16.0
         faction: hostile

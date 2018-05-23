@@ -1,5 +1,6 @@
 use prelude::*;
 use specs::DenseVecStorage;
+use def;
 
 /**
  * Shooter component
@@ -12,5 +13,5 @@ pub struct Shooter {
     #[serde(default = "::def::periodic_default")]
     pub interval: Periodic,
     #[serde(deserialize_with = "::def::spawner_deserialize")]
-    pub spawner: usize, // TODO: look into serde rename, deserialize this from "spawner" into "spawner_id"
+    pub spawner: def::SpawnerId, // TODO: look into serde rename, deserialize this from "spawner" into "spawner_id"
 }
