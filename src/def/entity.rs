@@ -94,8 +94,8 @@ impl EntityDescriptor {
         if let Some(inertial) = &self.inertial {
             let mut inertial_clone = inertial.clone();
             if let Some(angle) = angle {
-                inertial_clone.v_fraction = angle.to_vec2();
-                inertial_clone.v_current = angle.to_vec2() * inertial_clone.v_max;
+                inertial_clone.v_fraction = Vec2::from(angle);
+                inertial_clone.v_current = Vec2::from(angle) * inertial_clone.v_max;
             }
             ent = ent.with(inertial_clone);
         }

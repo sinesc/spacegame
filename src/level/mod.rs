@@ -5,6 +5,8 @@ use sound::{SoundGroup};
 use def;
 use bloom;
 use repository::Repository;
+use specs::LazyUpdate;
+use specs::world::EntitiesRes;
 
 pub mod component;
 mod system;
@@ -31,8 +33,21 @@ pub struct WorldState {
 }
 
 impl WorldState {
-    pub fn spawn_lazy(self: &Self, lazy: &specs::LazyUpdate, entities: &specs::world::EntitiesRes, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+    pub fn spawn_lazy(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
         self.inf.repository[name].spawn_lazy(lazy, entities, self.age, position, angle, faction);
+    }
+    pub fn spawner(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, spawner_id: usize, parent_angle: Angle, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+        let spawner = &self.inf.spawner.index(spawner_id);
+        for ref spawn in &spawner.entities {
+            self.spawn_lazy(
+                lazy,
+                entities,
+                &spawn.entity,
+                Some(position.unwrap() + spawn.position.rotate(parent_angle)),
+                Some(angle.unwrap()),
+                Some(faction.unwrap())
+            );
+        }
     }
 }
 
@@ -41,9 +56,10 @@ pub struct Level<'a, 'b> {
     dispatcher  : specs::Dispatcher<'a, 'b>,
     layer_def   : def::LayerDef,
     inf         : Arc<Infrastructure>,
+    age         : f32,
+
     bloom       : postprocessors::Bloom,
     glare       : bloom::Bloom,
-
     roidspawn   : Periodic,
     minespawn   : Periodic,
     rng         : Rng,
@@ -52,8 +68,8 @@ pub struct Level<'a, 'b> {
 
 impl<'a, 'b> Level<'a, 'b> {
 
-    pub fn spawn(self: &mut Self, name: &str, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
-        self.inf.repository[name].spawn(&mut self.world, age, position, angle, faction);
+    pub fn spawn(self: &mut Self, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+        self.inf.repository[name].spawn(&mut self.world, self.age, position, angle, faction);
     }
 
     pub fn new(input: &Input, context: &RenderContext) -> Self {
@@ -168,6 +184,7 @@ impl<'a, 'b> Level<'a, 'b> {
             world       : world,
             dispatcher  : dispatcher,
             layer_def   : layer_def,
+            age         : 0.0,
             roidspawn   : Periodic::new(0.0, 0.5),
             minespawn   : Periodic::new(0.0, 3.73),
             rng         : Rng::new(123.4),
@@ -188,6 +205,7 @@ impl<'a, 'b> Level<'a, 'b> {
             world_state.paused = paused;
         }
 
+        self.age = age;
         self.dispatcher.dispatch(&mut self.world.res);
 
         // render layers
@@ -228,16 +246,16 @@ impl<'a, 'b> Level<'a, 'b> {
 
         if self.roidspawn.elapsed(age) {
             let angle = Angle(self.rng.range(-PI, PI));
-            let mut pos = Vec2(800.0, 450.0) + angle.to_vec2() * 2000.0;
+            let mut pos = Vec2(800.0, 450.0) + Vec2::from(angle) * 2000.0;
             let outbound = pos.outbound(((0.0, 0.0), (1920.0, 1080.0))).unwrap();
             let scale = self.rng.range(0.3, 1.3);
 
             pos -= outbound;
 
-            let v_max = (-angle).to_vec2() * 100.0;
+            let v_max = Vec2::from(-angle) * 100.0;
             let faction = self.rng.range(2., 100.) as u32;
 
-            self.spawn("asteroid", age, Some(pos), Some(v_max.to_angle()), Some(faction));
+            self.spawn("asteroid", Some(pos), Some(Angle::from(v_max)), Some(faction));
             /*self.world.create_entity()
                 .with(component::Spatial::new(pos, angle))
                 .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.sprite["asteroid"].clone(), Color::WHITE, scale, 30, 1.0))
@@ -251,14 +269,14 @@ impl<'a, 'b> Level<'a, 'b> {
         if self.minespawn.elapsed(age) {
 
             let angle = Angle(self.rng.range(-PI, PI));
-            let mut pos = Vec2(800.0, 450.0) + angle.to_vec2() * 2000.0;
+            let mut pos = Vec2(800.0, 450.0) + Vec2::from(angle) * 2000.0;
             let outbound = pos.outbound(((0.0, 0.0), (1920.0, 1080.0))).unwrap();
             let scale = self.rng.range(0.9, 1.1);
             let faction = self.rng.range(101., 200.) as u32;
 
             pos -= outbound;
 
-            self.spawn("mine-red", age, Some(pos), Some(angle), Some(faction));
+            self.spawn("mine-red", Some(pos), Some(angle), Some(faction));
         }
 
         self.world.maintain();

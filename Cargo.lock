@@ -951,7 +951,7 @@ dependencies = [
 
 [[package]]
 name = "radiant-rs"
-version = "0.12.4"
+version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "avec 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -970,11 +970,11 @@ dependencies = [
 
 [[package]]
 name = "radiant-utils"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "num-traits 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)",
- "radiant-rs 0.12.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "radiant-rs 0.12.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.58 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.58 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1229,8 +1229,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "spacegame"
 version = "0.1.0"
 dependencies = [
- "radiant-rs 0.12.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "radiant-utils 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "radiant-rs 0.12.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "radiant-utils 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rodio 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.58 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.58 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1740,8 +1740,8 @@ dependencies = [
 "checksum quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
 "checksum quote 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1eca14c727ad12702eb4b6bfb5a232287dcf8385cb8ca83a3eeaf6519c44c408"
 "checksum quote 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9949cfe66888ffe1d53e6ec9d9f3b70714083854be20fd5e271b232a017401e8"
-"checksum radiant-rs 0.12.4 (registry+https://github.com/rust-lang/crates.io-index)" = "17496f739e5b06140bddc203a438fd0c5668f68802b7316c556b09b5b7f19995"
-"checksum radiant-utils 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1d485d38e03bd5b0cb22f0ec8d6c9dc1b496bd7f2c47f3ec9bd00e321c189dc9"
+"checksum radiant-rs 0.12.5 (registry+https://github.com/rust-lang/crates.io-index)" = "69c4d87b5efc2100ed3558c75e24e948f0eb1531595fdd6b02174f4d190532be"
+"checksum radiant-utils 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6f2d7f3e86025aef1bf5ed15b7470251d896bfbac601521f8f43ff49ed038337"
 "checksum rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)" = "15a732abf9d20f0ad8eeb6f909bf6868722d9a06e1e50802b6a70351f40b4eb1"
 "checksum rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "eba5f8cb59cc50ed56be8880a5c7b496bfd9bd26394e176bc67884094145c2c5"
 "checksum rayon 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "80e811e76f1dbf68abf87a759083d34600017fc4e10b6bd5ad84a700f9dba4b1"

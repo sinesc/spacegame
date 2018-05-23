@@ -6,8 +6,8 @@ mine-green:
     computed: { }
     shooter:
         interval: 1.0
-        spawner: weapon
-    hitpoints: 10000
+        spawner: mine-green-weapon
+    hitpoints: 1000
     bounding:
         radius: 28.0
         faction: hostile
@@ -30,8 +30,8 @@ mine-red:
     computed: { }
     shooter:
         interval: 1.0
-        spawner: weapon
-    hitpoints: 10000
+        spawner: mine-red-weapon
+    hitpoints: 1000
     bounding:
         radius: 28.0
         faction: hostile

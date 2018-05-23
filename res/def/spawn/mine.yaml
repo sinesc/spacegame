@@ -1,0 +1,15 @@
+mine-red-weapon:
+    <<: *weapon
+    entities:
+        -
+            position: [ 0., 0. ]
+            angle: 0.
+            entity: mine-red-shot
+
+mine-green-weapon:
+    <<: *weapon
+    entities:
+        -
+            position: [ 0., 0. ]
+            angle: 0.
+            entity: mine-green-shot

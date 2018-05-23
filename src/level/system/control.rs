@@ -125,24 +125,8 @@ impl<'a> specs::System<'a> for Control {
             }
 		}
 
-        for (mut position, angle, faction, spawner_id) in projectiles {
-            let dir = angle.to_vec2();
-            position -= dir * 10.0;
-            data.world_state.spawn_lazy(&data.lazy, &data.entities, "player-shot", Some(position + (dir.right() * 30.0)), Some(angle), Some(faction));
-            data.world_state.spawn_lazy(&data.lazy, &data.entities, "player-shot", Some(position + (dir.left() * 30.0)), Some(angle), Some(faction));
-
-            let spawner = &data.world_state.inf.spawner.index(spawner_id);
-
-            for ref spawn in &spawner.entities {
-                data.world_state.spawn_lazy(
-                    &data.lazy,
-                    &data.entities,
-                    &spawn.entity,
-                    Some(position + spawn.position),
-                    Some(angle),
-                    Some(faction)
-                );
-            }
+        for (position, angle, faction, spawner_id) in projectiles {
+            data.world_state.spawner(&data.lazy, &data.entities, spawner_id, angle, Some(position), Some(angle), Some(faction));
         }
 
 	}

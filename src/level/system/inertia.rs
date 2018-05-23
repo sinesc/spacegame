@@ -47,14 +47,14 @@ impl<'a> specs::System<'a> for Inertia {
                 // limit change in direction of velocity vector to max angular velocity
 
                 let v_current_target = lerp(&inertial.v_current, &(inertial.v_max * inertial.v_fraction), v_trans * delta);
-                let old_angle = inertial.v_current.to_angle();
-                let mut target_angle = v_current_target.to_angle();
+                let old_angle = Angle::from(inertial.v_current);
+                let mut target_angle = Angle::from(v_current_target);
                 target_angle.align_with(old_angle);
 
                 let mut av_current = (target_angle - old_angle).to_radians();
 
                 inertial.v_current = if av_current.abs() > av_max {
-                    v_current_target.len() * (old_angle + Angle(av_max) * av_current.signum()).to_vec2()
+                    v_current_target.len() * Vec2::from(old_angle + Angle(av_max) * av_current.signum())
                 } else {
                     v_current_target
                 };
@@ -68,7 +68,7 @@ impl<'a> specs::System<'a> for Inertia {
 
                 // update spatial angle
 
-                spatial.angle = inertial.v_current.to_angle();
+                spatial.angle = Angle::from(inertial.v_current);
 
             } else if inertial.motion_type == component::InertialMotionType::StrafeVector {
 
@@ -78,7 +78,7 @@ impl<'a> specs::System<'a> for Inertia {
 
                 // lean into strafe direction
 
-                let current_lean = (inertial.v_current.to_angle() - spatial.angle).to_radians().sin() * inertial.v_fraction.len();
+                let current_lean = (Angle::from(inertial.v_current) - spatial.angle).to_radians().sin() * inertial.v_fraction.len();
                 approach(&mut spatial.lean, &current_lean, 10.0 * data.world_state.delta);
 
             } else if inertial.motion_type == component::InertialMotionType::Detached {
@@ -94,7 +94,7 @@ impl<'a> specs::System<'a> for Inertia {
                 // limit change in direction of velocity vector to max angular velocity
 
                 let old_angle = spatial.angle;
-                let mut target_angle = if inertial.v_fraction.len() > 0. { inertial.v_fraction.to_angle() } else { spatial.angle };
+                let mut target_angle = if inertial.v_fraction.len() > 0. { Angle::from(inertial.v_fraction) } else { spatial.angle };
                 target_angle.align_with(old_angle);
 
                 let mut av_current = (target_angle - old_angle).to_radians();
@@ -143,7 +143,7 @@ impl<'a> specs::System<'a> for Inertia {
                 inertial.v_fraction = reflection.normalize() * inertial.v_fraction.len();
 
                 if inertial.motion_type != component::InertialMotionType::Detached {
-                    spatial.angle = inertial.v_fraction.to_angle();
+                    spatial.angle = Angle::from(inertial.v_fraction);
                 }
             }
 		}

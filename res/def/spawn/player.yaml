@@ -1,0 +1,19 @@
+player-weapon-single:
+    <<: *weapon
+    entities:
+        -
+            position: [ 0., 0. ]
+            angle: 0.
+            entity: player-shot
+
+player-weapon-dual:
+    <<: *weapon
+    entities:
+        -
+            position: [ 10., -25. ]
+            angle: 0.
+            entity: player-shot
+        -
+            position: [ 10., 25. ]
+            angle: 0.
+            entity: player-shot
