@@ -57,6 +57,7 @@ impl<'a> specs::System<'a> for Render {
                     let alpha = 1.0 - (progress / duration);
                     if alpha >= 0.0 {
                         visual.color.set_a(alpha);
+                        visual.effect_color.set_a(alpha);
                     }
                 }
             }

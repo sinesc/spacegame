@@ -75,3 +75,17 @@ powerup: &powerup
         radius: 16.0
         faction: friendly
         spawner: weapon
+    exploding:
+        spawner: fader-powerup
+
+fading-powerup:
+    <<: *explosion
+    visual:
+        <<: *explosion_visual
+        layer: none
+        effect_layer: effects
+        sprite: powerup/ball_v_32x32x18.jpg
+    lifetime: 1
+    fading:
+        start: 0.0
+        end: 1.0

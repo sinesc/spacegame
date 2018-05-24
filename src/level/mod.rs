@@ -123,6 +123,7 @@ impl<'a, 'b> Level<'a, 'b> {
         sounds.insert("projectile/pew".to_string(), SoundGroup::load(&["res/sound/projectile/pew1a.ogg", "res/sound/projectile/pew1b.ogg", "res/sound/projectile/pew1c.ogg", "res/sound/projectile/pew2.ogg"]).unwrap());
         sounds.insert("damage/explosion_pop".to_string(), SoundGroup::load(&["res/sound/damage/explosion_pop1.ogg", "res/sound/damage/explosion_pop2.ogg"]).unwrap());
         sounds.insert("damage/explosion_large".to_string(), SoundGroup::load(&["res/sound/damage/explosion1.ogg", "res/sound/damage/explosion2.ogg"]).unwrap());
+        sounds.insert("projectile/powerup".to_string(), SoundGroup::load(&["res/sound/projectile/powerup1.ogg"]).unwrap());
 
         // create layers
 

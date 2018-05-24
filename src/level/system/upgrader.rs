@@ -12,11 +12,14 @@ pub struct Upgrader;
 
 #[derive(SystemData)]
 pub struct UpgraderData<'a> {
-    spatial: specs::ReadStorage<'a, component::Spatial>,
-    bounding: specs::ReadStorage<'a, component::Bounding>,
-    powerup: specs::ReadStorage<'a, component::Powerup>,
-    shooter: specs::WriteStorage<'a, component::Shooter>,
-    entities: specs::Entities<'a>,
+    world_state : specs::ReadExpect<'a, WorldState>,
+    spatial     : specs::ReadStorage<'a, component::Spatial>,
+    bounding    : specs::ReadStorage<'a, component::Bounding>,
+    powerup     : specs::ReadStorage<'a, component::Powerup>,
+    shooter     : specs::WriteStorage<'a, component::Shooter>,
+    exploding   : specs::ReadStorage<'a, component::Exploding>,
+    entities    : specs::Entities<'a>,
+    lazy        : specs::Read<'a, specs::LazyUpdate>,
 }
 
 impl<'a> specs::System<'a> for Upgrader {
@@ -35,9 +38,14 @@ impl<'a> specs::System<'a> for Upgrader {
                     && powerup.radius + bounding.radius > spatial_a.position.distance(&spatial_b.position) {
 
                     if let Some(shooter) = data.shooter.get_mut(entity_b) {
+
                         shooter.spawner = powerup.spawner;
+
+                        if let Some(exploding) = data.exploding.get(entity_a) {
+                            data.world_state.spawner(&data.lazy, &data.entities, exploding.spawner, Angle(0.), Some(spatial_a.position), None, None);
+                        }
+
                         data.entities.delete(entity_a).unwrap();
-                        //todo explosion
                     }
                 }
             }

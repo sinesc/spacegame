@@ -14,3 +14,12 @@ exploder:
             angle: 0.
             entity: explosion
             sound: damage/explosion_pop
+
+fader-powerup:
+    dispatch: All
+    entities:
+        -
+            position: [ 0., 0. ]
+            angle: 0.
+            entity: fading-powerup
+            sound: projectile/powerup

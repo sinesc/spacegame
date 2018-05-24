@@ -19,3 +19,5 @@ triple-weapon:
         radius: 16.0
         faction: friendly
         spawner: player-weapon-triple
+    exploding:
+        spawner: fader-powerup
