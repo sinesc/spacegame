@@ -27,10 +27,11 @@ impl<'a> Render {
 
 #[derive(SystemData)]
 pub struct RenderData<'a> {
-    world_state: specs::ReadExpect<'a, WorldState>,
-    spatial: specs::ReadStorage<'a, component::Spatial>,
-    visual: specs::WriteStorage<'a, component::Visual>,
-    fading: specs::ReadStorage<'a, component::Fading>,
+    world_state : specs::ReadExpect<'a, WorldState>,
+    spatial     : specs::ReadStorage<'a, component::Spatial>,
+    visual      : specs::WriteStorage<'a, component::Visual>,
+    fading      : specs::ReadStorage<'a, component::Fading>,
+    entities    : specs::Entities<'a>,
 }
 
 impl<'a> specs::System<'a> for Render {
@@ -41,24 +42,24 @@ impl<'a> specs::System<'a> for Render {
 
         let age = data.world_state.age;
 
-        // apply fade effects
-
-		for (fading, visual) in (&data.fading, &mut data.visual).join() {
-            if age >= fading.start {
-                let duration = fading.end - fading.start;
-                let progress = age - fading.start;
-                let alpha = 1.0 - (progress / duration);
-                if alpha >= 0.0 {
-                    visual.color.set_a(alpha);
-                }
-            }
-        }
-
         // draw sprites
 
         let mut num_sprites = 0;
 
-		for (spatial, visual) in (&data.spatial, &mut data.visual).join() {
+		for (spatial, visual, entity) in (&data.spatial, &mut data.visual, &*data.entities).join() {
+
+            // apply fade effects
+
+            if let Some(fading) = data.fading.get(entity) {
+                if age >= fading.start {
+                    let duration = fading.end - fading.start;
+                    let progress = age - fading.start;
+                    let alpha = 1.0 - (progress / duration);
+                    if alpha >= 0.0 {
+                        visual.color.set_a(alpha);
+                    }
+                }
+            }
 
             if let Some(ref layer) = visual.layer {
                 visual.sprite.draw_transformed(&layer, visual.frame_id as u32, spatial.position, visual.color.to_pm(), spatial.angle.to_radians(), (visual.scale, visual.scale));

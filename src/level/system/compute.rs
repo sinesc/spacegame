@@ -85,7 +85,6 @@ impl<'a> specs::System<'a> for Compute {
 
             if shooter.interval.elapsed(age) {
                 projectiles.push((spatial.position, spatial.angle - diff, bounding.faction, shooter.spawner));
-                rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.samples());
             }
 		}
 

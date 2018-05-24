@@ -114,14 +114,7 @@ impl<'a> specs::System<'a> for Control {
             // shoot ?
 
             if shoot && shooter.interval.elapsed(age) {
-                //inertial.v_fraction -= spatial.angle.to_vec2() * 0.001 / data.world_state.delta;
                 projectiles.push((spatial.position, spatial.angle, bounding.faction, shooter.spawner));
-                rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.pew.samples());
-
-                /*let dir = spatial.angle.to_vec2();
-                let pos = spatial.position - (dir * 10.0);
-                component::Shooter::shoot(data.lazy, pos + (dir.right() * 30.0), spatial.angle);
-                component::Shooter::shoot(data.lazy, pos + (dir.left() * 30.0), spatial.angle);*/
             }
 		}
 

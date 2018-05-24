@@ -14,13 +14,12 @@ mod system;
 pub struct Infrastructure {
     input       : Input,
     audio       : rodio::Device,
-    layer       : Repository<String, Arc<Layer>>,
-    sprite      : Repository<String, Arc<Sprite>>,
-    repository  : Repository<String, def::EntityDescriptor>,
-    spawner     : Repository<String, def::SpawnerDescriptor, def::SpawnerId>,
+    layer       : Repository<Arc<Layer>>,
+    sprite      : Repository<Arc<Sprite>>,
+    repository  : Repository<def::EntityDescriptor>,
+    spawner     : Repository<def::SpawnerDescriptor, def::SpawnerId>,
+    sound       : Repository<SoundGroup>,
     font        : Arc<Font>,
-    pew         : SoundGroup,
-    boom        : SoundGroup,
 }
 
 #[derive(Clone)]
@@ -39,18 +38,23 @@ impl WorldState {
     pub fn spawner(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, spawner_id: def::SpawnerId, parent_angle: Angle, parent_position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
         let spawner = &self.inf.spawner.index(spawner_id);
         for ref spawn in &spawner.entities {
-            let pos = match parent_position {
-                Some(parent_position) => parent_position + spawn.position.rotate(parent_angle),
-                None => spawn.position.rotate(parent_angle),
-            };
-            self.spawn_lazy(
-                lazy,
-                entities,
-                &spawn.entity,
-                Some(pos),
-                angle,
-                faction
-            );
+            if let Some(ref entity) = spawn.entity {
+                let pos = match parent_position {
+                    Some(parent_position) => parent_position + spawn.position.rotate(parent_angle),
+                    None => spawn.position.rotate(parent_angle),
+                };
+                self.spawn_lazy(
+                    lazy,
+                    entities,
+                    &entity,
+                    Some(pos),
+                    angle,
+                    faction
+                );
+            }
+            if let Some(ref sound) = spawn.sound {
+                rodio::play_raw(&self.inf.audio, self.inf.sound[sound].samples());
+            }
         }
     }
 }
@@ -71,10 +75,6 @@ pub struct Level<'a, 'b> {
 }
 
 impl<'a, 'b> Level<'a, 'b> {
-
-    /*pub fn spawn(self: &mut Self, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
-        self.inf.repository[name].spawn(&mut self.world, self.age, position, angle, faction);
-    }*/
 
     pub fn new(input: &Input, context: &RenderContext) -> Self {
 
@@ -116,8 +116,11 @@ impl<'a, 'b> Level<'a, 'b> {
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
 
         let audio = rodio::default_output_device().unwrap();
-        let pew = SoundGroup::load(&["res/sound/projectile/pew1a.ogg", "res/sound/projectile/pew1b.ogg", "res/sound/projectile/pew1c.ogg", "res/sound/projectile/pew2.ogg"]).unwrap();
-        let boom = SoundGroup::load(&["res/sound/damage/explosion_pop1.ogg", "res/sound/damage/explosion_pop2.ogg"]).unwrap();
+
+        let mut sounds = Repository::new();
+        sounds.insert("projectile/pew".to_string(), SoundGroup::load(&["res/sound/projectile/pew1a.ogg", "res/sound/projectile/pew1b.ogg", "res/sound/projectile/pew1c.ogg", "res/sound/projectile/pew2.ogg"]).unwrap());
+        sounds.insert("damage/explosion_pop".to_string(), SoundGroup::load(&["res/sound/damage/explosion_pop1.ogg", "res/sound/damage/explosion_pop2.ogg"]).unwrap());
+        sounds.insert("damage/explosion_large".to_string(), SoundGroup::load(&["res/sound/damage/explosion1.ogg", "res/sound/damage/explosion2.ogg"]).unwrap());
 
         // create layers
 
@@ -149,15 +152,14 @@ impl<'a, 'b> Level<'a, 'b> {
         entities["player-1"].spawn(&mut world, 0., Some(Vec2(230., 350.)), None, None);
 
         let infrastructure = Arc::new(Infrastructure {
+            audio       : audio,
             input       : input.clone(),
             layer       : layers,
             sprite      : sprites,
             repository  : entities,
             spawner     : spawners,
+            sound       : sounds,
             font        : font,
-            audio       : audio,
-            pew         : pew,
-            boom        : boom,
         });
 
         world.add_resource(WorldState {

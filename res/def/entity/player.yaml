@@ -36,7 +36,7 @@ player-1:
 
 player-shot:
     <<: *projectile
-    hitpoints: 10
+    hitpoints: 25
     visual:
         <<: *projectile_visual
         sprite: projectile/bolt_white_60x36x1.jpg
@@ -44,3 +44,5 @@ player-shot:
     bounding:
         radius: 5.0
         faction: friendly
+    exploding:
+        spawner: exploder-small-blue

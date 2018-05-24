@@ -4,6 +4,13 @@ explosion-small:
         <<: *explosion_visual
         effect_scale: 0.5
 
+explosion-small-blue:
+    <<: *explosion
+    visual:
+        <<: *explosion_visual
+        effect_scale: 0.3
+        effect_color: [ 0.7, 1.0, 2.0, 1.0 ]
+
 explosion-red:
     <<: *explosion
     visual:

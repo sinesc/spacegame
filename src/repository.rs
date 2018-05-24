@@ -7,12 +7,12 @@ use std::borrow::Borrow;
 
 // TODO: look into owned_ref so that vec can hold the data and hashmap ref it
 
-pub struct Repository<K, V, I = usize> {
+pub struct Repository<V, I = usize, K = String> {
     map: HashMap<K, I>,
     data: Vec<V>,
 }
 
-impl<K, V, I> Repository<K, V, I> where K: Eq + Hash, I: Copy + Into<usize> + From<usize> {
+impl<V, I, K> Repository<V, I, K> where K: Eq + Hash, I: Copy + Into<usize> + From<usize> {
     pub fn new() -> Self {
         Repository {
             map: HashMap::new(),
@@ -46,7 +46,7 @@ impl<K, V, I> Repository<K, V, I> where K: Eq + Hash, I: Copy + Into<usize> + Fr
     }
 }
 
-impl<'a, K, Q: ?Sized, V, I> Index<&'a Q> for Repository<K, V, I>
+impl<'a, K, Q: ?Sized, V, I> Index<&'a Q> for Repository<V, I, K>
     where K: Eq + Hash + Borrow<Q>,
           Q: Eq + Hash,
           I: Debug + Copy + Into<usize> + From<usize>
@@ -59,7 +59,7 @@ impl<'a, K, Q: ?Sized, V, I> Index<&'a Q> for Repository<K, V, I>
     }
 }
 
-impl<K, V, I> Debug for Repository<K, V, I>
+impl<V, I, K> Debug for Repository<V, I, K>
 where
     K: Eq + Hash + Debug,
     V: Debug,
@@ -79,11 +79,11 @@ use std::fmt;
 use std::marker::PhantomData;
 use serde::de::{Deserialize, Deserializer, Visitor, MapAccess};
 
-struct RepositoryVisitor<K, V, I> {
-    marker: PhantomData<fn() -> Repository<K, V, I>>
+struct RepositoryVisitor<V, I, K> {
+    marker: PhantomData<fn() -> Repository<V, I, K>>
 }
 
-impl<K, V, I> RepositoryVisitor<K, V, I> {
+impl<V, I, K> RepositoryVisitor<V, I, K> {
     fn new() -> Self {
         RepositoryVisitor {
             marker: PhantomData
@@ -91,13 +91,13 @@ impl<K, V, I> RepositoryVisitor<K, V, I> {
     }
 }
 
-impl<'de, K, V, I> Visitor<'de> for RepositoryVisitor<K, V, I>
+impl<'de, V, I, K> Visitor<'de> for RepositoryVisitor<V, I, K>
 where
     K: Deserialize<'de> + Eq + Hash,
     V: Deserialize<'de>,
     I: Copy + Into<usize> + From<usize>,
 {
-    type Value = Repository<K, V, I>;
+    type Value = Repository<V, I, K>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str("a map")
@@ -115,7 +115,7 @@ where
     }
 }
 
-impl<'de, K, V, I> Deserialize<'de> for Repository<K, V, I>
+impl<'de, V, I, K> Deserialize<'de> for Repository<V, I, K>
 where
     K: Deserialize<'de> + Eq + Hash,
     V: Deserialize<'de>,

@@ -2,7 +2,7 @@ use prelude::*;
 use ::def::{parse_dir, Error};
 use repository::Repository;
 
-pub fn parse_spawners() -> Result<Repository<String, SpawnerDescriptor, SpawnerId>, Error> {
+pub fn parse_spawners() -> Result<Repository<SpawnerDescriptor, SpawnerId>, Error> {
     parse_dir("res/def/spawner/", &[ "yaml" ])
 }
 
@@ -23,7 +23,8 @@ impl Default for SpawnerDispatch {
 pub struct SpawnerParameters {
     pub position: Vec2,
     pub angle: Angle,
-    pub entity: String,
+    pub entity: Option<String>,
+    pub sound: Option<String>,
 }
 
 #[derive(Clone, Default, Debug, Deserialize)]

@@ -64,12 +64,10 @@ impl<'a> specs::System<'a> for Collider {
             if a <= b {
                 if let Some(exploding) = data.exploding.get(entity_a) {
                     data.world_state.spawner(&data.lazy, &data.entities, exploding.spawner, Angle(0.), Some(position_a), None, None);
-                    rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.boom.samples());
                 }
             } else if b <= a {
                 if let Some(exploding) = data.exploding.get(entity_b) {
                     data.world_state.spawner(&data.lazy, &data.entities, exploding.spawner, Angle(0.), Some(position_b), None, None);
-                    rodio::play_raw(&data.world_state.inf.audio, data.world_state.inf.boom.samples());
                 }
             }
 

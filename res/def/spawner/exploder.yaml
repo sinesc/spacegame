@@ -1,3 +1,29 @@
+exploder-large:
+    dispatch: All
+    entities:
+        -
+            position: [ 0., 0. ]
+            angle: 0.
+            entity: explosion
+            sound: damage/explosion_large
+
+exploder-small:
+    dispatch: All
+    entities:
+        -
+            position: [ 0., 0. ]
+            angle: 0.
+            entity: explosion-small
+            sound: damage/explosion_pop
+
+exploder-small-blue:
+    dispatch: All
+    entities:
+        -
+            position: [ 0., 0. ]
+            angle: 0.
+            entity: explosion-small-blue
+
 exploder-green:
     dispatch: All
     entities:
@@ -5,6 +31,7 @@ exploder-green:
             position: [ 0., 0. ]
             angle: 0.
             entity: explosion-green
+            sound: damage/explosion_large
 
 exploder-red:
     dispatch: All
@@ -13,3 +40,4 @@ exploder-red:
             position: [ 0., 0. ]
             angle: 0.
             entity: explosion-red
+            sound: damage/explosion_large
