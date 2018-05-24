@@ -23,20 +23,3 @@ pub struct Visual {
     pub frame_id        : f32,
     pub fps             : u32,
 }
-
-/*
-impl Debug for Visual {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Visual")
-            .field("layer", &self.layer.is_some())
-            .field("effect_layer", &self.effect_layer.is_some())
-            .field("effect_size", &self.effect_size)
-            .field("sprite", &self.sprite)
-            .field("scale", &self.scale)
-            .field("color", &self.color)
-            .field("frame_id", &self.frame_id)
-            .field("fps", &self.fps)
-            .finish()
-    }
-}
-*/

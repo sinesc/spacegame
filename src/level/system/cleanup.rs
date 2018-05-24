@@ -7,15 +7,7 @@ use level::WorldState;
  *
  * This system removes dead/expired entities
  */
-pub struct Cleanup {
-}
-
-impl<'a> Cleanup {
-    pub fn new() -> Self {
-        Cleanup {
-        }
-    }
-}
+pub struct Cleanup;
 
 #[derive(SystemData)]
 pub struct CleanupData<'a> {
@@ -24,7 +16,6 @@ pub struct CleanupData<'a> {
     hitpoints: specs::ReadStorage<'a, component::Hitpoints>,
     entities: specs::Entities<'a>,
 }
-
 
 impl<'a> specs::System<'a> for Cleanup {
     type SystemData = CleanupData<'a>;

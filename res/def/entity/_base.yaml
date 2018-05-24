@@ -59,16 +59,19 @@ explosion: &explosion
     lifetime: 1.3
 
 powerup: &powerup
-    <<: *hostile
-    visual: &powerup_visual
-        <<: *hostile_visual
-        layer: effects
-        effect_layer: none
+    spatial:
+        position: [ 0.0, 0.0 ]
+        angle: 0.0
     inertial:
         <<: *hostile_inertial
         v_current: [ -100.0, 0.0 ]
         motion_type: Const
+    visual: &powerup_visual
+        <<: *hostile_visual
+        layer: effects
+        effect_layer: none
     lifetime: 60.0
-    bounding:
+    powerup:
         radius: 16.0
-        faction: powerup
+        faction: friendly
+        spawner: weapon

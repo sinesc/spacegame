@@ -31,3 +31,6 @@ pub use self::exploding::Exploding;
 
 mod hitpoints;
 pub use self::hitpoints::Hitpoints;
+
+mod powerup;
+pub use self::powerup::Powerup;

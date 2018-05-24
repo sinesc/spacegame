@@ -1,5 +1,5 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
+//#![allow(dead_code)]
+//#![allow(unused_variables)]
 
 extern crate radiant_rs as radiant;
 extern crate radiant_utils;
@@ -69,11 +69,11 @@ fn main() {
         last_age = age;
 
         if input.pressed(InputId::Escape, false) {
-            cmd.call("menu_toggle", &[]);
+            cmd.call("menu_toggle", &[]).unwrap();
         }
 
         if input.pressed(InputId::U, false) {
-            cmd.exec("level_start bad_argument");
+            cmd.exec("level_start bad_argument").unwrap();;
         }
 
         display.clear_frame(Color::BLACK);

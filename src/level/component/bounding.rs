@@ -1,4 +1,5 @@
 use specs::DenseVecStorage;
+use def::FactionId;
 
 /**
  * Bounding Box component
@@ -8,7 +9,6 @@ use specs::DenseVecStorage;
 #[derive(Clone, Debug, Deserialize, Default, Component)]
 pub struct Bounding {
     pub radius: f32, // !todo starting out simple
-    #[serde(deserialize_with = "::def::faction_deserialize")]
-    pub faction: u32,
+    pub faction: FactionId,
 }
 

@@ -15,3 +15,6 @@ pub use self::cleanup::Cleanup;
 
 mod collider;
 pub use self::collider::Collider;
+
+mod upgrader;
+pub use self::upgrader::Upgrader;

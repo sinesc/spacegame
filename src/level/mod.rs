@@ -3,6 +3,7 @@ use specs;
 use rodio;
 use sound::{SoundGroup};
 use def;
+use def::FactionId;
 use bloom;
 use repository::Repository;
 use specs::LazyUpdate;
@@ -32,10 +33,10 @@ pub struct WorldState {
 }
 
 impl WorldState {
-    pub fn spawn_lazy(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+    pub fn spawn_lazy(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
         self.inf.repository[name].spawn_lazy(lazy, entities, self.age, position, angle, faction);
     }
-    pub fn spawner(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, spawner_id: def::SpawnerId, parent_angle: Angle, parent_position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+    pub fn spawner(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, spawner_id: def::SpawnerId, parent_angle: Angle, parent_position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
         let spawner = &self.inf.spawner.index(spawner_id);
         for ref spawn in &spawner.entities {
             if let Some(ref entity) = spawn.entity {
@@ -81,17 +82,18 @@ impl<'a, 'b> Level<'a, 'b> {
         // create world and register components
 
         let mut world = specs::World::new();
-        world.register::<component::Spatial>();
-        world.register::<component::Inertial>();
-        world.register::<component::Visual>();
-        world.register::<component::Controlled>();
-        world.register::<component::Computed>();
-        world.register::<component::Lifetime>();
-        world.register::<component::Shooter>();
-        world.register::<component::Fading>();
         world.register::<component::Bounding>();
-        world.register::<component::Hitpoints>();
+        world.register::<component::Computed>();
+        world.register::<component::Controlled>();
         world.register::<component::Exploding>();
+        world.register::<component::Fading>();
+        world.register::<component::Hitpoints>();
+        world.register::<component::Inertial>();
+        world.register::<component::Lifetime>();
+        world.register::<component::Powerup>();
+        world.register::<component::Shooter>();
+        world.register::<component::Spatial>();
+        world.register::<component::Visual>();
 
         // create a scene and a layer TODO: temporary, load from def
 
@@ -173,12 +175,13 @@ impl<'a, 'b> Level<'a, 'b> {
         // create planner and add systems
 
         let dispatcher = specs::DispatcherBuilder::new()
-                .with(system::Control::new(), "control", &[])
-                .with(system::Compute::new(), "compute", &[])
-                .with(system::Inertia::new(), "inertia", &[ "control", "compute" ])
-                .with(system::Collider::new(), "collider", &[])
-                .with(system::Render::new(), "render", &[ "control", "compute", "inertia", "collider" ])
-                .with(system::Cleanup::new(), "cleanup", &[ "render" ])
+                .with(system::Control, "control", &[])
+                .with(system::Compute, "compute", &[])
+                .with(system::Inertia, "inertia", &[ "control", "compute" ])
+                .with(system::Collider, "collider", &[])
+                .with(system::Upgrader, "upgrader", &[])
+                .with(system::Render::new(), "render", &[ "control", "compute", "inertia", "collider", "upgrader" ])
+                .with(system::Cleanup, "cleanup", &[ "render" ])
                 .build();
 
         // return level
@@ -255,12 +258,11 @@ impl<'a, 'b> Level<'a, 'b> {
             let angle = Angle(self.rng.range(-PI, PI));
             let mut pos = Vec2(800.0, 450.0) + Vec2::from(angle) * 2000.0;
             let outbound = pos.outbound(((0.0, 0.0), (1920.0, 1080.0))).unwrap();
-            let scale = self.rng.range(0.3, 1.3);
 
             pos -= outbound;
 
             let v_max = Vec2::from(-angle) * 100.0;
-            let faction = self.rng.range(2., 100.) as u32;
+            let faction = FactionId(self.rng.range(2., 100.) as usize);
 
             self.inf.repository["asteroid"].spawn(&mut self.world, self.age, Some(pos), Some(Angle::from(v_max)), Some(faction));
             /*self.world.create_entity()
@@ -278,14 +280,18 @@ impl<'a, 'b> Level<'a, 'b> {
             let angle = Angle(self.rng.range(-PI, PI));
             let mut pos = Vec2(800.0, 450.0) + Vec2::from(angle) * 2000.0;
             let outbound = pos.outbound(((0.0, 0.0), (1920.0, 1080.0))).unwrap();
-            let scale = self.rng.range(0.9, 1.1);
-            let faction = self.rng.range(101., 200.) as u32;
+            let faction = FactionId(self.rng.range(101., 200.) as usize);
             let pw_y = self.rng.range(0., 1080.);
 
             pos -= outbound;
 
             self.inf.repository["mine-red"].spawn(&mut self.world, self.age, Some(pos), Some(angle), Some(faction));
-            self.inf.repository["dual-weapon"].spawn(&mut self.world, self.age, Some(Vec2(1920., pw_y)), None, None);
+
+            if self.rng.range(0., 1.) > 0.5 {
+                self.inf.repository["dual-weapon"].spawn(&mut self.world, self.age, Some(Vec2(1920., pw_y)), None, None);
+            } else {
+                self.inf.repository["triple-weapon"].spawn(&mut self.world, self.age, Some(Vec2(1920., pw_y)), None, None);
+            }
         }
 
         self.world.maintain();

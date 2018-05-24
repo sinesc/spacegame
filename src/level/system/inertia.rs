@@ -10,12 +10,6 @@ use level::WorldState;
  */
 pub struct Inertia;
 
-impl Inertia {
-    pub fn new() -> Self {
-        Inertia { }
-    }
-}
-
 #[derive(SystemData)]
 pub struct InertiaData<'a> {
     world_state: specs::ReadExpect<'a, WorldState>,

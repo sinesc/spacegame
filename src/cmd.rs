@@ -3,6 +3,7 @@ use unicode_segmentation::UnicodeSegmentation as UCS;
 use error::Error;
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub enum Type {
     Str,
     Int,
@@ -26,17 +27,17 @@ impl Param {
 
 #[derive(Debug)]
 pub enum CmdError {
-    UnknownCommand,
-    UnknownOverload(u32, Vec<u32>),
-    InvalidArgument(u32, Type),
+    UnknownCommand(String),
+    UnknownOverload(String, u32, Vec<u32>),
+    InvalidArgument(String, u32, Type),
 }
 
 impl fmt::Display for CmdError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}{}", self.description(), match self {
-            CmdError::UnknownOverload(got, expected) => format!(". Got {}, expected {:?}", got, expected),
-            CmdError::InvalidArgument(index, ty) => format!(". Expected {:?} as argument {}", ty, index),
-            _ => "".to_string(),
+            CmdError::UnknownCommand(command) => format!("\"{}\"", &command),
+            CmdError::UnknownOverload(command, got, expected) => format!("\"{}\". Got {}, expected {:?}", &command, got, expected),
+            CmdError::InvalidArgument(command, index, ty) => format!("\"{}\". Expected {:?} as argument {}", &command, ty, index),
         })
     }
 }
@@ -44,9 +45,9 @@ impl fmt::Display for CmdError {
 impl error::Error for CmdError {
     fn description(&self) -> &str {
         match self {
-            CmdError::UnknownCommand => "Unknown command",
-            CmdError::UnknownOverload(_, _) => "Invalid number of arguments for given command",
-            CmdError::InvalidArgument(_, _) => "Invalid argument type",
+            CmdError::UnknownCommand(_) => "Unknown command",
+            CmdError::UnknownOverload(_, _, _) => "Invalid number of arguments for given command",
+            CmdError::InvalidArgument(_, _, _) => "Invalid argument type",
         }
     }
 }
@@ -95,50 +96,50 @@ impl<T> Cmd<T> {
     /**
      * attempts to execute the console commands in the given string
      */
-    pub fn exec(self: &Self, input: &str) {
+    pub fn exec(self: &Self, input: &str) -> Result<(), CmdError> {
 
         let lines = Self::tokenize(input);
+        let lines = lines.iter().filter(|t| t.len() > 0);
 
-        for tokens in lines.iter() {
-            if tokens.len() > 0 {
-                match self.commands.get(tokens[0]) {
-                    Some(overloads) => {
-                        if let Some(command) = overloads.get(&(tokens.len() - 1)) {
-                            match Self::parse(&tokens[1..tokens.len()], &command.0) {
-                                Ok(params) => command.1(self, &params),
-                                Err(error) => println!("{}.", error),
-                            }
-                        } else {
-                            println!("Command \"{}\" expects one of the following number of arguments: {:?}.", tokens[0], overloads.keys());
-                        }
+        for tokens in lines {
+            match self.commands.get(tokens[0]) {
+                Some(overloads) => {
+                    if let Some(command) = overloads.get(&(tokens.len() - 1)) {
+                        let params = Self::parse(&tokens[1..tokens.len()], &tokens[0], &command.0)?;
+                        command.1(self, &params);
+                    } else {
+                        return Err(CmdError::UnknownOverload(tokens[0].to_string(), tokens.len() as u32 - 1, overloads.keys().map(|&k| k as u32).collect::<Vec<_>>()))
                     }
-                    None => println!("Unknown command \"{}\".", tokens[0])
                 }
+                None => return Err(CmdError::UnknownCommand(tokens[0].to_string()))
             }
         }
+
+        Ok(())
     }
 
     /**
      * execute the given (single) console command using typed parameters
      */
-    pub fn call(self: &Self, command: &str, params: &[Param]) {
+    pub fn call(self: &Self, command: &str, params: &[Param]) -> Result<(), CmdError> {
 
         match self.commands.get(command) {
             Some(overloads) => {
                 if let Some(command) = overloads.get(&params.len()) {
                     command.1(self, params);
+                    Ok(())
                 } else {
-                    panic!("Command \"{}\" expects one of the following number of arguments: {:?}.", command, overloads.keys());
+                    Err(CmdError::UnknownOverload(command.to_string(), params.len() as u32, overloads.keys().map(|&k| k as u32).collect::<Vec<_>>()))
                 }
             }
-            None => panic!("Unknown command \"{}\".", command)
+            None => Err(CmdError::UnknownCommand(command.to_string()))
         }
     }
 
     /**
      * parses list of parameter strings into list of typed values
      */
-    fn parse(raw_params: &[&str], signature: &[Type]) -> Result<Vec<Param>, CmdError> {
+    fn parse(raw_params: &[&str], command: &str, signature: &[Type]) -> Result<Vec<Param>, CmdError> {
 
         let mut result = Vec::new();
 
@@ -157,14 +158,14 @@ impl<T> Cmd<T> {
                     if let Ok(result) = raw_params[index].parse() {
                         Param::Int(result)
                     } else {
-                        return Err(CmdError::InvalidArgument(index as u32 + 1, Type::Int))
+                        return Err(CmdError::InvalidArgument(command.to_string(), index as u32 + 1, Type::Int))
                     }
                 },
                 Type::Float => {
                     if let Ok(result) = raw_params[index].parse() {
                         Param::Float(result)
                     } else {
-                        return Err(CmdError::InvalidArgument(index as u32 + 1, Type::Float))
+                        return Err(CmdError::InvalidArgument(command.to_string(), index as u32 + 1, Type::Float))
                     }
                 },
                 Type::Bool => {
@@ -173,7 +174,7 @@ impl<T> Cmd<T> {
                     } else if raw_params[index] == "false" {
                         Param::Bool(false)
                     } else {
-                        return Err(CmdError::InvalidArgument(index as u32 + 1, Type::Bool))
+                        return Err(CmdError::InvalidArgument(command.to_string(), index as u32 + 1, Type::Bool))
                     }
                 }
             });

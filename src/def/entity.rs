@@ -5,6 +5,7 @@ use def::{parse_dir, Error};
 use level::component::*;
 use repository::Repository;
 use def::spawner::*;
+use def::faction::*;
 
 static mut FACTIONS: *const Vec<String> = 0 as _;
 static mut SPRITES: *const Repository<Arc<Sprite>> = 0 as _;
@@ -32,6 +33,7 @@ pub struct EntityDescriptor {
     hitpoints   : Option<Hitpoints>,
     inertial    : Option<Inertial>,
     lifetime    : Option<Lifetime>,
+    powerup     : Option<Powerup>,
     shooter     : Option<Shooter>,
     spatial     : Option<Spatial>,
     visual      : Option<Visual>,
@@ -65,7 +67,7 @@ impl<'a> Builder for LazyBuilder<'a> {
 }
 
 impl EntityDescriptor {
-    fn configure<T>(self: &Self, mut ent: T, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) where T: Builder {
+    fn configure<T>(self: &Self, mut ent: T, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) where T: Builder {
         if let Some(bounding) = &self.bounding {
             let mut bounding_clone = bounding.clone();
             if let Some(faction) = faction {
@@ -104,6 +106,9 @@ impl EntityDescriptor {
             lifetime_clone.0 += age;
             ent = ent.with(lifetime_clone);
         }
+        if let Some(powerup) = &self.powerup {
+            ent = ent.with(powerup.clone());
+        }
         if let Some(shooter) = &self.shooter {
             ent = ent.with(shooter.clone());
         }
@@ -122,20 +127,11 @@ impl EntityDescriptor {
         }
         ent.build();
     }
-    pub fn spawn_lazy(self: &Self, lazy: &specs::LazyUpdate, entities: &specs::world::EntitiesRes, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+    pub fn spawn_lazy(self: &Self, lazy: &specs::LazyUpdate, entities: &specs::world::EntitiesRes, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
         self.configure(LazyBuilder(lazy.create_entity(entities)), age, position, angle, faction);
     }
-    pub fn spawn(self: &Self, world: &mut specs::World, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<u32>) {
+    pub fn spawn(self: &Self, world: &mut specs::World, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
         self.configure(EntityBuilder(world.create_entity()), age, position, angle, faction);
-    }
-}
-
-pub fn faction_deserialize<'de, D>(deserializer: D) -> Result<u32, D::Error> where D: Deserializer<'de>, {
-    let name = String::deserialize(deserializer)?;
-    if let Some(index) = unsafe { (*FACTIONS).iter().position(|x: &String| x == &name) } {
-        Ok(index as u32)
-    } else {
-        Err(de::Error::unknown_variant(&name, &[ "<valid factions>" ]))
     }
 }
 
@@ -159,15 +155,28 @@ pub fn layer_deserialize<'de, D>(deserializer: D) -> Result<Option<Arc<Layer>>, 
     }
 }
 
-pub fn spawner_deserialize<'de, D>(deserializer: D) -> Result<SpawnerId, D::Error> where D: Deserializer<'de>, {
-    let name = String::deserialize(deserializer)?;
-    if let Some(spawner_id) = unsafe { (*SPAWNERS).index_of(&name) } {
-        Ok(spawner_id)
-    } else {
-        Err(de::Error::unknown_variant(&name, &[ "<valid loaded spawners>" ]))
+pub fn layer_default() -> Option<Arc<Layer>> {
+    None
+}
+
+impl<'de> Deserialize<'de> for SpawnerId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        let name = String::deserialize(deserializer)?;
+        if let Some(id) = unsafe { (*SPAWNERS).index_of(&name) } {
+            Ok(id)
+        } else {
+            Err(de::Error::unknown_variant(&name, &[ "<valid loaded spawners>" ]))
+        }
     }
 }
 
-pub fn layer_default() -> Option<Arc<Layer>> {
-    None
+impl<'de> Deserialize<'de> for FactionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        let name = String::deserialize(deserializer)?;
+        if let Some(id) = unsafe { (*FACTIONS).iter().position(|x: &String| x == &name) } {
+            Ok(FactionId(id))
+        } else {
+            Err(de::Error::unknown_variant(&name, &[ "<valid loaded factions>" ]))
+        }
+    }
 }

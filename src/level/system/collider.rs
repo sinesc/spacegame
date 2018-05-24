@@ -1,6 +1,5 @@
 use prelude::*;
 use specs;
-use rodio;
 use level::component;
 use level::WorldState;
 
@@ -8,30 +7,18 @@ use level::WorldState;
  * Collider system
  *
  * This system detects colliding entities with a Bounding component and applies damage.
- * todo: move effect of this collision somewhere else. find out how.
  */
-pub struct Collider {
-}
+pub struct Collider;
 
 #[derive(SystemData)]
 pub struct ColliderData<'a> {
     world_state: specs::ReadExpect<'a, WorldState>,
     spatial: specs::ReadStorage<'a, component::Spatial>,
-    visual: specs::ReadStorage<'a, component::Visual>,
-    lifetime: specs::ReadStorage<'a, component::Lifetime>,
-    fading: specs::ReadStorage<'a, component::Fading>,
     bounding: specs::ReadStorage<'a, component::Bounding>,
     hitpoints: specs::WriteStorage<'a, component::Hitpoints>,
     exploding: specs::ReadStorage<'a, component::Exploding>,
     entities: specs::Entities<'a>,
     lazy: specs::Read<'a, specs::LazyUpdate>,
-}
-
-impl<'a> Collider {
-    pub fn new() -> Self {
-        Collider {
-        }
-    }
 }
 
 impl<'a> specs::System<'a> for Collider {
@@ -44,8 +31,8 @@ impl<'a> specs::System<'a> for Collider {
 
         let mut collisions = Vec::new();
 
-		for (spatial_a, bounding_a, _, _, entity_a) in (&data.spatial, &data.bounding, &data.visual, &data.hitpoints, &*data.entities).join() {
-            for (spatial_b, bounding_b, _, _, entity_b) in (&data.spatial, &data.bounding, &data.visual, &data.hitpoints, &*data.entities).join() {
+		for (spatial_a, bounding_a, _, entity_a) in (&data.spatial, &data.bounding, &data.hitpoints, &*data.entities).join() {
+            for (spatial_b, bounding_b, _, entity_b) in (&data.spatial, &data.bounding, &data.hitpoints, &*data.entities).join() {
 
                 if bounding_a.faction != bounding_b.faction
                     && entity_a != entity_b

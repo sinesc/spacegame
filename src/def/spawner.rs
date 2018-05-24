@@ -33,8 +33,8 @@ pub struct SpawnerDescriptor {
     pub entities: Vec<SpawnerParameters>,
 }
 
-#[derive(Copy, Clone, Debug, Default)]
-pub struct SpawnerId(usize);
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+pub struct SpawnerId(pub usize);
 
 impl From<SpawnerId> for usize {
     fn from(input: SpawnerId) -> usize {

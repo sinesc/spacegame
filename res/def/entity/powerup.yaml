@@ -3,4 +3,19 @@ dual-weapon:
     visual:
         <<: *powerup_visual
         sprite: powerup/ball_v_32x32x18.jpg
-        color: [ 1.2, 1.2, 1.8, 1.0 ]
+        color: [ 1.5, 1.5, 2.0, 1.0 ]
+    powerup:
+        radius: 16.0
+        faction: friendly
+        spawner: player-weapon-dual
+
+triple-weapon:
+    <<: *powerup
+    visual:
+        <<: *powerup_visual
+        sprite: powerup/ball_v_32x32x18.jpg
+        color: [ 1.5, 0.5, 0.5, 1.0 ]
+    powerup:
+        radius: 16.0
+        faction: friendly
+        spawner: player-weapon-triple

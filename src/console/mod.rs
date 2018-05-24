@@ -32,19 +32,19 @@ pub fn init_cmd<'a, 'b>(menu: &Rc<Menu>, level: &Rc<RefCell<Level<'a, 'b>>>) -> 
 
     cmd.register("menu_toggle", &[], Box::new(|cmd, _| {
         if cmd.context().menu.visible() {
-            cmd.call("menu_hide", &[]);
+            cmd.call("menu_hide", &[]).unwrap();
         } else {
-            cmd.call("menu_show", &[Param::Str("main".to_string())]);
+            cmd.call("menu_show", &[Param::Str("main".to_string())]).unwrap();
         }
     }));
 
     cmd.register("menu_show", &[Str], Box::new(|cmd, p| {
-        cmd.call("pause", &[]);
+        cmd.call("pause", &[]).unwrap();
         cmd.context().menu.group(&p[0].to_string());
     }));
 
     cmd.register("menu_hide", &[], Box::new(|cmd, _| {
-        cmd.call("resume", &[]);
+        cmd.call("resume", &[]).unwrap();
         cmd.context().menu.hide();
     }));
 

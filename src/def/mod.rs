@@ -13,6 +13,8 @@ pub mod spawner;
 pub use self::spawner::*;
 pub mod menu;
 pub use self::menu::*;
+pub mod faction;
+pub use self::faction::*;
 
 #[derive(Debug)]
 pub struct Error {

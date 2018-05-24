@@ -10,6 +10,5 @@ use def::SpawnerId;
 pub struct Exploding {
     //pub start_time: f32,     // todo: not yes used. overlay multiple explosions for given duration
     //pub duration: f32,
-    #[serde(deserialize_with = "::def::spawner_deserialize")]
     pub spawner: SpawnerId,
 }

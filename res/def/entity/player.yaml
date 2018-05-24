@@ -27,7 +27,7 @@ player: &player
     hitpoints: 10000
     shooter:
         interval: 0.2
-        spawner: player-weapon-dual
+        spawner: player-weapon-single
 
 player-1:
     <<: *player

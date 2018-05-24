@@ -1,5 +1,4 @@
 use prelude::*;
-use rodio;
 use specs;
 use level::component;
 use level::WorldState;
@@ -9,29 +8,16 @@ use level::WorldState;
  *
  * This system handles game controlled entities.
  */
-pub struct Compute {
-}
-
-impl Compute {
-    pub fn new() -> Self {
-        Compute {
-        }
-    }
-}
-
+pub struct Compute;
 
 #[derive(SystemData)]
 pub struct ComputeData<'a> {
     world_state: specs::ReadExpect<'a, WorldState>,
     controlled: specs::ReadStorage<'a, component::Controlled>,
-    computed: specs::WriteStorage<'a, component::Computed>,
-    spatial: specs::WriteStorage<'a, component::Spatial>,
+    computed: specs::ReadStorage<'a, component::Computed>,
+    spatial: specs::ReadStorage<'a, component::Spatial>,
     inertial: specs::WriteStorage<'a, component::Inertial>,
-    visual: specs::WriteStorage<'a, component::Visual>,
-    lifetime: specs::WriteStorage<'a, component::Lifetime>,
-    fading: specs::WriteStorage<'a, component::Fading>,
-    bounding: specs::WriteStorage<'a, component::Bounding>,
-    hitpoints: specs::WriteStorage<'a, component::Hitpoints>,
+    bounding: specs::ReadStorage<'a, component::Bounding>,
     shooter: specs::WriteStorage<'a, component::Shooter>,
     entities: specs::Entities<'a>,
     lazy: specs::Read<'a, specs::LazyUpdate>,
@@ -59,7 +45,7 @@ impl<'a> specs::System<'a> for Compute {
             }
         }
 
-		for (_, spatial, inertial, shooter, bounding) in (&mut data.computed, &mut data.spatial, &mut data.inertial, &mut data.shooter, &data.bounding).join() {
+		for (_, spatial, inertial, shooter, bounding) in (&data.computed, &data.spatial, &mut data.inertial, &mut data.shooter, &data.bounding).join() {
 
             // approach position 250px offset to the right (direction normal) of the player
 

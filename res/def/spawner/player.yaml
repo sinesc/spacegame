@@ -2,7 +2,7 @@ player-weapon-single:
     <<: *weapon
     entities:
         -
-            position: [ 0., 0. ]
+            position: [ 35., 0. ]
             angle: 0.
             entity: player-shot
             sound: projectile/pew
@@ -18,4 +18,21 @@ player-weapon-dual:
         -
             position: [ 10., 25. ]
             angle: 0.
+            entity: player-shot
+
+player-weapon-triple:
+    <<: *weapon
+    entities:
+        -
+            position: [ 35., 0. ]
+            angle: 0.
+            entity: player-shot
+            sound: projectile/pew
+        -
+            position: [ 10., -25. ]
+            angle: 0.1
+            entity: player-shot
+        -
+            position: [ 10., 25. ]
+            angle: -0.1
             entity: player-shot

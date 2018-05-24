@@ -97,7 +97,7 @@ impl Menu {
         // perform action, if any (can't do above since the action might have to borrow state as well)
 
         if let Some(action) = action {
-            cmd.exec(action);
+            cmd.exec(action).unwrap();
         }
     }
 }
