@@ -1,0 +1,13 @@
+projectile/pew:
+    - projectile/pew1a.ogg
+    - projectile/pew1b.ogg
+    - projectile/pew1c.ogg
+    - projectile/pew2.ogg
+damage/explosion_pop:
+    - damage/explosion_pop1.ogg
+    - damage/explosion_pop2.ogg
+damage/explosion_large:
+    - damage/explosion1.ogg
+    - damage/explosion2.ogg
+projectile/powerup:
+    - projectile/powerup1.ogg

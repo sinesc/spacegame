@@ -53,3 +53,53 @@ impl SoundGroup {
         self.decoder().convert_samples()
     }
 }
+
+
+use std::fmt;
+use std::marker::PhantomData;
+use serde::de::{Deserialize, Deserializer, Visitor, SeqAccess};
+
+struct SoundGroupVisitor {
+    marker: PhantomData<fn() -> SoundGroup>
+}
+
+impl SoundGroupVisitor {
+    fn new() -> Self {
+        SoundGroupVisitor {
+            marker: PhantomData
+        }
+    }
+}
+
+impl<'de> Visitor<'de> for SoundGroupVisitor {
+
+    type Value = SoundGroup;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a soundgroup")
+    }
+
+    fn visit_seq<M>(self, mut access: M) -> Result<Self::Value, M::Error> where M: SeqAccess<'de> {
+
+        let mut group = SoundGroup { sounds: Vec::new(), rng: ARng::new(0) };
+
+        while let Some(value) = access.next_element()? {
+            group.sounds.push(value);
+        }
+
+        Ok(group)
+    }
+}
+
+impl<'de> Deserialize<'de> for SoundGroup {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        deserializer.deserialize_seq(SoundGroupVisitor::new())
+    }
+}
+
+impl<'de> Deserialize<'de> for Sound {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        let name = String::deserialize(deserializer)?;
+        Ok(Sound::load(&("res/sound/".to_string() + &name)).unwrap()) // TODO: error handling
+    }
+}

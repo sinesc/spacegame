@@ -101,13 +101,6 @@ impl<'a, 'b> Level<'a, 'b> {
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
         let audio = rodio::default_output_device().unwrap();
 
-
-        let mut sounds = Repository::new();
-        sounds.insert("projectile/pew".to_string(), SoundGroup::load(&["res/sound/projectile/pew1a.ogg", "res/sound/projectile/pew1b.ogg", "res/sound/projectile/pew1c.ogg", "res/sound/projectile/pew2.ogg"]).unwrap());
-        sounds.insert("damage/explosion_pop".to_string(), SoundGroup::load(&["res/sound/damage/explosion_pop1.ogg", "res/sound/damage/explosion_pop2.ogg"]).unwrap());
-        sounds.insert("damage/explosion_large".to_string(), SoundGroup::load(&["res/sound/damage/explosion1.ogg", "res/sound/damage/explosion2.ogg"]).unwrap());
-        sounds.insert("projectile/powerup".to_string(), SoundGroup::load(&["res/sound/projectile/powerup1.ogg"]).unwrap());
-
         // create layers
 
         let layer_def = def::parse_layers().unwrap();
@@ -130,6 +123,7 @@ impl<'a, 'b> Level<'a, 'b> {
 
         let mut sprites = Repository::new();
         let factions = def::parse_factions().unwrap();
+        let sounds = def::parse_sounds().unwrap();
         let spawners = def::parse_spawners().unwrap();
         let entities = def::parse_entities(&context, &mut sprites, &factions, &spawners, &layers).unwrap();
 

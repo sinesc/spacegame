@@ -15,6 +15,8 @@ pub mod menu;
 pub use self::menu::*;
 pub mod faction;
 pub use self::faction::*;
+pub mod sound;
+pub use self::sound::*;
 
 #[derive(Debug)]
 pub struct Error {
