@@ -7,18 +7,20 @@ use repository::Repository;
 use def::spawner::*;
 use def::faction::*;
 
+// set up some ugly unsafe global state to work around missing DeserializeSeed in Serde-Yaml
 static mut FACTIONS: *const Vec<String> = 0 as _;
-static mut SPRITES: *const Repository<Arc<Sprite>> = 0 as _;
+static mut SPRITES: *mut Repository<Arc<Sprite>> = 0 as _;
 static mut LAYERS: *const Repository<Arc<Layer>> = 0 as _;
 static mut SPAWNERS: *const Repository<SpawnerDescriptor, SpawnerId> = 0 as _;
+static mut CONTEXT: *const RenderContext = 0 as _;
 
-pub fn parse_entities(factions: &Vec<String>, spawners: &Repository<SpawnerDescriptor, SpawnerId>, sprites: &Repository<Arc<Sprite>>, layers: &Repository<Arc<Layer>>) -> Result<Repository<EntityDescriptor>, Error> {
+pub fn parse_entities(context: &RenderContext, sprites: &mut Repository<Arc<Sprite>>, factions: &Vec<String>, spawners: &Repository<SpawnerDescriptor, SpawnerId>, layers: &Repository<Arc<Layer>>) -> Result<Repository<EntityDescriptor>, Error> {
     unsafe {
-        // set up some ugly unsafe global state to work around missing DeserializeSeed in Serde-Yaml
         FACTIONS = factions as *const Vec<String>;
-        SPRITES = sprites as *const Repository<Arc<Sprite>>;
+        SPRITES = sprites as *mut Repository<Arc<Sprite>>;
         LAYERS = layers as *const Repository<Arc<Layer>>;
         SPAWNERS = spawners as *const Repository<SpawnerDescriptor, SpawnerId>;
+        CONTEXT = context as *const RenderContext;
     }
     parse_dir("res/def/entity/", &[ "yaml" ])
 }
@@ -140,7 +142,10 @@ pub fn sprite_deserialize<'de, D>(deserializer: D) -> Result<Arc<Sprite>, D::Err
     if let Some(sprite) = unsafe { (*SPRITES).name(&name) } {
         Ok(sprite.clone())
     } else {
-        Err(de::Error::unknown_variant(&name, &[ "<valid loaded sprites>" ]))
+        let context = unsafe { &*CONTEXT };
+        let sprite = Sprite::from_file(context, &("res/sprite/".to_string() + &name)).unwrap().arc(); // TODO: error handling
+        unsafe { (*SPRITES).insert(name.to_string(), sprite.clone()) };
+        Ok(sprite)
     }
 }
 

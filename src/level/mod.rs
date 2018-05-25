@@ -97,27 +97,10 @@ impl<'a, 'b> Level<'a, 'b> {
 
         // create a scene and a layer TODO: temporary, load from def
 
-        let mut sprites = Repository::new();
-        sprites.insert("mine".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_red_lm_64x64x15x2.png").unwrap().arc());
-        sprites.insert("friend".to_string(), Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc());
-        sprites.insert("asteroid".to_string(), Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc());
-        sprites.insert("explosion".to_string(), Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc());
-        sprites.insert("laser".to_string(), Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc());
-
-        sprites.insert("hostile/mine_green_lm_64x64x15x2.png".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_green_lm_64x64x15x2.png").unwrap().arc());
-        sprites.insert("player/speedy_98x72x30.png".to_string(), Sprite::from_file(context, "res/sprite/player/speedy_98x72x30.png").unwrap().arc());
-        sprites.insert("placeholder_16x16x1.png".to_string(), Sprite::from_file(context, "res/sprite/placeholder_16x16x1.png").unwrap().arc());
-        sprites.insert("projectile/bolt_white_60x36x1.jpg".to_string(), Sprite::from_file(context, "res/sprite/projectile/bolt_white_60x36x1.jpg").unwrap().arc());
-        sprites.insert("explosion/default_256x256x40.jpg".to_string(), Sprite::from_file(context, "res/sprite/explosion/default_256x256x40.jpg").unwrap().arc());
-        sprites.insert("hostile/mine_red_lm_64x64x15x2.png".to_string(), Sprite::from_file(context, "res/sprite/hostile/mine_red_lm_64x64x15x2.png").unwrap().arc());
-        sprites.insert("asteroid/type1_64x64x60.png".to_string(), Sprite::from_file(context, "res/sprite/asteroid/type1_64x64x60.png").unwrap().arc());
-        sprites.insert("powerup/ball_v_32x32x18.jpg".to_string(), Sprite::from_file(context, "res/sprite/powerup/ball_v_32x32x18.jpg").unwrap().arc());
-
-
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
-
         let audio = rodio::default_output_device().unwrap();
+
 
         let mut sounds = Repository::new();
         sounds.insert("projectile/pew".to_string(), SoundGroup::load(&["res/sound/projectile/pew1a.ogg", "res/sound/projectile/pew1b.ogg", "res/sound/projectile/pew1c.ogg", "res/sound/projectile/pew2.ogg"]).unwrap());
@@ -143,12 +126,12 @@ impl<'a, 'b> Level<'a, 'b> {
             layers.insert(info.name.clone(), layer);
         }
 
+        // load entity/spawner/faction definitions and required sprites
+
+        let mut sprites = Repository::new();
         let factions = def::parse_factions().unwrap();
         let spawners = def::parse_spawners().unwrap();
-        let entities = def::parse_entities(&factions, &spawners, &sprites, &layers).unwrap();
-
-        //test
-        entities["mine-green"].spawn(&mut world, 0., Some(Vec2(100., 100.)), None, None);
+        let entities = def::parse_entities(&context, &mut sprites, &factions, &spawners, &layers).unwrap();
 
         // create player entity
 
@@ -253,7 +236,7 @@ impl<'a, 'b> Level<'a, 'b> {
             self.inf.layer[&info.name].clear();
         }
 
-        // some temporary spawning
+        // TODO: some temporary spawning
 
         if self.roidspawn.elapsed(age) {
             let angle = Angle(self.rng.range(-PI, PI));
@@ -266,14 +249,6 @@ impl<'a, 'b> Level<'a, 'b> {
             let faction = FactionId(self.rng.range(2., 100.) as usize);
 
             self.inf.repository["asteroid"].spawn(&mut self.world, self.age, Some(pos), Some(Angle::from(v_max)), Some(faction));
-            /*self.world.create_entity()
-                .with(component::Spatial::new(pos, angle))
-                .with(component::Visual::new(Some(self.inf.layer["base"].clone()), None, self.inf.sprite["asteroid"].clone(), Color::WHITE, scale, 30, 1.0))
-                .with(component::Inertial::new(v_max, Vec2(1.0, 1.0), 1.0))
-                .with(component::Bounding::new(20.0 * scale, self.rng.range(2., 100.) as u32))
-                .with(component::Hitpoints::new(100. * scale))
-                .build();*/
-
         }
 
         if self.minespawn.elapsed(age) {
@@ -286,7 +261,11 @@ impl<'a, 'b> Level<'a, 'b> {
 
             pos -= outbound;
 
-            self.inf.repository["mine-red"].spawn(&mut self.world, self.age, Some(pos), Some(angle), Some(faction));
+            if self.rng.range(0., 1.) > 0.5 {
+                self.inf.repository["mine-red"].spawn(&mut self.world, self.age, Some(pos), Some(angle), Some(faction));
+            } else {
+                self.inf.repository["mine-green"].spawn(&mut self.world, self.age, Some(pos), Some(angle), Some(faction));
+            }
 
             if self.rng.range(0., 1.) > 0.5 {
                 self.inf.repository["dual-weapon"].spawn(&mut self.world, self.age, Some(Vec2(1920., pw_y)), None, None);
