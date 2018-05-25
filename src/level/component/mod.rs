@@ -26,8 +26,8 @@ pub use self::fading::Fading;
 mod bounding;
 pub use self::bounding::Bounding;
 
-mod exploding;
-pub use self::exploding::Exploding;
+mod explodes;
+pub use self::explodes::Explodes;
 
 mod hitpoints;
 pub use self::hitpoints::Hitpoints;

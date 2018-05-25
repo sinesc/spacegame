@@ -26,7 +26,7 @@ hostile: &hostile
         frame_id: 0
         fps: 30
     hitpoints: 100
-    exploding:
+    explodes:
         spawner: exploder
 
 projectile: &projectile
@@ -44,7 +44,7 @@ projectile: &projectile
     fading:
         start: 0.5
         end: 1.0
-    exploding:
+    explodes:
         spawner: exploder-small
 
 explosion: &explosion
@@ -75,7 +75,7 @@ powerup: &powerup
         radius: 16.0
         faction: friendly
         spawner: weapon
-    exploding:
+    explodes:
         spawner: fader-powerup
 
 fading-powerup:

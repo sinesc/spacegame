@@ -11,7 +11,7 @@ mine-green:
     bounding:
         radius: 28.0
         faction: hostile
-    exploding:
+    explodes:
         spawner: exploder-green
     inertial:
         <<: *hostile_inertial
@@ -44,7 +44,7 @@ mine-red:
     bounding:
         radius: 28.0
         faction: hostile
-    exploding:
+    explodes:
         spawner: exploder-red
 
 mine-red-shot:

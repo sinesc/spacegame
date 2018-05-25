@@ -85,7 +85,7 @@ impl<'a, 'b> Level<'a, 'b> {
         world.register::<component::Bounding>();
         world.register::<component::Computed>();
         world.register::<component::Controlled>();
-        world.register::<component::Exploding>();
+        world.register::<component::Explodes>();
         world.register::<component::Fading>();
         world.register::<component::Hitpoints>();
         world.register::<component::Inertial>();

@@ -195,7 +195,7 @@ impl<T> Cmd<T> {
         let mut tokens = Vec::new();
 
         // * is required since start==pos right after a string ends (can't look ahead and skip the space)
-        // TODO: handle escaped "
+        // this also handles multiple spaces as single separator
 
         for (pos, ref grapheme) in UCS::grapheme_indices(input, true) {
             if within_string {

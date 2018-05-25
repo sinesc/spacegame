@@ -17,7 +17,7 @@ pub struct UpgraderData<'a> {
     bounding    : specs::ReadStorage<'a, component::Bounding>,
     powerup     : specs::ReadStorage<'a, component::Powerup>,
     shooter     : specs::WriteStorage<'a, component::Shooter>,
-    exploding   : specs::ReadStorage<'a, component::Exploding>,
+    explodes   : specs::ReadStorage<'a, component::Explodes>,
     entities    : specs::Entities<'a>,
     lazy        : specs::Read<'a, specs::LazyUpdate>,
 }
@@ -41,8 +41,8 @@ impl<'a> specs::System<'a> for Upgrader {
 
                         shooter.spawner = powerup.spawner;
 
-                        if let Some(exploding) = data.exploding.get(entity_a) {
-                            data.world_state.spawner(&data.lazy, &data.entities, exploding.spawner, Angle(0.), Some(spatial_a.position), None, None);
+                        if let Some(explodes) = data.explodes.get(entity_a) {
+                            data.world_state.spawner(&data.lazy, &data.entities, explodes.spawner, Angle(0.), Some(spatial_a.position), None, None);
                         }
 
                         data.entities.delete(entity_a).unwrap();

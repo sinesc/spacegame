@@ -4,8 +4,6 @@ use def;
 
 /**
  * Shooter component
- *
- * todo: This is a stupid component. I need to find a better solution.
  */
 #[derive(Clone, Debug, Deserialize, Component)]
 pub struct Shooter {

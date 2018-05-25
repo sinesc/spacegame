@@ -16,7 +16,7 @@ pub struct ColliderData<'a> {
     spatial: specs::ReadStorage<'a, component::Spatial>,
     bounding: specs::ReadStorage<'a, component::Bounding>,
     hitpoints: specs::WriteStorage<'a, component::Hitpoints>,
-    exploding: specs::ReadStorage<'a, component::Exploding>,
+    explodes: specs::ReadStorage<'a, component::Explodes>,
     entities: specs::Entities<'a>,
     lazy: specs::Read<'a, specs::LazyUpdate>,
 }
@@ -49,12 +49,12 @@ impl<'a> specs::System<'a> for Collider {
             let b = data.hitpoints.get(entity_b).unwrap().0;
 
             if a <= b {
-                if let Some(exploding) = data.exploding.get(entity_a) {
-                    data.world_state.spawner(&data.lazy, &data.entities, exploding.spawner, Angle(0.), Some(position_a), None, None);
+                if let Some(explodes) = data.explodes.get(entity_a) {
+                    data.world_state.spawner(&data.lazy, &data.entities, explodes.spawner, Angle(0.), Some(position_a), None, None);
                 }
             } else if b <= a {
-                if let Some(exploding) = data.exploding.get(entity_b) {
-                    data.world_state.spawner(&data.lazy, &data.entities, exploding.spawner, Angle(0.), Some(position_b), None, None);
+                if let Some(explodes) = data.explodes.get(entity_b) {
+                    data.world_state.spawner(&data.lazy, &data.entities, explodes.spawner, Angle(0.), Some(position_b), None, None);
                 }
             }
 

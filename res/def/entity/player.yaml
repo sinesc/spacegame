@@ -44,5 +44,5 @@ player-shot:
     bounding:
         radius: 5.0
         faction: friendly
-    exploding:
+    explodes:
         spawner: exploder-small-blue

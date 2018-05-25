@@ -30,7 +30,7 @@ pub struct EntityDescriptor {
     bounding    : Option<Bounding>,
     computed    : Option<Computed>,
     controlled  : Option<Controlled>,
-    exploding   : Option<Exploding>,
+    explodes   : Option<Explodes>,
     fading      : Option<Fading>,
     hitpoints   : Option<Hitpoints>,
     inertial    : Option<Inertial>,
@@ -83,8 +83,8 @@ impl EntityDescriptor {
         if let Some(controlled) = &self.controlled {
             ent = ent.with(controlled.clone());
         }
-        if let Some(exploding) = &self.exploding {
-            ent = ent.with(exploding.clone());
+        if let Some(explodes) = &self.explodes {
+            ent = ent.with(explodes.clone());
         }
         if let Some(fading) = &self.fading {
             let mut fading_clone = fading.clone();
