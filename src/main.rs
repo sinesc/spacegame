@@ -27,6 +27,7 @@ mod cmd;
 mod timeframe;
 mod console;
 mod repository;
+mod completion;
 
 use prelude::*;
 use level::Level;
@@ -70,10 +71,6 @@ fn main() {
 
         if input.pressed(InputId::Escape, false) {
             cmd.call("menu_toggle", &[]).unwrap();
-        }
-
-        if input.pressed(InputId::U, false) {
-            cmd.exec("level_start bad_argument").unwrap();;
         }
 
         display.clear_frame(Color::BLACK);
