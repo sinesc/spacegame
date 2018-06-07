@@ -4,6 +4,8 @@ use std::hash::Hash;
 use std::fmt::Debug;
 use std::ops::Index;
 use std::borrow::Borrow;
+use std::slice::IterMut;
+use std::iter::FromIterator;
 
 // TODO: look into owned_ref so that vec can hold the data and hashmap ref it
 
@@ -44,6 +46,9 @@ impl<V, I, K> Repository<V, I, K> where K: Eq + Hash, I: Copy + Into<usize> + Fr
     pub fn index_of<Q: ?Sized>(self: &Self, name: &Q) -> Option<I> where K: Borrow<Q>, Q: Hash + Eq {
         self.map.get(name).map(|i| *i)
     }
+    pub fn values_mut(&mut self) -> IterMut<V> {
+        self.data.iter_mut()
+    }
 }
 
 impl<'a, K, Q: ?Sized, V, I> Index<&'a Q> for Repository<V, I, K>
@@ -72,6 +77,23 @@ where
                 ((k, v), &self.data[v.into()])
             }))
             .finish()
+    }
+}
+
+impl<V, I, K> FromIterator<(K, V)> for Repository<V, I, K>
+where
+    K: Eq + Hash,
+    I: Copy + Into<usize> + From<usize>
+{
+    fn from_iter<F: IntoIterator<Item=(K, V)>>(iter: F) -> Self {
+
+        let mut repository = Repository::new();
+
+        for (k, v) in iter {
+            repository.insert(k, v);
+        }
+
+        repository
     }
 }
 
