@@ -6,6 +6,7 @@ use level::component::*;
 use repository::Repository;
 use def::spawner::*;
 use def::faction::*;
+use serde_yaml;
 
 // set up some ugly unsafe global state to work around missing DeserializeSeed in Serde-Yaml
 static mut FACTIONS: *const Vec<String> = 0 as _;
@@ -14,7 +15,7 @@ static mut LAYERS: *const Repository<Arc<Layer>> = 0 as _;
 static mut SPAWNERS: *const Repository<SpawnerDescriptor, SpawnerId> = 0 as _;
 static mut CONTEXT: *const RenderContext = 0 as _;
 
-pub fn parse_entities(context: &RenderContext, sprites: &mut Repository<Arc<Sprite>>, factions: &Vec<String>, spawners: &Repository<SpawnerDescriptor, SpawnerId>, layers: &Repository<Arc<Layer>>) -> Result<Repository<EntityDescriptor>, Error> {
+pub fn parse_entities(context: &RenderContext, sprites: &mut Repository<Arc<Sprite>>, factions: &Vec<String>, spawners: &mut Repository<SpawnerDescriptor, SpawnerId>, layers: &Repository<Arc<Layer>>) -> Result<Repository<EntityDescriptor>, Error> {
     unsafe {
         FACTIONS = factions as *const Vec<String>;
         SPRITES = sprites as *mut Repository<Arc<Sprite>>;
@@ -22,7 +23,15 @@ pub fn parse_entities(context: &RenderContext, sprites: &mut Repository<Arc<Spri
         SPAWNERS = spawners as *const Repository<SpawnerDescriptor, SpawnerId>;
         CONTEXT = context as *const RenderContext;
     }
-    parse_dir("res/def/entity/", &[ "yaml" ])
+
+    // parse entities to values first. spawners allow derival of custom entities from base entities.
+    // the derival is implemented as a merge operation between the base entity yaml map and the derived entity yaml map
+
+    let entity_values: HashMap<String, serde_yaml::Value> = parse_dir("res/def/entity/", &[ "yaml" ])?;
+    complete_spawners(spawners, &entity_values);
+
+    // finally deserialize entities into a repository of entities
+    Ok(entity_values.iter().map(|(k, v)| (k.clone(), serde_yaml::from_value(v.clone()).unwrap())).collect())
 }
 
 #[derive(Deserialize, Debug)]
@@ -30,7 +39,7 @@ pub struct EntityDescriptor {
     bounding    : Option<Bounding>,
     computed    : Option<Computed>,
     controlled  : Option<Controlled>,
-    explodes   : Option<Explodes>,
+    explodes    : Option<Explodes>,
     fading      : Option<Fading>,
     hitpoints   : Option<Hitpoints>,
     inertial    : Option<Inertial>,
@@ -39,33 +48,6 @@ pub struct EntityDescriptor {
     shooter     : Option<Shooter>,
     spatial     : Option<Spatial>,
     visual      : Option<Visual>,
-}
-
-pub trait Builder {
-    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self;
-    fn build(self) -> specs::Entity;
-}
-
-pub struct EntityBuilder<'a>(specs::EntityBuilder<'a>);
-
-impl<'a> Builder for EntityBuilder<'a> {
-    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self {
-        EntityBuilder(self.0.with(c))
-    }
-    fn build(self) -> specs::Entity {
-        self.0.build()
-    }
-}
-
-pub struct LazyBuilder<'a>(specs::world::LazyBuilder<'a>);
-
-impl<'a> Builder for LazyBuilder<'a> {
-    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self {
-        LazyBuilder(self.0.with(c))
-    }
-    fn build(self) -> specs::Entity {
-        self.0.build()
-    }
 }
 
 impl EntityDescriptor {
@@ -134,6 +116,33 @@ impl EntityDescriptor {
     }
     pub fn spawn(self: &Self, world: &mut specs::World, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
         self.configure(EntityBuilder(world.create_entity()), age, position, angle, faction);
+    }
+}
+
+trait Builder {
+    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self;
+    fn build(self) -> specs::Entity;
+}
+
+struct EntityBuilder<'a>(specs::EntityBuilder<'a>);
+
+impl<'a> Builder for EntityBuilder<'a> {
+    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self {
+        EntityBuilder(self.0.with(c))
+    }
+    fn build(self) -> specs::Entity {
+        self.0.build()
+    }
+}
+
+struct LazyBuilder<'a>(specs::world::LazyBuilder<'a>);
+
+impl<'a> Builder for LazyBuilder<'a> {
+    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self {
+        LazyBuilder(self.0.with(c))
+    }
+    fn build(self) -> specs::Entity {
+        self.0.build()
     }
 }
 

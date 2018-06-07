@@ -124,8 +124,8 @@ impl<'a, 'b> Level<'a, 'b> {
         let mut sprites = Repository::new();
         let factions = def::parse_factions().unwrap();
         let sounds = def::parse_sounds().unwrap();
-        let spawners = def::parse_spawners().unwrap();
-        let entities = def::parse_entities(&context, &mut sprites, &factions, &spawners, &layers).unwrap();
+        let mut spawners = def::parse_spawners().unwrap();
+        let entities = def::parse_entities(&context, &mut sprites, &factions, &mut spawners, &layers).unwrap();
 
         // create player entity
 
