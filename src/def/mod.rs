@@ -99,3 +99,22 @@ fn find(path: &str, extensions: &[ &str ]) -> io::Result<Vec<path::PathBuf>> {
     }
     Ok(files)
 }
+
+// Merges keys from source into destination, if they don't already exist. Handles maps recursively.
+pub fn yaml_merge_maps(destination: &mut serde_yaml::Value, source: &serde_yaml::Value) {
+    use serde_yaml::Value;
+
+    if let Value::Mapping(source_map) = source {
+        if let Value::Mapping(destination_map) = destination {
+            for (k, v) in source_map.iter() {
+                if !destination_map.contains_key(k) {
+                    destination_map.insert(k.clone(), v.clone());
+                } else if destination_map[k].is_mapping() {
+                    yaml_merge_maps(&mut destination_map[k], &source_map[k]);
+                }
+            }
+        } else {
+            panic!("destination is not a map"); // TODO: Result?
+        }
+    }
+}
