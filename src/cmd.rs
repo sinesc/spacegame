@@ -21,7 +21,7 @@ pub enum Param {
 
 impl Param {
     pub fn to_string(self: &Self) -> String {
-        if let &Param::Str(ref ret) = self { ret.to_string() } else { "".to_string() }
+        if let Param::Str(ret) = self { ret.to_string() } else { "".to_string() }
     }
 }
 
@@ -34,10 +34,10 @@ pub enum CmdError {
 
 impl fmt::Display for CmdError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{}", self.description(), match self {
-            CmdError::UnknownCommand(command) => format!("\"{}\"", &command),
-            CmdError::UnknownOverload(command, got, expected) => format!("\"{}\". Got {}, expected {:?}", &command, got, expected),
-            CmdError::InvalidArgument(command, index, ty) => format!("\"{}\". Expected {:?} as argument {}", &command, ty, index),
+        write!(f, "{} {}", self.description(), match self {
+            CmdError::UnknownCommand(command) => format!("\"{}\".", &command),
+            CmdError::UnknownOverload(command, got, expected) => format!("for command \"{}\". Got {}, expected {:?}.", &command, got, expected),
+            CmdError::InvalidArgument(command, index, ty) => format!("for command \"{}\". Expected argument {} to be of type {:?}.", &command, index, ty),
         })
     }
 }
@@ -46,7 +46,7 @@ impl error::Error for CmdError {
     fn description(&self) -> &str {
         match self {
             CmdError::UnknownCommand(_) => "Unknown command",
-            CmdError::UnknownOverload(_, _, _) => "Invalid number of arguments for given command",
+            CmdError::UnknownOverload(_, _, _) => "Invalid number of arguments",
             CmdError::InvalidArgument(_, _, _) => "Invalid argument type",
         }
     }
@@ -147,7 +147,7 @@ impl<T> Cmd<T> {
             result.push(match *ptype {
                 // TODO: ugly
                 Type::Str => {
-                    let param = &raw_params[index];
+                    let param = raw_params[index];
                     if &param[0..1] == "\"" {
                         Param::Str(param[1..param.len()-1].to_string())
                     } else {
