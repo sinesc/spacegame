@@ -15,6 +15,9 @@ impl<I, C> Completion<I, C> {
     pub fn new(value: I) -> Self {
         Completion::Incomplete(Some(Box::new(value)))
     }
+    pub fn completed(value: C) -> Self {
+        Completion::Complete(value)
+    }
     pub fn complete<F>(self: &mut Self, func: F) where F: Fn(I) -> C {
         *self = match self {
             Completion::Incomplete(ref mut opt) => Completion::Complete(func(*opt.take().unwrap())),

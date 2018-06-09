@@ -12,13 +12,17 @@ pub fn parse_spawners() -> Result<Repository<SpawnerDescriptor, SpawnerId>, Erro
 pub fn complete_spawners(spawners: &mut Repository<SpawnerDescriptor, SpawnerId>, entities: &HashMap<String, serde_yaml::Value>) {
     for spawner in spawners.values_mut() {
         for spawn in &mut spawner.entities {
-            if let Some(ref mut overrides) = &mut spawn.entity_overrides {
-                let base_entity = entities.get(spawn.entity.as_ref().unwrap()).unwrap();
-                overrides.complete(|mut incomplete| {
+            let base_entity = entities.get(&spawn.base).expect(&format!("Spawner-entity {} is not defined.", &spawn.base));
+            if let Some(ref mut extension) = &mut spawn.extend {
+                extension.complete(|mut incomplete| {
                     // merge base entity yaml map into spawner entity, then deserialize the result
                     yaml_merge_maps(&mut incomplete, &base_entity);
                     serde_yaml::from_value(incomplete).unwrap()
                 });
+            } // TODO: use else here once rust if else scoping bug is fixed
+            if spawn.extend.is_none() {
+                let entity = serde_yaml::from_value(base_entity.clone()).unwrap();
+                spawn.extend = Some(Completion::completed(entity));
             }
         }
     }
@@ -41,8 +45,8 @@ impl Default for SpawnerDispatch {
 pub struct SpawnerParameters {
     pub position: Vec2,
     pub angle: Angle,
-    pub entity: Option<String>,
-    pub entity_overrides: Option<Completion<serde_yaml::Value, EntityDescriptor>>,
+    pub base: String,
+    pub extend: Option<Completion<serde_yaml::Value, EntityDescriptor>>,
     pub sound: Option<String>,
 }
 

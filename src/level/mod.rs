@@ -33,25 +33,19 @@ pub struct WorldState {
 }
 
 impl WorldState {
+    // TODO: not really nice to have these on worldstate. they are only here because they require "age", which is available on worldstate
     pub fn spawn_lazy(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
         self.inf.repository[name].spawn_lazy(lazy, entities, self.age, position, angle, faction);
     }
     pub fn spawner(self: &Self, lazy: &LazyUpdate, entities: &EntitiesRes, spawner_id: def::SpawnerId, parent_angle: Angle, parent_position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
         let spawner = &self.inf.spawner.index(spawner_id);
         for ref spawn in &spawner.entities {
-            if let Some(ref entity) = spawn.entity {
-                let pos = match parent_position {
-                    Some(parent_position) => parent_position + spawn.position.rotate(parent_angle),
-                    None => spawn.position.rotate(parent_angle),
-                };
-                self.spawn_lazy(
-                    lazy,
-                    entities,
-                    &entity,
-                    Some(pos),
-                    angle,
-                    faction
-                );
+            let pos = match parent_position {
+                Some(parent_position) => parent_position + spawn.position.rotate(parent_angle),
+                None => spawn.position.rotate(parent_angle),
+            };
+            if let Some(ref entity) = spawn.extend {
+                entity.get().unwrap().spawn_lazy(lazy, entities, self.age, Some(pos), angle, faction);
             }
             if let Some(ref sound) = spawn.sound {
                 rodio::play_raw(&self.inf.audio, self.inf.sound[sound].samples());

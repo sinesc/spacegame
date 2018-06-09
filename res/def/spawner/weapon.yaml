@@ -4,7 +4,7 @@ weapon-red:
         -
             position: [ 0., 0. ]
             angle: 0.
-            entity: mine-red-shot
+            base: mine-red-shot
 
 weapon-green:
     <<: *weapon
@@ -12,4 +12,4 @@ weapon-green:
         -
             position: [ 0., 0. ]
             angle: 0.
-            entity: mine-green-shot
+            base: mine-green-shot

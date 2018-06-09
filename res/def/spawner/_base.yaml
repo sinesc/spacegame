@@ -4,7 +4,7 @@ weapon: &weapon
         -
             position: [ 0., 0. ]
             angle: 0.
-            entity: projectile
+            base: projectile
 
 exploder:
     dispatch: All
@@ -12,7 +12,7 @@ exploder:
         -
             position: [ 0., 0. ]
             angle: 0.
-            entity: explosion
+            base: explosion
             sound: damage/explosion_pop
 
 fader-powerup:
@@ -21,5 +21,5 @@ fader-powerup:
         -
             position: [ 0., 0. ]
             angle: 0.
-            entity: fading-powerup
+            base: fading-powerup
             sound: projectile/powerup
