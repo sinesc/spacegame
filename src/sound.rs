@@ -39,6 +39,7 @@ pub struct SoundGroup {
 }
 
 impl SoundGroup {
+    #[allow(dead_code)]
     pub fn load(filenames: &[&str]) -> io::Result<SoundGroup> {
         let sounds: io::Result<Vec<_>> = filenames.iter().map(|filename| { Sound::load(filename) }).collect();
         Ok(SoundGroup {
