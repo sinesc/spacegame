@@ -1,7 +1,6 @@
 asteroid:
-    <<: *hostile
+    <<<: *hostile
     visual:
-        <<: *hostile_visual
         sprite: asteroid/type1_64x64x60.png
     bounding:
         radius: 16.0

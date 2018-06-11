@@ -1229,6 +1229,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "spacegame"
 version = "0.1.0"
 dependencies = [
+ "lazy_static 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "radiant-rs 0.12.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "radiant-utils 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rodio 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",

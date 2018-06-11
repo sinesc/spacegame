@@ -16,6 +16,8 @@ extern crate yaml_merge_keys;
 #[macro_use]
 extern crate serde_derive;
 extern crate unicode_segmentation;
+#[macro_use]
+extern crate lazy_static;
 
 mod prelude;
 mod def;

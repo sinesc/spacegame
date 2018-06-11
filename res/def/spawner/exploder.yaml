@@ -13,7 +13,10 @@ exploder-small:
         -
             position: [ 0., 0. ]
             angle: 0.
-            base: explosion-small
+            base: explosion
+            extend:
+                visual:
+                    effect_scale: 0.5
             sound: damage/explosion_pop
 
 exploder-small-blue:
@@ -22,7 +25,11 @@ exploder-small-blue:
         -
             position: [ 0., 0. ]
             angle: 0.
-            base: explosion-small-blue
+            base: explosion
+            extend:
+                visual:
+                    effect_scale: 0.3
+                    effect_color: [ 0.7, 1.0, 2.0, 1.0 ]
 
 exploder-green:
     dispatch: All
@@ -30,7 +37,10 @@ exploder-green:
         -
             position: [ 0., 0. ]
             angle: 0.
-            base: explosion-green
+            base: explosion
+            extend:
+                visual:
+                    effect_color: [ 1.0, 2.0, 1.0, 1.0 ]
             sound: damage/explosion_large
 
 exploder-red:
@@ -39,5 +49,8 @@ exploder-red:
         -
             position: [ 0., 0. ]
             angle: 0.
-            base: explosion-red
+            base: explosion
+            extend:
+                visual:
+                    effect_color: [ 2.0, 1.0, 1.0, 1.0 ]
             sound: damage/explosion_large

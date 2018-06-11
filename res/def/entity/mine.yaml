@@ -1,7 +1,6 @@
 mine-green:
-    <<: *hostile
+    <<<: *hostile
     visual:
-        <<: *hostile_visual
         sprite: hostile/mine_green_lm_64x64x15x2.png
     computed: { }
     shooter:
@@ -14,7 +13,6 @@ mine-green:
     explodes:
         spawner: exploder-green
     inertial:
-        <<: *hostile_inertial
         v_max: [ 100.0, 100.0 ]
         trans_motion: 6.0
         trans_rest: 3.0
@@ -22,9 +20,8 @@ mine-green:
         av_max_vmax: 0.1
 
 mine-green-shot:
-    <<: *projectile
+    <<<: *projectile
     visual:
-        <<: *projectile_visual
         sprite: projectile/bolt_white_60x36x1.jpg
         color: [ 0.2, 2.0, 0.2, 1.0 ]
     bounding:
@@ -32,9 +29,8 @@ mine-green-shot:
         faction: hostile
 
 mine-red:
-    <<: *hostile
+    <<<: *hostile
     visual:
-        <<: *hostile_visual
         sprite: hostile/mine_red_lm_64x64x15x2.png
     computed: { }
     shooter:
@@ -48,9 +44,8 @@ mine-red:
         spawner: exploder-red
 
 mine-red-shot:
-    <<: *projectile
+    <<<: *projectile
     visual:
-        <<: *projectile_visual
         sprite: projectile/bolt_white_60x36x1.jpg
         color: [ 2.0, 0.2, 0.2, 1.0 ]
     bounding:

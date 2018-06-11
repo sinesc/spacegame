@@ -30,15 +30,14 @@ player: &player
         spawner: player-weapon-single
 
 player-1:
-    <<: *player
+    <<<: *player
     controlled:
         input_id: 1
 
 player-shot:
-    <<: *projectile
+    <<<: *projectile
     hitpoints: 25
     visual:
-        <<: *projectile_visual
         sprite: projectile/bolt_white_60x36x1.jpg
         color: [ 1.0, 1.0, 1.5, 1.0 ]
     bounding:

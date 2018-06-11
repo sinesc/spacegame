@@ -18,6 +18,10 @@ pub use self::faction::*;
 pub mod sound;
 pub use self::sound::*;
 
+lazy_static! {
+    static ref MERGE_KEY: serde_yaml::Value = serde_yaml::Value::String("<<<".to_string());
+}
+
 #[derive(Debug)]
 pub struct Error {
     description: String,
@@ -75,8 +79,12 @@ fn parse_str<T>(source: &str) -> Result<T, Error> where T: serde::de::Deserializ
     match serde_yaml::from_str(source) {
         Ok(value) => {
             match yaml_merge_keys::merge_keys_serde(value) {
-                Ok(merged) => {
-                    Ok(serde_yaml::from_value(merged).unwrap())
+                Ok(mut merged) => {
+                    yaml_merge_keys_recursively(&mut merged);
+                    match serde_yaml::from_value(merged) {
+                        Ok(result) => Ok(result),
+                        Err(error) => Err(Error { description: "Deserialize failed". to_string(), cause: Some(Box::new(error)) })
+                    }
                 }
                 Err(error) => Err(Error { description: "Merge failed".to_string(), cause: Some(Box::new(error)) })
             }
@@ -100,7 +108,41 @@ fn find(path: &str, extensions: &[ &str ]) -> io::Result<Vec<path::PathBuf>> {
     Ok(files)
 }
 
-// Merges keys from source into destination, if they don't already exist. Handles maps recursively.
+/// Merges values of "<<<" keys into the current map.
+pub fn yaml_merge_keys_recursively(value: &mut serde_yaml::Value) {
+    use serde_yaml::Value;
+
+    // check for merge key, if present, merge and remove it
+
+    let mut merge_data = None;
+
+    if let Value::Mapping(mapping) = value {
+        if let Some(mut ref_value) = mapping.remove(&MERGE_KEY) {
+            // ensure refs in the merge source are resolved
+            yaml_merge_keys_recursively(&mut ref_value);
+            // TODO: ugly method to get around active borrow on value
+            merge_data = Some(ref_value);
+        }
+    }
+
+    if let Some(merge_data) = merge_data {
+        yaml_merge_maps(value, &merge_data);
+    }
+
+    // recurse
+
+    if let Value::Mapping(mapping) = value {
+        for (_, v) in mapping {
+            yaml_merge_keys_recursively(v);
+        }
+    } else if let Value::Sequence(sequence) = value {
+        for v in sequence {
+            yaml_merge_keys_recursively(v);
+        }
+    }
+}
+
+/// Merges keys from source into destination, if they don't already exist. Handles maps recursively.
 pub fn yaml_merge_maps(destination: &mut serde_yaml::Value, source: &serde_yaml::Value) {
     use serde_yaml::Value;
 

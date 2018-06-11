@@ -30,14 +30,12 @@ hostile: &hostile
         spawner: exploder
 
 projectile: &projectile
-    <<: *hostile
-    visual: &projectile_visual
-        <<: *hostile_visual
+    <<<: *hostile
+    visual:
         layer: effects
         effect_layer: none
         fps: 0
     inertial:
-        <<: *hostile_inertial
         v_max: [ 1000.0, 1000.0 ]
         motion_type: Const
     lifetime: 1.0
@@ -51,7 +49,7 @@ explosion: &explosion
     spatial:
         position: [ 0.0, 0.0 ]
         angle: 0.0
-    visual: &explosion_visual
+    visual:
         <<: *hostile_visual
         layer: none
         effect_layer: effects
@@ -66,7 +64,7 @@ powerup: &powerup
         <<: *hostile_inertial
         v_current: [ -100.0, 0.0 ]
         motion_type: Const
-    visual: &powerup_visual
+    visual:
         <<: *hostile_visual
         layer: effects
         effect_layer: none
@@ -79,9 +77,8 @@ powerup: &powerup
         spawner: fader-powerup
 
 fading-powerup:
-    <<: *explosion
+    <<<: *explosion
     visual:
-        <<: *explosion_visual
         layer: none
         effect_layer: effects
         sprite: powerup/ball_v_32x32x18.jpg
