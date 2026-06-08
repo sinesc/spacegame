@@ -71,7 +71,7 @@ pub struct Level<'a, 'b> {
 
 impl<'a, 'b> Level<'a, 'b> {
 
-    pub fn new(input: &Input, context: &RenderContext) -> Self {
+    pub fn new(input: &Input, context: &Context) -> Self {
 
         // create world and register components
 
@@ -158,7 +158,7 @@ impl<'a, 'b> Level<'a, 'b> {
 
         // return level
 
-        let mut bloom = postprocessors::Bloom::new(&context, 4, 2);
+        let mut bloom = postprocessors::Bloom::new(&context, (1920u32, 1080u32), 2);
         bloom.clear = false;
         bloom.draw_color = Color::alpha_pm(0.15);
 

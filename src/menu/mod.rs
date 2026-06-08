@@ -17,7 +17,7 @@ pub struct Menu {
 
 impl Menu {
 
-    pub fn new(input: &Input, context: &RenderContext) -> Menu {
+    pub fn new(input: &Input, context: &Context) -> Menu {
         let layer = Layer::new((1920., 1080.));
         layer.set_blendmode(blendmodes::ALPHA);
         Menu {

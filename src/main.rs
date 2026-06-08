@@ -42,9 +42,12 @@ fn main() {
     let dummy = sound::Sound::load("res/sound/projectile/pew1a.ogg").unwrap();
     rodio::play_raw(&rodio::default_output_device().unwrap(), dummy.samples());
 
+    let monitors = Display::monitors();
     let display = Display::builder().dimensions((1920, 1080)).vsync().build().unwrap();
     display.grab_cursor();
-    display.set_fullscreen().unwrap();
+    if let Some(monitor) = monitors.into_iter().next() {
+        display.set_fullscreen(Some(monitor)).unwrap();
+    }
     let renderer =  Renderer::new(&display).unwrap();
     let debug_layer = Layer::new((1920., 1080.));
     let debug_font = Font::builder(&renderer.context()).family("Arial").size(20.0).build().unwrap().arc();

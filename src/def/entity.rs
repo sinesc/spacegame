@@ -13,15 +13,15 @@ static mut FACTIONS: *const Vec<String> = 0 as _;
 static mut SPRITES: *mut Repository<Arc<Sprite>> = 0 as _;
 static mut LAYERS: *const Repository<Arc<Layer>> = 0 as _;
 static mut SPAWNERS: *const Repository<SpawnerDescriptor, SpawnerId> = 0 as _;
-static mut CONTEXT: *const RenderContext = 0 as _;
+static mut CONTEXT: *const Context = 0 as _;
 
-pub fn parse_entities(context: &RenderContext, sprites: &mut Repository<Arc<Sprite>>, factions: &Vec<String>, spawners: &mut Repository<SpawnerDescriptor, SpawnerId>, layers: &Repository<Arc<Layer>>) -> Result<Repository<EntityDescriptor>, Error> {
+pub fn parse_entities(context: &Context, sprites: &mut Repository<Arc<Sprite>>, factions: &Vec<String>, spawners: &mut Repository<SpawnerDescriptor, SpawnerId>, layers: &Repository<Arc<Layer>>) -> Result<Repository<EntityDescriptor>, Error> {
     unsafe {
         FACTIONS = factions as *const Vec<String>;
         SPRITES = sprites as *mut Repository<Arc<Sprite>>;
         LAYERS = layers as *const Repository<Arc<Layer>>;
         SPAWNERS = spawners as *const Repository<SpawnerDescriptor, SpawnerId>;
-        CONTEXT = context as *const RenderContext;
+        CONTEXT = context as *const Context;
     }
 
     // parse entities to values first. spawners allow derival of custom entities from base entities.
