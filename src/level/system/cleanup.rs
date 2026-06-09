@@ -1,38 +1,26 @@
-use specs;
+use hecs;
 use level::component;
 use level::WorldState;
 
-/**
- * Cleanup system
- *
- * This system removes dead/expired entities
- */
-pub struct Cleanup;
+pub fn run(world: &mut hecs::World, ws: &WorldState) {
+    let mut to_despawn = Vec::new();
 
-#[derive(SystemData)]
-pub struct CleanupData<'a> {
-    world_state: specs::ReadExpect<'a, WorldState>,
-    lifetime: specs::ReadStorage<'a, component::Lifetime>,
-    hitpoints: specs::ReadStorage<'a, component::Hitpoints>,
-    entities: specs::Entities<'a>,
-}
+    for (entity, lifetime) in world.query::<&component::Lifetime>().iter() {
+        if lifetime.0 < ws.age {
+            to_despawn.push(entity);
+        }
+    }
 
-impl<'a> specs::System<'a> for Cleanup {
-    type SystemData = CleanupData<'a>;
+    for (entity, hitpoints) in world.query::<&component::Hitpoints>().iter() {
+        if hitpoints.0 <= 0. {
+            to_despawn.push(entity);
+        }
+    }
 
-    fn run(&mut self, data: CleanupData) {
-		use specs::Join;
+    to_despawn.sort_unstable();
+    to_despawn.dedup();
 
-		for (lifetime, entity) in (&data.lifetime, &*data.entities).join() {
-            if lifetime.0 < data.world_state.age {
-                data.entities.delete(entity).unwrap();
-            }
-		}
-
-		for (hitpoints, entity) in (&data.hitpoints, &*data.entities).join() {
-            if hitpoints.0 <= 0. {
-                data.entities.delete(entity).unwrap();
-            }
-		}
-	}
+    for entity in to_despawn {
+        let _ = world.despawn(entity);
+    }
 }

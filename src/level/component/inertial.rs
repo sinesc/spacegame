@@ -1,5 +1,4 @@
 use prelude::*;
-use specs::DenseVecStorage;
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 pub enum InertialMotionType {
@@ -20,7 +19,7 @@ impl Default for InertialMotionType {
  *
  * Entities with this component accellerate/rotate towards given vector according to trans_motion/rest values.
  */
-#[derive(Clone, Debug, Deserialize, Default, Component)]
+#[derive(Clone, Debug, Deserialize, Default)]
 #[serde(default)]
 pub struct Inertial {
     /// Maximum velocity, needs to be positive.

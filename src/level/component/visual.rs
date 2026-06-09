@@ -1,12 +1,11 @@
 use prelude::*;
-use specs::DenseVecStorage;
 
 /**
  * Visual component
  *
  * Entities with this component are rendered.
  */
-#[derive(Clone, Debug, Deserialize, Component)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Visual {
     #[serde(deserialize_with = "::def::layer_deserialize")]
     #[serde(default = "::def::layer_default")]

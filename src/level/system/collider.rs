@@ -1,65 +1,53 @@
 use prelude::*;
-use specs;
+use hecs;
+use def::{FactionId, SpawnerId};
 use level::component;
 use level::WorldState;
 
-/**
- * Collider system
- *
- * This system detects colliding entities with a Bounding component and applies damage.
- */
-pub struct Collider;
+pub fn run(world: &mut hecs::World, ws: &WorldState, cmd: &mut hecs::CommandBuffer) {
+    // Collect entity data to avoid holding world borrows during mutation
+    let entities: Vec<(hecs::Entity, Vec2, f32, FactionId, Option<SpawnerId>)> = world
+        .query::<(&component::Spatial, &component::Bounding, &component::Hitpoints, Option<&component::Explodes>)>()
+        .iter()
+        .map(|(e, (s, b, _, exp))| (e, s.position, b.radius, b.faction, exp.map(|x| x.spawner)))
+        .collect();
 
-#[derive(SystemData)]
-pub struct ColliderData<'a> {
-    world_state: specs::ReadExpect<'a, WorldState>,
-    spatial: specs::ReadStorage<'a, component::Spatial>,
-    bounding: specs::ReadStorage<'a, component::Bounding>,
-    hitpoints: specs::WriteStorage<'a, component::Hitpoints>,
-    explodes: specs::ReadStorage<'a, component::Explodes>,
-    entities: specs::Entities<'a>,
-    lazy: specs::Read<'a, specs::LazyUpdate>,
-}
+    let mut collisions: Vec<(hecs::Entity, hecs::Entity, Vec2, Vec2)> = Vec::new();
 
-impl<'a> specs::System<'a> for Collider {
-    type SystemData = ColliderData<'a>;
-
-    fn run(&mut self, mut data: ColliderData) {
-		use specs::Join;
-
-        // test all against all other entities todo: use a grid or quadtree to reduce checks
-
-        let mut collisions = Vec::new();
-
-		for (spatial_a, bounding_a, _, entity_a) in (&data.spatial, &data.bounding, &data.hitpoints, &*data.entities).join() {
-            for (spatial_b, bounding_b, _, entity_b) in (&data.spatial, &data.bounding, &data.hitpoints, &*data.entities).join() {
-
-                if bounding_a.faction != bounding_b.faction
-                    && entity_a != entity_b
-                    && bounding_a.radius + bounding_a.radius > spatial_a.position.distance(&spatial_b.position) {
-
-                    collisions.push((entity_a, entity_b, spatial_a.position, spatial_b.position));
-                }
+    for (i, &(ea, pos_a, rad_a, fac_a, _)) in entities.iter().enumerate() {
+        for &(eb, pos_b, rad_b, fac_b, _) in entities[i + 1..].iter() {
+            if fac_a != fac_b && rad_a + rad_b > pos_a.distance(&pos_b) {
+                collisions.push((ea, eb, pos_a, pos_b));
             }
-		}
-
-        for (entity_a, entity_b, position_a, position_b) in collisions {
-
-            let a = data.hitpoints.get(entity_a).unwrap().0;
-            let b = data.hitpoints.get(entity_b).unwrap().0;
-
-            if a <= b {
-                if let Some(explodes) = data.explodes.get(entity_a) {
-                    data.world_state.spawner(&data.lazy, &data.entities, explodes.spawner, Angle(0.), Some(position_a), None, None);
-                }
-            } else if b <= a {
-                if let Some(explodes) = data.explodes.get(entity_b) {
-                    data.world_state.spawner(&data.lazy, &data.entities, explodes.spawner, Angle(0.), Some(position_b), None, None);
-                }
-            }
-
-            data.hitpoints.get_mut(entity_a).unwrap().0 -= min(a, b);
-            data.hitpoints.get_mut(entity_b).unwrap().0 -= min(a, b);
         }
-	}
+    }
+
+    for (ea, eb, pos_a, pos_b) in collisions {
+        let a = match world.get::<&component::Hitpoints>(ea) {
+            Ok(hp) => hp.0,
+            Err(_) => continue,
+        };
+        let b = match world.get::<&component::Hitpoints>(eb) {
+            Ok(hp) => hp.0,
+            Err(_) => continue,
+        };
+
+        let damage = min(a, b);
+
+        let exp_a = entities.iter().find(|e| e.0 == ea).and_then(|e| e.4);
+        let exp_b = entities.iter().find(|e| e.0 == eb).and_then(|e| e.4);
+
+        if a <= b {
+            if let Some(spawner_id) = exp_a {
+                ws.spawner(cmd, spawner_id, Angle(0.), Some(pos_a), None, None);
+            }
+        } else {
+            if let Some(spawner_id) = exp_b {
+                ws.spawner(cmd, spawner_id, Angle(0.), Some(pos_b), None, None);
+            }
+        }
+
+        if let Ok(mut hp) = world.get::<&mut component::Hitpoints>(ea) { hp.0 -= damage; }
+        if let Ok(mut hp) = world.get::<&mut component::Hitpoints>(eb) { hp.0 -= damage; }
+    }
 }

@@ -6,14 +6,14 @@ use menu::Menu;
 use level::Level;
 use timeframe::Timeframe;
 
-pub struct CommandContext<'a, 'b> {
+pub struct CommandContext {
     pub menu            : Rc<Menu>,
-    pub level           : Rc<RefCell<Level<'a, 'b>>>,
+    pub level           : Rc<RefCell<Level>>,
     pub timeframe       : Timeframe,
     pub exit_requested  : bool,
 }
 
-pub fn init_cmd<'a, 'b>(menu: &Rc<Menu>, level: &Rc<RefCell<Level<'a, 'b>>>) -> Cmd<CommandContext<'a, 'b>> {
+pub fn init_cmd(menu: &Rc<Menu>, level: &Rc<RefCell<Level>>) -> Cmd<CommandContext> {
 
     let mut cmd = Cmd::new(CommandContext {
         menu            : menu.clone(),

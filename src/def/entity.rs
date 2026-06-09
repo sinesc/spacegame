@@ -1,5 +1,5 @@
 use serde::de::{self, Deserializer, Deserialize};
-use specs;
+use hecs;
 use prelude::*;
 use def::{parse_dir, Error};
 use level::component::*;
@@ -51,98 +51,56 @@ pub struct EntityDescriptor {
 }
 
 impl EntityDescriptor {
-    fn configure<T>(self: &Self, mut ent: T, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) where T: Builder {
+    fn configure(&self, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) -> hecs::EntityBuilder {
+        let mut b = hecs::EntityBuilder::new();
         if let Some(bounding) = &self.bounding {
-            let mut bounding_clone = bounding.clone();
-            if let Some(faction) = faction {
-                bounding_clone.faction = faction;
-            }
-            ent = ent.with(bounding_clone);
+            let mut c = bounding.clone();
+            if let Some(faction) = faction { c.faction = faction; }
+            b.add(c);
         }
-        if let Some(computed) = &self.computed {
-            ent = ent.with(computed.clone());
-        }
-        if let Some(controlled) = &self.controlled {
-            ent = ent.with(controlled.clone());
-        }
-        if let Some(explodes) = &self.explodes {
-            ent = ent.with(explodes.clone());
-        }
+        if let Some(c) = &self.computed { b.add(c.clone()); }
+        if let Some(c) = &self.controlled { b.add(c.clone()); }
+        if let Some(c) = &self.explodes { b.add(c.clone()); }
         if let Some(fading) = &self.fading {
-            let mut fading_clone = fading.clone();
-            fading_clone.start += age;
-            fading_clone.end += age;
-            ent = ent.with(fading_clone);
+            let mut c = fading.clone();
+            c.start += age;
+            c.end += age;
+            b.add(c);
         }
-        if let Some(hitpoints) = &self.hitpoints {
-            ent = ent.with(hitpoints.clone());
-        }
+        if let Some(c) = &self.hitpoints { b.add(c.clone()); }
         if let Some(inertial) = &self.inertial {
-            let mut inertial_clone = inertial.clone();
+            let mut c = inertial.clone();
             if let Some(angle) = angle {
-                inertial_clone.v_fraction = Vec2::from(angle);
-                inertial_clone.v_current = Vec2::from(angle) * inertial_clone.v_max;
+                c.v_fraction = Vec2::from(angle);
+                c.v_current = Vec2::from(angle) * c.v_max;
             }
-            ent = ent.with(inertial_clone);
+            b.add(c);
         }
         if let Some(lifetime) = &self.lifetime {
-            let mut lifetime_clone = lifetime.clone();
-            lifetime_clone.0 += age;
-            ent = ent.with(lifetime_clone);
+            let mut c = lifetime.clone();
+            c.0 += age;
+            b.add(c);
         }
-        if let Some(powerup) = &self.powerup {
-            ent = ent.with(powerup.clone());
-        }
-        if let Some(shooter) = &self.shooter {
-            ent = ent.with(shooter.clone());
-        }
+        if let Some(c) = &self.powerup { b.add(c.clone()); }
+        if let Some(c) = &self.shooter { b.add(c.clone()); }
         if let Some(spatial) = &self.spatial {
-            let mut spatial_clone = spatial.clone();
-            if let Some(position) = position {
-                spatial_clone.position = position.into();
-            }
-            if let Some(angle) = angle {
-                spatial_clone.angle = angle;
-            }
-            ent = ent.with(spatial_clone);
+            let mut c = spatial.clone();
+            if let Some(position) = position { c.position = position.into(); }
+            if let Some(angle) = angle { c.angle = angle; }
+            b.add(c);
         }
-        if let Some(visual) = &self.visual {
-            ent = ent.with(visual.clone());
-        }
-        ent.build();
+        if let Some(c) = &self.visual { b.add(c.clone()); }
+        b
     }
-    pub fn spawn_lazy(self: &Self, lazy: &specs::LazyUpdate, entities: &specs::world::EntitiesRes, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
-        self.configure(LazyBuilder(lazy.create_entity(entities)), age, position, angle, faction);
-    }
-    pub fn spawn(self: &Self, world: &mut specs::World, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
-        self.configure(EntityBuilder(world.create_entity()), age, position, angle, faction);
-    }
-}
 
-trait Builder {
-    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self;
-    fn build(self) -> specs::Entity;
-}
-
-struct EntityBuilder<'a>(specs::EntityBuilder<'a>);
-
-impl<'a> Builder for EntityBuilder<'a> {
-    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self {
-        EntityBuilder(self.0.with(c))
+    pub fn spawn_lazy(&self, cmd: &mut hecs::CommandBuffer, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
+        let mut b = self.configure(age, position, angle, faction);
+        cmd.spawn(b.build());
     }
-    fn build(self) -> specs::Entity {
-        self.0.build()
-    }
-}
 
-struct LazyBuilder<'a>(specs::world::LazyBuilder<'a>);
-
-impl<'a> Builder for LazyBuilder<'a> {
-    fn with<T: specs::Component + Send + Sync>(self, c: T) -> Self {
-        LazyBuilder(self.0.with(c))
-    }
-    fn build(self) -> specs::Entity {
-        self.0.build()
+    pub fn spawn(&self, world: &mut hecs::World, age: f32, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
+        let mut b = self.configure(age, position, angle, faction);
+        world.spawn(b.build());
     }
 }
 

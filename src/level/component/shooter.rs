@@ -1,11 +1,10 @@
 use prelude::*;
-use specs::DenseVecStorage;
 use def;
 
 /**
  * Shooter component
  */
-#[derive(Clone, Debug, Deserialize, Component)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Shooter {
     #[serde(deserialize_with = "::def::periodic_deserialize")]
     #[serde(default = "::def::periodic_default")]

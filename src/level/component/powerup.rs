@@ -1,4 +1,3 @@
-use specs::DenseVecStorage;
 use def::FactionId;
 use def::SpawnerId;
 
@@ -7,7 +6,7 @@ use def::SpawnerId;
  *
  * Powerups collide with the given faction.
  */
-#[derive(Clone, Debug, Deserialize, Default, Component)]
+#[derive(Clone, Debug, Deserialize, Default)]
 pub struct Powerup {
     pub radius: f32, // !todo starting out simple
     pub faction: FactionId,

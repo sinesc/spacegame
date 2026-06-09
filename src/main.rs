@@ -3,13 +3,8 @@
 
 extern crate radiant_rs as radiant;
 extern crate radiant_utils;
+extern crate hecs;
 extern crate rodio;
-extern crate shred;
-#[macro_use]
-extern crate shred_derive;
-extern crate specs;
-#[macro_use]
-extern crate specs_derive;
 extern crate serde;
 extern crate serde_yaml;
 extern crate yaml_merge_keys;

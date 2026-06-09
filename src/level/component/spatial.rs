@@ -1,12 +1,11 @@
 use prelude::*;
-use specs::DenseVecStorage;
 
 /**
  * Spatial component
  *
  * Entities with this component have a position and orientation in space.
  */
-#[derive(Clone, Debug, Deserialize, Default, Component)]
+#[derive(Clone, Debug, Deserialize, Default)]
 pub struct Spatial {
     /// Current position
     pub position: Vec2,
