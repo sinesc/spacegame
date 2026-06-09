@@ -1,9 +1,7 @@
 use crate::prelude::*;
 use std::io;
 use std::convert::AsRef;
-use rodio;
-use rodio::{Decoder, Source, Sample};
-use rodio::source::SamplesConverter;
+use rodio::Decoder;
 use radiant_utils::util::ARng;
 
 pub struct Sound (Arc<Vec<u8>>);
@@ -22,14 +20,11 @@ impl Sound {
         file.read_to_end(&mut buf)?;
         Ok(Sound(Arc::new(buf)))
     }
-    fn cursor(self: &Self) -> io::Cursor<Sound> {
+    fn cursor(&self) -> io::Cursor<Sound> {
         io::Cursor::new(Sound(self.0.clone()))
     }
-    fn decoder(self: &Self) -> Decoder<io::Cursor<Sound>> {
-        rodio::Decoder::new(self.cursor()).unwrap()
-    }
-    pub fn samples<T>(self: &Self) -> SamplesConverter<Decoder<io::Cursor<Sound>>, T> where T: Sample {
-        self.decoder().convert_samples()
+    pub fn decoder(&self) -> Decoder<io::Cursor<Sound>> {
+        Decoder::try_from(self.cursor()).unwrap()
     }
 }
 
@@ -47,11 +42,8 @@ impl SoundGroup {
             rng: ARng::new(0),
         })
     }
-    fn decoder(self: &Self) -> Decoder<io::Cursor<Sound>> {
+    pub fn decoder(&self) -> Decoder<io::Cursor<Sound>> {
         self.rng.chose(&self.sounds).decoder()
-    }
-    pub fn samples<T>(self: &Self) -> SamplesConverter<Decoder<io::Cursor<Sound>>, T> where T: Sample {
-        self.decoder().convert_samples()
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use hecs;
-use rodio;
+use rodio::{MixerDeviceSink, DeviceSinkBuilder};
+use rodio::mixer::Mixer;
 use crate::sound::{SoundGroup};
 use crate::def;
 use crate::def::FactionId;
@@ -12,7 +13,7 @@ mod system;
 
 pub struct Infrastructure {
     input       : Input,
-    audio       : rodio::Device,
+    audio       : Mixer,
     layer       : Repository<Arc<Layer>>,
     sprite      : Repository<Arc<Sprite>>,
     repository  : Repository<def::EntityDescriptor>,
@@ -45,7 +46,7 @@ impl WorldState {
                 entity.get().unwrap().spawn_lazy(cmd, self.age, Some(pos), angle, faction);
             }
             if let Some(ref sound) = spawn.sound {
-                rodio::play_raw(&self.inf.audio, self.inf.sound[sound].samples());
+                self.inf.audio.add(self.inf.sound[sound].decoder());
             }
         }
     }
@@ -58,6 +59,7 @@ pub struct Level {
     layer_def       : def::LayerDef,
     inf             : Arc<Infrastructure>,
     age             : f32,
+    _audio_sink     : MixerDeviceSink,
 
     bloom           : postprocessors::Bloom,
     glare           : bloom::Bloom,
@@ -75,7 +77,9 @@ impl Level {
 
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
-        let audio = rodio::default_output_device().unwrap();
+        let mut audio_sink = DeviceSinkBuilder::open_default_sink().unwrap();
+        audio_sink.log_on_drop(false);
+        let audio = audio_sink.mixer().clone();
 
         let layer_def = def::parse_layers().unwrap();
         let mut layers = Repository::new();
@@ -129,6 +133,7 @@ impl Level {
             render_system   : system::Render::new(),
             layer_def       : layer_def,
             age             : 0.0,
+            _audio_sink     : audio_sink,
             roidspawn       : Periodic::new(0.0, 0.5),
             minespawn       : Periodic::new(0.0, 3.73),
             rng             : Rng::new(123.4),

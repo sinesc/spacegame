@@ -1,5 +1,5 @@
 # spacegame
-Demo game using radiant-rs (rendering), rodio (audio) and specs (ECS).
+Demo game using radiant-rs (rendering), rodio (audio) and hecs (ECS).
 
 Not much there yet. There's lasers though!
 

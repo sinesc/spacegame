@@ -25,9 +25,6 @@ use crate::timeframe::Timeframe;
 
 fn main() {
 
-    let dummy = sound::Sound::load("res/sound/projectile/pew1a.ogg").unwrap();
-    rodio::play_raw(&rodio::default_output_device().unwrap(), dummy.samples());
-
     let monitors = Display::monitors();
     let display = Display::builder().dimensions((1920, 1080)).vsync().build().unwrap();
     display.grab_cursor();
