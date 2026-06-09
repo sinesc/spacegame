@@ -65,8 +65,8 @@ impl Bloom {
     pub fn new(context: &Context, dimensions: (u32, u32), iterations: u32, spread: u8, brightness: f32) -> Self {
         use std::cmp::min;
 
-        let blur_program = Program::from_string(&context, include_str!("../res/shader/blur.fs")).unwrap();
-        let mut combine_program = Program::from_string(&context, include_str!("../res/shader/combine.fs")).unwrap();
+        let blur_program = Program::from_string(&context, include_str!("../res/shader/blur.wgsl")).unwrap();
+        let mut combine_program = Program::from_string(&context, include_str!("../res/shader/combine.wgsl")).unwrap();
         let (width, height) = dimensions;
         let builder = Texture::builder(context).format(TextureFormat::F16F16F16F16);
 
