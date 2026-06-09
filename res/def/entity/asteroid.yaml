@@ -2,6 +2,7 @@ asteroid:
     <<<: *hostile
     visual:
         sprite: asteroid/type1_64x64x60.png
+        effect_layer: none
     bounding:
         radius: 16.0
         faction: hostile

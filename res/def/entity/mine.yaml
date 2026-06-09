@@ -2,6 +2,7 @@ mine-green:
     <<<: *hostile
     visual:
         sprite: hostile/mine_green_lm_64x64x15x2.png
+        effect_layer: none
     computed: { }
     shooter:
         interval: 1.0
@@ -32,6 +33,7 @@ mine-red:
     <<<: *hostile
     visual:
         sprite: hostile/mine_red_lm_64x64x15x2.png
+        effect_layer: none
     computed: { }
     shooter:
         interval: 1.0
