@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use prelude::*;
+use crate::prelude::*;
 use serde::{Deserialize, Deserializer};
 
 /**
@@ -20,7 +20,7 @@ impl<I, C> Completion<I, C> {
     }
     pub fn complete<F>(self: &mut Self, func: F) where F: Fn(I) -> C {
         *self = match self {
-            Completion::Incomplete(ref mut opt) => Completion::Complete(func(*opt.take().unwrap())),
+            Completion::Incomplete(opt) => Completion::Complete(func(*opt.take().unwrap())),
             Completion::Complete(_) => panic!("Attempted to complete() already completed Completion"),
         }
     }

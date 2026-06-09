@@ -1,5 +1,5 @@
-use def::FactionId;
-use def::SpawnerId;
+use crate::def::FactionId;
+use crate::def::SpawnerId;
 
 /**
  * Powerup component

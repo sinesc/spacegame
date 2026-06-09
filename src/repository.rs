@@ -46,7 +46,7 @@ impl<V, I, K> Repository<V, I, K> where K: Eq + Hash, I: Copy + Into<usize> + Fr
     pub fn index_of<Q: ?Sized>(self: &Self, name: &Q) -> Option<I> where K: Borrow<Q>, Q: Hash + Eq {
         self.map.get(name).map(|i| *i)
     }
-    pub fn values_mut(&mut self) -> IterMut<V> {
+    pub fn values_mut(&mut self) -> IterMut<'_, V> {
         self.data.iter_mut()
     }
 }

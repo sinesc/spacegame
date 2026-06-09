@@ -1,10 +1,10 @@
-use prelude::*;
+use crate::prelude::*;
 use hecs;
-use level::component;
-use level::WorldState;
+use crate::level::component;
+use crate::level::WorldState;
 
 pub fn run(world: &mut hecs::World, ws: &WorldState, cmd: &mut hecs::CommandBuffer) {
-    use def::{SpawnerId, FactionId};
+    use crate::def::{SpawnerId, FactionId};
 
     // Collect powerup entity data
     let powerups: Vec<(hecs::Entity, Vec2, f32, FactionId, SpawnerId, Option<SpawnerId>)> = world

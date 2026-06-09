@@ -1,4 +1,4 @@
-use def::FactionId;
+use crate::def::FactionId;
 
 /**
  * Bounding Box component

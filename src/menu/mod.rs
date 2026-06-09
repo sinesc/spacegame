@@ -1,6 +1,6 @@
-use prelude::*;
-use def;
-use cmd::Cmd;
+use crate::prelude::*;
+use crate::def;
+use crate::cmd::Cmd;
 
 struct MenuState {
     index       : u32,

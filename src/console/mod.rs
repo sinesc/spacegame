@@ -1,10 +1,10 @@
-use prelude::*;
-use cmd::Cmd;
-use cmd::Type::*;
-use cmd::Param;
-use menu::Menu;
-use level::Level;
-use timeframe::Timeframe;
+use crate::prelude::*;
+use crate::cmd::Cmd;
+use crate::cmd::Type::*;
+use crate::cmd::Param;
+use crate::menu::Menu;
+use crate::level::Level;
+use crate::timeframe::Timeframe;
 
 pub struct CommandContext {
     pub menu            : Rc<Menu>,

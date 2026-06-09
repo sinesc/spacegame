@@ -1,4 +1,4 @@
-use prelude::*;
+use crate::prelude::*;
 use std::io;
 use std::convert::AsRef;
 use rodio;

@@ -1,7 +1,7 @@
-use prelude::*;
-use ::def::{parse_dir, yaml_merge_maps, Error, EntityDescriptor};
-use completion::Completion;
-use repository::Repository;
+use crate::prelude::*;
+use crate::def::{parse_dir, yaml_merge_maps, Error, EntityDescriptor};
+use crate::completion::Completion;
+use crate::repository::Repository;
 use serde_yaml;
 
 pub fn parse_spawners() -> Result<Repository<SpawnerDescriptor, SpawnerId>, Error> {
@@ -13,7 +13,7 @@ pub fn complete_spawners(spawners: &mut Repository<SpawnerDescriptor, SpawnerId>
     for spawner in spawners.values_mut() {
         for spawn in &mut spawner.entities {
             let base_entity = entities.get(&spawn.base).expect(&format!("Spawner-entity {} is not defined.", &spawn.base));
-            if let Some(ref mut extension) = &mut spawn.extend {
+            if let Some(extension) = &mut spawn.extend {
                 extension.complete(|mut incomplete| {
                     // merge base entity yaml map into spawner entity, then deserialize the result
                     yaml_merge_maps(&mut incomplete, &base_entity);

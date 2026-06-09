@@ -1,6 +1,5 @@
-use prelude::*;
+use crate::prelude::*;
 use unicode_segmentation::UnicodeSegmentation as UCS;
-use error::Error;
 
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
@@ -34,25 +33,23 @@ pub enum CmdError {
 
 impl fmt::Display for CmdError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {}", self.description(), match self {
-            CmdError::UnknownCommand(command) => format!("\"{}\".", &command),
-            CmdError::UnknownOverload(command, got, expected) => format!("for command \"{}\". Got {}, expected {:?}.", &command, got, expected),
-            CmdError::InvalidArgument(command, index, ty) => format!("for command \"{}\". Expected argument {} to be of type {:?}.", &command, index, ty),
-        })
-    }
-}
-
-impl error::Error for CmdError {
-    fn description(&self) -> &str {
-        match self {
+        let prefix = match self {
             CmdError::UnknownCommand(_) => "Unknown command",
             CmdError::UnknownOverload(_, _, _) => "Invalid number of arguments",
             CmdError::InvalidArgument(_, _, _) => "Invalid argument type",
-        }
+        };
+        let detail = match self {
+            CmdError::UnknownCommand(command) => format!("\"{}\".", &command),
+            CmdError::UnknownOverload(command, got, expected) => format!("for command \"{}\". Got {}, expected {:?}.", &command, got, expected),
+            CmdError::InvalidArgument(command, index, ty) => format!("for command \"{}\". Expected argument {} to be of type {:?}.", &command, index, ty),
+        };
+        write!(f, "{} {}", prefix, detail)
     }
 }
 
-pub type Handler<T> = Box<Fn(&Cmd<T>, &[Param])>;
+impl error::Error for CmdError {}
+
+pub type Handler<T> = Box<dyn Fn(&Cmd<T>, &[Param])>;
 
 pub struct Cmd<T> {
     commands: HashMap<String, HashMap<usize, (Vec<Type>, Handler<T>)>>,
@@ -74,14 +71,14 @@ impl<T> Cmd<T> {
     /**
      * returns a reference to the given context
      */
-    pub fn context(self: &Self) -> ::std::cell::Ref<T> {
+    pub fn context(&self) -> ::std::cell::Ref<'_, T> {
         self.context.borrow()
     }
 
     /**
      * returns a mutable reference to the given context
      */
-    pub fn context_mut(self: &Self) -> ::std::cell::RefMut<T> {
+    pub fn context_mut(&self) -> ::std::cell::RefMut<'_, T> {
         self.context.borrow_mut()
     }
 

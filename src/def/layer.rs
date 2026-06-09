@@ -1,4 +1,4 @@
-use prelude::*;
+use crate::prelude::*;
 use super::{parse_file, Error};
 
 pub fn parse_layers() -> Result<LayerDef, Error> {

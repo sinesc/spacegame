@@ -1,11 +1,11 @@
 use serde::de::{self, Deserializer, Deserialize};
 use hecs;
-use prelude::*;
-use def::{parse_dir, Error};
-use level::component::*;
-use repository::Repository;
-use def::spawner::*;
-use def::faction::*;
+use crate::prelude::*;
+use crate::def::{parse_dir, Error};
+use crate::level::component::*;
+use crate::repository::Repository;
+use crate::def::spawner::*;
+use crate::def::faction::*;
 use serde_yaml;
 
 // set up some ugly unsafe global state to work around missing DeserializeSeed in Serde-Yaml

@@ -1,4 +1,4 @@
-use prelude::*;
+use crate::prelude::*;
 
 /**
  * Visual component
@@ -7,13 +7,13 @@ use prelude::*;
  */
 #[derive(Clone, Debug, Deserialize)]
 pub struct Visual {
-    #[serde(deserialize_with = "::def::layer_deserialize")]
-    #[serde(default = "::def::layer_default")]
+    #[serde(deserialize_with = "crate::def::layer_deserialize")]
+    #[serde(default = "crate::def::layer_default")]
     pub layer           : Option<Arc<Layer>>,
-    #[serde(deserialize_with = "::def::layer_deserialize")]
-    #[serde(default = "::def::layer_default")]
+    #[serde(deserialize_with = "crate::def::layer_deserialize")]
+    #[serde(default = "crate::def::layer_default")]
     pub effect_layer    : Option<Arc<Layer>>,
-    #[serde(deserialize_with = "::def::sprite_deserialize")]
+    #[serde(deserialize_with = "crate::def::sprite_deserialize")]
     pub sprite          : Arc<Sprite>,
     pub scale           : f32,
     pub effect_scale    : f32,

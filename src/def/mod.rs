@@ -1,7 +1,4 @@
-use prelude::*;
-use serde;
-use serde_yaml;
-use yaml_merge_keys;
+use crate::prelude::*;
 
 pub mod misc;
 pub use self::misc::*;
@@ -18,14 +15,13 @@ pub use self::faction::*;
 pub mod sound;
 pub use self::sound::*;
 
-lazy_static! {
-    static ref MERGE_KEY: serde_yaml::Value = serde_yaml::Value::String("<<<".to_string());
-}
+static MERGE_KEY: std::sync::LazyLock<serde_yaml::Value> =
+    std::sync::LazyLock::new(|| serde_yaml::Value::String("<<<".to_string()));
 
 #[derive(Debug)]
 pub struct Error {
     description: String,
-    cause: Option<Box<error::Error>>,
+    cause: Option<Box<dyn error::Error + 'static>>,
 }
 
 impl From<io::Error> for Error {
@@ -41,11 +37,8 @@ impl fmt::Display for Error {
 }
 
 impl error::Error for Error {
-    fn description(self: &Self) -> &str {
-        &self.description
-    }
-    fn cause(self: &Self) -> Option<&error::Error> {
-        self.cause.as_ref().map(|cause| &**cause)
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        self.cause.as_ref().map(|e| e.as_ref())
     }
 }
 

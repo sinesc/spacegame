@@ -1,6 +1,6 @@
 use hecs;
-use level::component;
-use level::WorldState;
+use crate::level::component;
+use crate::level::WorldState;
 
 pub fn run(world: &mut hecs::World, ws: &WorldState) {
     let mut to_despawn = Vec::new();

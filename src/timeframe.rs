@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone)]
 pub struct Timeframe {

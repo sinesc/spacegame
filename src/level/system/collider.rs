@@ -1,8 +1,8 @@
-use prelude::*;
+use crate::prelude::*;
 use hecs;
-use def::{FactionId, SpawnerId};
-use level::component;
-use level::WorldState;
+use crate::def::{FactionId, SpawnerId};
+use crate::level::component;
+use crate::level::WorldState;
 
 pub fn run(world: &mut hecs::World, ws: &WorldState, cmd: &mut hecs::CommandBuffer) {
     // Collect entity data to avoid holding world borrows during mutation

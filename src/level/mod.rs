@@ -1,11 +1,11 @@
-use prelude::*;
+use crate::prelude::*;
 use hecs;
 use rodio;
-use sound::{SoundGroup};
-use def;
-use def::FactionId;
-use bloom;
-use repository::Repository;
+use crate::sound::{SoundGroup};
+use crate::def;
+use crate::def::FactionId;
+use crate::bloom;
+use crate::repository::Repository;
 
 pub mod component;
 mod system;

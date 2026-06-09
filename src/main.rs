@@ -2,17 +2,8 @@
 //#![allow(unused_variables)]
 
 extern crate radiant_rs as radiant;
-extern crate radiant_utils;
-extern crate hecs;
-extern crate rodio;
-extern crate serde;
-extern crate serde_yaml;
-extern crate yaml_merge_keys;
 #[macro_use]
 extern crate serde_derive;
-extern crate unicode_segmentation;
-#[macro_use]
-extern crate lazy_static;
 
 mod prelude;
 mod def;
@@ -26,10 +17,10 @@ mod console;
 mod repository;
 mod completion;
 
-use prelude::*;
-use level::Level;
-use menu::Menu;
-use timeframe::Timeframe;
+use crate::prelude::*;
+use crate::level::Level;
+use crate::menu::Menu;
+use crate::timeframe::Timeframe;
 
 
 fn main() {
@@ -45,13 +36,13 @@ fn main() {
     }
     let renderer =  Renderer::new(&display).unwrap();
     let debug_layer = Layer::new((1920., 1080.));
-    let debug_font = Font::builder(&renderer.context()).family("Arial").size(20.0).build().unwrap().arc();
+    let debug_font = Font::builder(&display.context()).family("Arial").size(20.0).build().unwrap().arc();
     let input = Input::new(&display);
 
     // create menu and command parser
 
-    let level = Rc::new(RefCell::new(Level::new(&input, &renderer.context())));
-    let menu = Rc::new(Menu::new(&input, &renderer.context()));
+    let level = Rc::new(RefCell::new(Level::new(&input, &display.context())));
+    let menu = Rc::new(Menu::new(&input, &display.context()));
     let cmd = console::init_cmd(&menu, &level);
 
     // game main loop

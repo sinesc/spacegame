@@ -1,4 +1,4 @@
-use prelude::*;
+use crate::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 pub enum InertialMotionType {

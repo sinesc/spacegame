@@ -1,7 +1,7 @@
-use prelude::*;
+use crate::prelude::*;
 use hecs;
-use level::component;
-use level::WorldState;
+use crate::level::component;
+use crate::level::WorldState;
 
 fn flatten(x: i32) -> f32 {
     let x = x as f32;

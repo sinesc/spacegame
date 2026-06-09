@@ -1,7 +1,7 @@
-use prelude::*;
+use crate::prelude::*;
 use hecs;
-use level::component;
-use level::WorldState;
+use crate::level::component;
+use crate::level::WorldState;
 
 pub fn run(world: &mut hecs::World, ws: &WorldState) {
     let delta = ws.delta;
