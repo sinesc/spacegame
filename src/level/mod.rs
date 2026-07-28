@@ -7,6 +7,7 @@ use crate::def;
 use crate::def::FactionId;
 use crate::bloom;
 use crate::repository::Repository;
+use crate::scripting::ScriptingSubsystem;
 
 pub mod component;
 mod system;
@@ -67,6 +68,7 @@ pub struct Level {
     minespawn       : Periodic,
     rng             : Rng,
     background      : Texture,
+    scripting       : ScriptingSubsystem,
 }
 
 impl Level {
@@ -141,7 +143,31 @@ impl Level {
             glare           : bloom::Bloom::new(&context, (1920, 1080), 2, 5, 5.0),
             inf             : infrastructure,
             background      : background,
+            scripting       : ScriptingSubsystem::new(),
         }
+    }
+
+    /// Detect collision pairs for the scripting subsystem.
+    /// Returns flat list: [a, b, c, d, ...] = [(a,b), (c,d)].
+    fn detect_collision_pairs(world: &hecs::World) -> Vec<u64> {
+        let entities: Vec<(hecs::Entity, Vec2, f32, FactionId)> = world
+            .query::<(&component::Spatial, &component::Bounding, &component::Hitpoints)>()
+            .iter()
+            .map(|(e, (s, b, _))| (e, s.position, b.radius, b.faction))
+            .collect();
+
+        let mut pairs = Vec::new();
+        for i in 0..entities.len() {
+            for j in (i + 1)..entities.len() {
+                let &(ea, pos_a, rad_a, fac_a) = &entities[i];
+                let &(eb, pos_b, rad_b, fac_b) = &entities[j];
+                if fac_a != fac_b && rad_a + rad_b > pos_a.distance(&pos_b) {
+                    pairs.push(ea.to_bits().into());
+                    pairs.push(eb.to_bits().into());
+                }
+            }
+        }
+        pairs
     }
 
     pub fn process(&mut self, renderer: &Renderer, age: f32, delta: f32, take_input: bool, paused: bool) {
@@ -161,6 +187,13 @@ impl Level {
         system::run_upgrader(&mut self.world, &self.world_state, &mut cmd);
         self.render_system.run(&mut self.world, &self.world_state);
         system::run_cleanup(&mut self.world, &self.world_state);
+
+        // Detect collisions for scripting subsystem
+        let collision_pairs = Self::detect_collision_pairs(&self.world);
+        self.scripting.set_collisions(collision_pairs);
+
+        // Run scripting subsystem
+        self.scripting.run(&mut self.world, &self.world_state, &mut cmd);
 
         cmd.run_on(&mut self.world);
 

@@ -14,6 +14,14 @@ serde_derive = "1.0"
 yaml-merge-keys = { version = "0.2.0", features = [ "serde_yaml" ] }
 rodio = { version = "0.22", default-features = false, features = ["playback", "lewton"] }
 unicode-segmentation = "1.2.1"
+itsy = "0.5"
+itsy-derive = "0.5"
 
 [profile.dev]
 opt-level = 2
+
+[patch.crates-io]
+radiant-utils = { path = "../radiant-rs/radiant-utils" }
+radiant-rs = { path = "../radiant-rs" }
+itsy =  { path = "../itsy" }
+itsy-derive =  { path = "../itsy/itsy-derive" }

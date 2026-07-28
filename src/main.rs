@@ -16,6 +16,7 @@ mod timeframe;
 mod console;
 mod repository;
 mod completion;
+mod scripting;
 
 use crate::prelude::*;
 use crate::level::Level;

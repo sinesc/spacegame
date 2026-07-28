@@ -34,3 +34,6 @@ pub use self::hitpoints::Hitpoints;
 
 mod powerup;
 pub use self::powerup::Powerup;
+
+mod script;
+pub use self::script::Script;

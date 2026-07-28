@@ -1,0 +1,158 @@
+// Spacegame Itsy script
+//
+// Processes entity logic each frame and writes commands into an action buffer.
+
+use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_velocity_y,
+          get_angle, get_script_type, is_alive,
+          get_collision_count, get_collision_id,
+          get_think_count, get_think_id,
+          set_action_count, set_action_view_ref};
+
+// Command data enum — each variant is one action the script can request.
+enum Command {
+    SpawnEntity(u32, f32, f32),
+    DestroyEntity(u64),
+    SetVelocity(u64, f32, f32),
+    SetAngle(u64, f32),
+    SetHitpoints(u64, f32),
+    ApplyDamage(u64, f32),
+}
+
+// Action buffer capacity (max commands per frame).
+const CAPACITY: i32 = 128;
+
+// Chase speed for scripted enemies.
+const CHASE_SPEED: f32 = 150.0;
+
+fn main() {
+    let actions: View<Command> = View::new(CAPACITY as u64);
+    let idx: i32 = 0;
+
+    // Process each entity that has a Script component.
+    process_think_list(actions, idx);
+
+    // Process collision pairs.
+    process_collisions(actions, idx);
+
+    // Submit action buffer to Rust.
+    set_action_view_ref(actions as HeapRef);
+    set_action_count(idx as u32);
+
+    // Suspend to return control to Rust.
+    suspend;
+}
+
+fn process_think_list(actions: View<Command>, idx: i32) {
+    let think_count = get_think_count();
+    let i: i32 = 0;
+    while (i < think_count) {
+        let entity_id = get_think_id(i as u32);
+        let script_type = get_script_type(entity_id);
+
+        if (script_type == 1) {
+            handle_player(entity_id, actions, idx);
+        } else if (script_type == 2) {
+            idx = handle_enemy(entity_id, actions, idx);
+        }
+
+        i = i + 1;
+    }
+}
+
+fn process_collisions(actions: View<Command>, idx: i32) {
+    let collision_count = get_collision_count();
+    let j: i32 = 0;
+    while (j < collision_count) {
+        let a = get_collision_id((j * 2) as u32);
+        let b = get_collision_id((j * 2 + 1) as u32);
+        idx = handle_collision(a, b, actions, idx);
+        j = j + 1;
+    }
+}
+
+fn handle_player(entity_id: u64, actions: View<Command>, idx: i32) {
+    // Placeholder: player logic goes here.
+    // For now, the player is controlled by input systems.
+}
+
+fn handle_enemy(entity_id: u64, actions: View<Command>, idx: i32) -> i32 {
+    // Find nearest player and chase it.
+    let player_id = find_nearest_player(entity_id);
+    if (player_id == 0) {
+        return idx; // No player found.
+    }
+
+    let my_x = get_position_x(entity_id);
+    let my_y = get_position_y(entity_id);
+    let pl_x = get_position_x(player_id);
+    let pl_y = get_position_y(player_id);
+
+    let dx = pl_x - my_x;
+    let dy = pl_y - my_y;
+    let dist_sq = dx * dx + dy * dy;
+
+    // Only chase if player is within range (avoid division by tiny numbers).
+    if (dist_sq > 100.0 && dist_sq < 1000000.0) {
+        let dist = dist_sq.sqrt();
+
+        // Normalize and scale to chase speed.
+        let nx = dx / dist;
+        let ny = dy / dist;
+
+        // Write SetVelocity command.
+        if (idx < CAPACITY) {
+            actions[idx as u64] = Command::SetVelocity(entity_id, nx * CHASE_SPEED, ny * CHASE_SPEED);
+            idx = idx + 1;
+        }
+    }
+
+    return idx;
+}
+
+fn handle_collision(a: u64, b: u64, actions: View<Command>, idx: i32) -> i32 {
+    // If a scripted enemy collides with a player, apply damage.
+    let type_a = get_script_type(a);
+    let type_b = get_script_type(b);
+
+    if (type_a == 2 && type_b == 1) {
+        if (idx < CAPACITY) {
+            actions[idx as u64] = Command::ApplyDamage(b, 10.0);
+            idx = idx + 1;
+        }
+    } else if (type_b == 2 && type_a == 1) {
+        if (idx < CAPACITY) {
+            actions[idx as u64] = Command::ApplyDamage(a, 10.0);
+            idx = idx + 1;
+        }
+    }
+
+    return idx;
+}
+
+// Find the nearest player entity (script_type == 1) to the given entity.
+fn find_nearest_player(to_entity_id: u64) -> u64 {
+    let my_x = get_position_x(to_entity_id);
+    let my_y = get_position_y(to_entity_id);
+
+    let best_dist_sq: f32 = 999999999.0;
+    let best_id: u64 = 0;
+
+    let think_count = get_think_count();
+    let i: i32 = 0;
+    while (i < think_count) {
+        let other_id = get_think_id(i as u32);
+        if (other_id != to_entity_id && get_script_type(other_id) == 1) {
+            let other_x = get_position_x(other_id);
+            let other_y = get_position_y(other_id);
+            let dx = other_x - my_x;
+            let dy = other_y - my_y;
+            let dist_sq = dx * dx + dy * dy;
+            if (dist_sq < best_dist_sq) {
+                best_dist_sq = dist_sq;
+                best_id = other_id;
+            }
+        }
+        i = i + 1;
+    }
+    return best_id;
+}

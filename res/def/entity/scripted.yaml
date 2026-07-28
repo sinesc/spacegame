@@ -1,0 +1,16 @@
+# Scripted entities - AI controlled by Itsy script
+
+scripted-enemy:
+    <<<: *hostile
+    script: 2
+    visual:
+        sprite: asteroid/type1_64x64x60.png
+        color: [ 1.0, 0.5, 0.5, 1.0 ]
+    bounding:
+        radius: 16.0
+        faction: hostile
+    hitpoints: 200
+
+scripted-player:
+    <<<: *player
+    script: 1

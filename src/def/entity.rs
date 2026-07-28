@@ -3,6 +3,7 @@ use hecs;
 use crate::prelude::*;
 use crate::def::{parse_dir, Error};
 use crate::level::component::*;
+use crate::level::component::Script;
 use crate::repository::Repository;
 use crate::def::spawner::*;
 use crate::def::faction::*;
@@ -45,6 +46,7 @@ pub struct EntityDescriptor {
     inertial    : Option<Inertial>,
     lifetime    : Option<Lifetime>,
     powerup     : Option<Powerup>,
+    script      : Option<Script>,
     shooter     : Option<Shooter>,
     spatial     : Option<Spatial>,
     visual      : Option<Visual>,
@@ -82,6 +84,7 @@ impl EntityDescriptor {
             b.add(c);
         }
         if let Some(c) = &self.powerup { b.add(c.clone()); }
+        if let Some(c) = &self.script { b.add(c.clone()); }
         if let Some(c) = &self.shooter { b.add(c.clone()); }
         if let Some(spatial) = &self.spatial {
             let mut c = spatial.clone();
