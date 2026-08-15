@@ -37,6 +37,7 @@ itsy::itsy_api! {
         fn get_sprites(&mut _ctx) -> [ String ] { Vec::new() }
         fn get_sounds(&mut _ctx) -> [ String ] { Vec::new() }
         fn get_layers(&mut _ctx) -> [ String ] { Vec::new() }
+        fn play_sound(&mut _ctx, _id: u32) {}
         fn get_dying_count(&mut _ctx) -> i32 { 0 }
         fn get_dying_id(&mut _ctx, _index: u32) -> u64 { 0 }
         fn debug_print(&mut _ctx, _msg: String) { }

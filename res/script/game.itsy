@@ -8,7 +8,7 @@ use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_vel
           get_think_count, get_think_id,
           get_collision_count, get_collision_id,
           get_game_time, get_input_fire, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_spawn_trigger, get_rand_range,
-          get_sprites, get_sounds, get_layers,
+          get_sprites, get_sounds, get_layers, play_sound,
           get_dying_count, get_dying_id,
           spawn_entity, destroy_entity, set_v_motion, set_angle, set_hitpoints, apply_damage,
           debug_print};
@@ -126,6 +126,16 @@ fn get_def(entity_type: u16) -> EntityDef {
 // bindings are const.
 const SPRITE_MAP: [ String => u32 ] = [ => ];
 const LAYER_MAP: [ String => u32 ] = [ => ];
+const SOUND_MAP: [ String => u32 ] = [ => ];
+
+// Sound groups: name -> variant file names (keys of SOUND_MAP). Moved here
+// from res/def/sound.yaml (2026-08); the script picks a variant at random.
+const SOUND_GROUPS: [ String => [ String ] ] = [
+    "projectile/pew"         => [ "res/sound/projectile/pew1a.ogg", "res/sound/projectile/pew1b.ogg", "res/sound/projectile/pew1c.ogg", "res/sound/projectile/pew2.ogg" ],
+    "damage/explosion_pop"   => [ "res/sound/damage/explosion_pop1.ogg", "res/sound/damage/explosion_pop2.ogg" ],
+    "damage/explosion_large" => [ "res/sound/damage/explosion1.ogg", "res/sound/damage/explosion2.ogg" ],
+    "projectile/powerup"     => [ "res/sound/projectile/powerup1.ogg" ],
+];
 
 trait Entity {
     fn on_think(self: Self, age: f32) { }
@@ -210,6 +220,7 @@ impl Entity for Player {
             let pvx = angle.cos() * def.speed;
             let pvy = angle.sin() * def.speed;
             spawn_with_def(ET_PROJECTILE, def, px, py, angle, pvx, pvy, faction);
+            play_snd("projectile/pew");
 
             self.shoot_timer = age;
         }
@@ -263,6 +274,7 @@ impl Entity for Mine {
             let py = get_position_y(self.id);
             let explode_def = get_def(def.explode_as);
             spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(self.id));
+            play_snd("damage/explosion_large");
         }
     }
 }
@@ -275,6 +287,7 @@ impl Entity for Asteroid {
             let py = get_position_y(self.id);
             let explode_def = get_def(def.explode_as);
             spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(self.id));
+            play_snd("damage/explosion_pop");
         }
     }
 }
@@ -299,6 +312,9 @@ impl Entity for Powerup {
     }
 
     fn on_die(self: Self) {
+        // Collected (or expired): original played the powerup sound + fading
+        // ball visual here (fader-powerup spawner).
+        play_snd("projectile/powerup");
         let etype = get_script_type(self.id);
         let def = get_def(etype);
         if (def.explode_as != ET_NONE) {
@@ -423,6 +439,27 @@ fn dispatch_on_die(state: GameState, entity_id: u64) {
 // ============================================================
 // Helpers
 // ============================================================
+
+// Plays a single sound by file name (key of SOUND_MAP).
+fn play_snd_id(name: String) {
+    match SOUND_MAP.get(name) {
+        Some(id) => play_sound(id),
+        None => debug_print("missing sound: {name}"),
+    }
+}
+
+// Plays a sound group (a key of SOUND_GROUPS): picks one of the group's
+// variant files at random and plays it.
+fn play_snd(group: String) {
+    let variants_opt = SOUND_GROUPS.get(group);
+    match variants_opt {
+        Some(names) => {
+            let idx = get_rand_range(0.0, names.len() as f32) as u64;
+            play_snd_id(names[idx]);
+        },
+        None => debug_print("missing sound group: {group}"),
+    }
+}
 
 // Resolves the def's sprite / layer names to IDs via the global resource maps
 // and calls the spawn API. All entity spawning goes through here.
@@ -568,7 +605,13 @@ fn main() {
         LAYER_MAP.insert(layers[i], i as u32);
         i = i + 1;
     }
-    debug_print("loaded {sprites.len()} sprites, {get_sounds().len()} sounds, {layers.len()} layers");
+    let sounds = get_sounds();
+    let i: u64 = 0;
+    while (i < sounds.len()) {
+        SOUND_MAP.insert(sounds[i], i as u32);
+        i = i + 1;
+    }
+    debug_print("loaded {sprites.len()} sprites, {sounds.len()} sounds, {layers.len()} layers");
 
     while (true) {
         let age = get_game_time();

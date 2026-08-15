@@ -2,7 +2,6 @@ use crate::prelude::*;
 use hecs;
 use rodio::{MixerDeviceSink, DeviceSinkBuilder};
 use rodio::mixer::Mixer;
-use crate::sound::{SoundGroup};
 use crate::def;
 use crate::def::FactionId;
 use crate::bloom;
@@ -15,11 +14,8 @@ mod system;
 
 pub struct Infrastructure {
     input       : Input,
-    #[allow(dead_code)] // kept for re-adding audio support
     audio       : Mixer,
     layer       : Repository<Arc<Layer>>,
-    #[allow(dead_code)] // kept for re-adding audio support
-    sound       : Repository<SoundGroup>,
     font        : Arc<Font>,
 }
 
@@ -75,15 +71,12 @@ impl Level {
             layers.insert(info.name.clone(), layer);
         }
 
-        let sounds = def::parse_sounds().unwrap(); // kept for re-adding audio support
-
         // Player is now spawned by Itsy via GAME_START trigger
 
         let infrastructure = Arc::new(Infrastructure {
             audio       : audio,
             input       : input.clone(),
             layer       : layers,
-            sound       : sounds,
             font        : font,
         });
 
@@ -107,6 +100,10 @@ impl Level {
         // Layer names for the scripting subsystem (ID = index into this list).
         let layer_names: Vec<String> = layer_def.create.iter().map(|i| i.name.clone()).collect();
 
+        // The scripting subsystem holds a raw pointer into the Infrastructure
+        // (audio mixer); keep an Arc so it stays alive as long as the Level does.
+        let inf_for_scripting = infrastructure.clone();
+
         Level {
             world           : world,
             world_state     : world_state,
@@ -118,7 +115,7 @@ impl Level {
             glare           : bloom::Bloom::new(&context, (1920, 1080), 2, 5, 5.0),
             inf             : infrastructure,
             background      : background,
-            scripting       : ScriptingSubsystem::new(context.clone(), layer_names),
+            scripting       : ScriptingSubsystem::new(context.clone(), layer_names, &inf_for_scripting.audio),
             game_started    : false,
         }
     }

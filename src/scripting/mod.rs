@@ -5,6 +5,8 @@ pub use self::context::{ScriptContext, EntityData};
 use crate::prelude::*;
 use crate::level::component;
 use crate::level::WorldState;
+use crate::sound::Sound;
+use rodio::mixer::Mixer;
 use hecs;
 use itsy;
 use std::fs;
@@ -20,6 +22,8 @@ pub struct ScriptingSubsystem {
     radiant_ctx: Context,
     /// Sprite cache
     sprite_cache: HashMap<String, Arc<Sprite>>,
+    /// Sound cache (loaded on first play)
+    sound_cache: HashMap<String, Sound>,
 }
 
 // Entity type constants (must match the ET_* constants in res/script/game.itsy).
@@ -116,6 +120,7 @@ itsy::itsy_api! {
         /// All sound file paths (recursive listing of res/sound, sorted).
         /// Generated once on the Rust side; the returned vector index is the
         /// sound ID shared between Itsy and Rust.
+        /// The script groups files into sound effects itself.
         fn get_sounds(&mut context) -> [ String ] {
             context.sound_list.clone()
         }
@@ -123,6 +128,26 @@ itsy::itsy_api! {
         /// The returned vector index is the layer ID shared between Itsy and Rust.
         fn get_layers(&mut context) -> [ String ] {
             context.layer_list.clone()
+        }
+        /// Play a sound file by ID (index into `get_sounds()`).
+        /// Files are loaded on first use and cached.
+        fn play_sound(&mut context, id: u32) {
+            let id = id as usize;
+            if id >= context.sound_list.len() {
+                eprintln!("play_sound: invalid id {}", id);
+                return;
+            }
+            let name = context.sound_list[id].clone();
+            let audio = unsafe { &*context.audio };
+            let cache = unsafe { &mut *context.sound_cache };
+            if cache.get(&name).is_none() {
+                match Sound::load(&name) {
+                    Ok(sound) => { cache.insert(name.clone(), sound); }
+                    Err(e) => { eprintln!("play_sound: failed to load '{}': {}", name, e); return; }
+                }
+            }
+            let sound = cache.get(&name).unwrap();
+            audio.add(sound.decoder());
         }
         fn debug_print(&mut _context, msg: String) {
             eprintln!("ITSY: {}", msg);
@@ -194,15 +219,19 @@ itsy::itsy_api! {
 }
 
 impl ScriptingSubsystem {
-    pub fn new(radiant_ctx: Context, layer_list: Vec<String>) -> Self {
+    /// `audio` references the Infrastructure, which outlives the scripting
+    /// subsystem.
+    pub fn new(radiant_ctx: Context, layer_list: Vec<String>, audio: &Mixer) -> Self {
         let mut context = ScriptContext::new();
         context.layer_list = layer_list;
+        context.audio = audio;
         ScriptingSubsystem {
             program: None,
             vm: None,
             context,
             radiant_ctx,
             sprite_cache: HashMap::new(),
+            sound_cache: HashMap::new(),
         }
     }
 
@@ -277,6 +306,7 @@ impl ScriptingSubsystem {
         self.context.cmd = cmd as *mut hecs::CommandBuffer;
         self.context.radiant_ctx = &self.radiant_ctx;
         self.context.sprite_cache = &mut self.sprite_cache;
+        self.context.sound_cache = &mut self.sound_cache;
 
         match vm.run(&mut self.context) {
             Ok(itsy::runtime::VMState::Suspended) => {

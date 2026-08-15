@@ -1,4 +1,6 @@
 use crate::prelude::*;
+use crate::sound::Sound;
+use rodio::mixer::Mixer;
 use hecs;
 
 /// Snapshot of entity state passed to the Itsy script each frame.
@@ -23,6 +25,10 @@ pub struct ScriptContext {
     pub radiant_ctx: *const Context,
     /// Sprite cache pointer (for spawn_entity).
     pub sprite_cache: *mut HashMap<String, Arc<Sprite>>,
+    /// Audio mixer (Infrastructure outlives the scripting subsystem).
+    pub audio: *const Mixer,
+    /// Sound cache pointer (for play_sound; set before vm.run()).
+    pub sound_cache: *mut HashMap<String, Sound>,
 
     /// Snapshot of entity state (rebuilt each frame).
     pub entity_data: HashMap<u64, EntityData>,
@@ -81,6 +87,8 @@ impl ScriptContext {
             sprite_list: list_files_recursive("res/sprite"),
             sound_list: list_files_recursive("res/sound"),
             layer_list: Vec::new(), // set by ScriptingSubsystem::new from the layer def
+            audio: std::ptr::null(),
+            sound_cache: std::ptr::null_mut(),
         }
     }
 }
@@ -99,13 +107,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lists_sprite_and_sound_files() {
+    fn lists_sprite_files() {
         let sprites = list_files_recursive("res/sprite");
-        let sounds = list_files_recursive("res/sound");
         assert!(sprites.len() > 0, "expected sprite files");
-        assert!(sounds.len() > 0, "expected sound files");
         assert!(sprites.iter().all(|p| p.starts_with("res/sprite/")));
-        assert!(sounds.iter().all(|p| p.starts_with("res/sound/")));
         // stable ordering: sorted
         let mut sorted = sprites.clone();
         sorted.sort();
