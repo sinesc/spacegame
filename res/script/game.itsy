@@ -1,135 +1,428 @@
 // Spacegame Itsy script
 //
-// Processes entity logic each frame and writes commands into an action buffer.
+// Entity definitions, AI logic, and event handling.
+// Communicates with Rust via API (input + direct action calls).
 
 use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_velocity_y,
-          get_angle, get_script_type, is_alive,
-          get_collision_count, get_collision_id,
+          get_angle, get_script_type, is_alive, get_faction,
           get_think_count, get_think_id,
-          set_action_count, set_action_view_ref};
+          get_collision_count, get_collision_id,
+          get_game_time, get_input_fire, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_spawn_trigger, get_rand_range,
+          get_dying_count, get_dying_id,
+          spawn_entity, destroy_entity, set_v_motion, set_angle, set_hitpoints, apply_damage,
+          debug_print};
 
-// Command data enum — each variant is one action the script can request.
-enum Command {
-    SpawnEntity(u32, f32, f32),
-    DestroyEntity(u64),
-    SetVelocity(u64, f32, f32),
-    SetAngle(u64, f32),
-    SetHitpoints(u64, f32),
-    ApplyDamage(u64, f32),
+// ============================================================
+// Entity type IDs (must match Rust constants)
+// ============================================================
+
+const ET_NONE       : u16 = 0;
+const ET_PLAYER     : u16 = 1;
+const ET_ASTEROID   : u16 = 2;
+const ET_MINE_RED   : u16 = 3;
+const ET_MINE_GREEN : u16 = 4;
+const ET_POWERUP_DUAL   : u16 = 5;
+const ET_POWERUP_TRIPLE : u16 = 6;
+const ET_PROJECTILE     : u16 = 7;
+const ET_EXPLOSION      : u16 = 8;
+
+// ============================================================
+// Spawn triggers (Rust -> Itsy)
+// ============================================================
+
+const TRIGGER_NONE      : u32 = 0;
+const TRIGGER_GAME_START: u32 = 4;
+
+// ============================================================
+// Spawner constants
+// ============================================================
+
+const PI: f32 = 3.14159265;
+
+// World geometry (matches the layer scale of 1920x1080).
+const WORLD_CENTER_X: f32 = 800.0;
+const WORLD_CENTER_Y: f32 = 450.0;
+const WORLD_WIDTH: f32 = 1920.0;
+const WORLD_HEIGHT: f32 = 1080.0;
+const SPAWN_DISTANCE: f32 = 2000.0;
+
+// Spawner intervals (seconds).
+const ASTEROID_INTERVAL: f32 = 2.0;
+const MINE_INTERVAL: f32 = 8.0;
+
+// Age at which each spawner first fires.
+const ASTEROID_FIRST_SPAWN: f32 = 4.0;
+const MINE_FIRST_SPAWN: f32 = 12.0;
+
+// ============================================================
+// Inertial motion types (must match Rust InertialMotionType order)
+// ============================================================
+
+const MOTION_CONST    : u32 = 0;
+const MOTION_FOLLOW   : u32 = 1;  // move + face movement direction
+const MOTION_STRAFE   : u32 = 2;  // move, keep current angle
+const MOTION_DETACHED : u32 = 3;  // rotate toward v_fraction, no movement
+
+// ============================================================
+// Entity type definitions (static data per type)
+// ============================================================
+
+struct EntityDef {
+    hitpoints   : f32,
+    radius      : f32,
+    lifetime    : f32,
+    explode_as  : u16,
+    speed       : f32,
+    fade        : f32,
+    fps         : u32,
 }
 
-// Action buffer capacity (max commands per frame).
-const CAPACITY: i32 = 128;
+// fps = sprite animation speed. 0 = lean-picked frame (player/lean-driven sprites);
+// 30 = original hostile_visual fps (asteroids, mines, powerups, explosions animate).
+const DEF_PLAYER    : EntityDef = EntityDef { hitpoints: 10000.0, radius: 20.0, lifetime: 0.0, explode_as: ET_NONE, speed: 0.0, fade: 0.0, fps: 0 };
+const DEF_ASTEROID  : EntityDef = EntityDef { hitpoints: 100.0,   radius: 16.0, lifetime: 0.0, explode_as: ET_EXPLOSION, speed: 100.0, fade: 0.0, fps: 30 };
+const DEF_MINE_RED  : EntityDef = EntityDef { hitpoints: 1000.0,  radius: 28.0, lifetime: 0.0, explode_as: ET_EXPLOSION, speed: 100.0, fade: 0.0, fps: 30 };
+const DEF_MINE_GREEN: EntityDef = EntityDef { hitpoints: 1000.0,  radius: 28.0, lifetime: 0.0, explode_as: ET_EXPLOSION, speed: 100.0, fade: 0.0, fps: 30 };
+const DEF_POWERUP_D : EntityDef = EntityDef { hitpoints: 50.0,    radius: 16.0, lifetime: 60.0, explode_as: ET_NONE, speed: 100.0, fade: 0.0, fps: 30 };
+const DEF_POWERUP_T : EntityDef = EntityDef { hitpoints: 50.0,    radius: 16.0, lifetime: 60.0, explode_as: ET_NONE, speed: 100.0, fade: 0.0, fps: 30 };
+const DEF_PROJECTILE: EntityDef = EntityDef { hitpoints: 25.0,    radius: 5.0,  lifetime: 1.0,  explode_as: ET_NONE, speed: 500.0, fade: 0.5, fps: 0 };
+const DEF_EXPLOSION : EntityDef = EntityDef { hitpoints: 1.0,     radius: 32.0, lifetime: 1.3,  explode_as: ET_NONE, speed: 0.0, fade: 0.0, fps: 30 };
 
-// Chase speed for scripted enemies.
-const CHASE_SPEED: f32 = 150.0;
-
-fn main() {
-    let actions: View<Command> = View::new(CAPACITY as u64);
-    let idx: i32 = 0;
-
-    // Process each entity that has a Script component.
-    process_think_list(actions, idx);
-
-    // Process collision pairs.
-    process_collisions(actions, idx);
-
-    // Submit action buffer to Rust.
-    set_action_view_ref(actions as HeapRef);
-    set_action_count(idx as u32);
-
-    // Suspend to return control to Rust.
-    suspend;
+fn get_def(entity_type: u16) -> EntityDef {
+    match entity_type {
+        1 => DEF_PLAYER,
+        2 => DEF_ASTEROID,
+        3 => DEF_MINE_RED,
+        4 => DEF_MINE_GREEN,
+        5 => DEF_POWERUP_D,
+        6 => DEF_POWERUP_T,
+        7 => DEF_PROJECTILE,
+        8 => DEF_EXPLOSION,
+        _ => DEF_ASTEROID,
+    }
 }
 
-fn process_think_list(actions: View<Command>, idx: i32) {
-    let think_count = get_think_count();
-    let i: i32 = 0;
-    while (i < think_count) {
-        let entity_id = get_think_id(i as u32);
-        let script_type = get_script_type(entity_id);
+// ============================================================
+// Entity trait: common interface for all entity types
+// ============================================================
 
-        if (script_type == 1) {
-            handle_player(entity_id, actions, idx);
-        } else if (script_type == 2) {
-            idx = handle_enemy(entity_id, actions, idx);
+trait Entity {
+    fn on_think(self: Self, entity_id: u64, age: f32);
+    fn on_collide(self: Self, entity_id: u64, other_id: u64);
+    fn on_die(self: Self, entity_id: u64);
+}
+
+// ============================================================
+// Per-instance entity state structs
+// ============================================================
+
+struct Player {
+    shoot_timer   : f32,
+    shoot_interval: f32,
+}
+
+struct Mine {
+    shoot_timer   : f32,
+    shoot_interval: f32,
+    projectile_type: u16,
+}
+
+struct Asteroid {
+}
+
+struct Powerup {
+    weapon_type: u16,
+}
+
+struct Projectile {
+}
+
+struct Explosion {
+}
+
+// ============================================================
+// Entity implementations (must be before they are used)
+// ============================================================
+
+impl Entity for Player {
+    fn on_think(self: Self, entity_id: u64, age: f32) {
+        // Move in the direction of mouse delta.  This is reliable even when the
+        // cursor is grabbed (reset to window center each frame), unlike absolute
+        // mouse position which would always read as center.
+        let dx = get_mouse_delta_x();
+        let dy = get_mouse_delta_y();
+        let dist_sq = dx * dx + dy * dy;
+
+        // Normalized movement direction; (0, 0) when the mouse is idle so the
+        // ship decelerates to a stop (v_current decays toward zero).
+        let vx = 0.0;
+        let vy = 0.0;
+        if (dist_sq > 0.001) {
+            let dist = dist_sq.sqrt();
+            vx = dx / dist;
+            vy = dy / dist;
         }
 
-        i = i + 1;
-    }
-}
+        // R-Shift: strafe (move without rotating).  Default: FollowVector
+        // (move and face the movement direction).
+        let keys = get_input_keys();
+        let mode = if ((keys & 16u8) != 0u8) { MOTION_STRAFE } else { MOTION_FOLLOW };
+        set_v_motion(entity_id, mode, vx, vy);
 
-fn process_collisions(actions: View<Command>, idx: i32) {
-    let collision_count = get_collision_count();
-    let j: i32 = 0;
-    while (j < collision_count) {
-        let a = get_collision_id((j * 2) as u32);
-        let b = get_collision_id((j * 2 + 1) as u32);
-        idx = handle_collision(a, b, actions, idx);
-        j = j + 1;
-    }
-}
+        // Shoot
+        let firing = get_input_fire();
+        if (firing && age - self.shoot_timer >= self.shoot_interval) {
+            let px = get_position_x(entity_id);
+            let py = get_position_y(entity_id);
+            let angle = get_angle(entity_id);
+            let faction = get_faction(entity_id);
 
-fn handle_player(entity_id: u64, actions: View<Command>, idx: i32) {
-    // Placeholder: player logic goes here.
-    // For now, the player is controlled by input systems.
-}
+            let def = get_def(ET_PROJECTILE);
+            let pvx = angle.cos() * def.speed;
+            let pvy = angle.sin() * def.speed;
+            spawn_entity(ET_PROJECTILE, px, py, angle, pvx, pvy, faction, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
 
-fn handle_enemy(entity_id: u64, actions: View<Command>, idx: i32) -> i32 {
-    // Find nearest player and chase it.
-    let player_id = find_nearest_player(entity_id);
-    if (player_id == 0) {
-        return idx; // No player found.
-    }
-
-    let my_x = get_position_x(entity_id);
-    let my_y = get_position_y(entity_id);
-    let pl_x = get_position_x(player_id);
-    let pl_y = get_position_y(player_id);
-
-    let dx = pl_x - my_x;
-    let dy = pl_y - my_y;
-    let dist_sq = dx * dx + dy * dy;
-
-    // Only chase if player is within range (avoid division by tiny numbers).
-    if (dist_sq > 100.0 && dist_sq < 1000000.0) {
-        let dist = dist_sq.sqrt();
-
-        // Normalize and scale to chase speed.
-        let nx = dx / dist;
-        let ny = dy / dist;
-
-        // Write SetVelocity command.
-        if (idx < CAPACITY) {
-            actions[idx as u64] = Command::SetVelocity(entity_id, nx * CHASE_SPEED, ny * CHASE_SPEED);
-            idx = idx + 1;
+            self.shoot_timer = age;
         }
     }
 
-    return idx;
+    fn on_collide(self: Self, entity_id: u64, other_id: u64) {
+    }
+
+    fn on_die(self: Self, entity_id: u64) {
+    }
 }
 
-fn handle_collision(a: u64, b: u64, actions: View<Command>, idx: i32) -> i32 {
-    // If a scripted enemy collides with a player, apply damage.
-    let type_a = get_script_type(a);
-    let type_b = get_script_type(b);
+impl Entity for Mine {
+    fn on_think(self: Self, entity_id: u64, age: f32) {
+        let player_id = find_nearest_player(entity_id);
+        if (player_id != 0) {
+            let my_x = get_position_x(entity_id);
+            let my_y = get_position_y(entity_id);
+            let pl_x = get_position_x(player_id);
+            let pl_y = get_position_y(player_id);
 
-    if (type_a == 2 && type_b == 1) {
-        if (idx < CAPACITY) {
-            actions[idx as u64] = Command::ApplyDamage(b, 10.0);
-            idx = idx + 1;
-        }
-    } else if (type_b == 2 && type_a == 1) {
-        if (idx < CAPACITY) {
-            actions[idx as u64] = Command::ApplyDamage(a, 10.0);
-            idx = idx + 1;
+            let dx = pl_x - my_x;
+            let dy = pl_y - my_y;
+            let dist_sq = dx * dx + dy * dy;
+
+            if (dist_sq > 100.0) {
+                let dist = dist_sq.sqrt();
+                let nx = dx / dist;
+                let ny = dy / dist;
+                let angle = ny.atan2(nx);
+
+                set_angle(entity_id, angle);
+                set_v_motion(entity_id, MOTION_FOLLOW, nx, ny);
+            }
+
+            if (age - self.shoot_timer >= self.shoot_interval && dist_sq < 400000.0) {
+                let dist = dist_sq.sqrt();
+                let nx = dx / dist;
+                let ny = dy / dist;
+                let angle = ny.atan2(nx);
+
+                let def = get_def(self.projectile_type);
+                let vx = nx * def.speed;
+                let vy = ny * def.speed;
+                spawn_entity(self.projectile_type, my_x, my_y, angle, vx, vy, get_faction(entity_id), def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
+
+                self.shoot_timer = age;
+            }
         }
     }
 
-    return idx;
+    fn on_collide(self: Self, entity_id: u64, other_id: u64) {
+    }
+
+    fn on_die(self: Self, entity_id: u64) {
+        let etype = get_script_type(entity_id);
+        let def = get_def(etype);
+        if (def.explode_as != ET_NONE) {
+            let px = get_position_x(entity_id);
+            let py = get_position_y(entity_id);
+            let explode_def = get_def(def.explode_as);
+            spawn_entity(def.explode_as, px, py, 0.0, 0.0, 0.0, get_faction(entity_id), explode_def.hitpoints, explode_def.radius, explode_def.lifetime, explode_def.fade, explode_def.fps);
+        }
+    }
 }
 
-// Find the nearest player entity (script_type == 1) to the given entity.
+impl Entity for Asteroid {
+    fn on_think(self: Self, entity_id: u64, age: f32) {
+    }
+
+    fn on_collide(self: Self, entity_id: u64, other_id: u64) {
+    }
+
+    fn on_die(self: Self, entity_id: u64) {
+        let def = get_def(ET_ASTEROID);
+        if (def.explode_as != ET_NONE) {
+            let px = get_position_x(entity_id);
+            let py = get_position_y(entity_id);
+            let explode_def = get_def(def.explode_as);
+            spawn_entity(def.explode_as, px, py, 0.0, 0.0, 0.0, get_faction(entity_id), explode_def.hitpoints, explode_def.radius, explode_def.lifetime, explode_def.fade, explode_def.fps);
+        }
+    }
+}
+
+impl Entity for Powerup {
+    fn on_think(self: Self, entity_id: u64, age: f32) {
+        // Pickup: powerups share the player's faction, and same-faction pairs are
+        // never reported as collisions, so pickup is done here via a distance check.
+        let player_id = find_nearest_player(entity_id);
+        if (player_id != 0) {
+            let dx = get_position_x(player_id) - get_position_x(entity_id);
+            let dy = get_position_y(player_id) - get_position_y(entity_id);
+            // Pickup radius: powerup (16) + player (20)
+            if (dx * dx + dy * dy < 1296.0) {
+                destroy_entity(entity_id);
+            }
+        }
+    }
+
+    fn on_collide(self: Self, entity_id: u64, other_id: u64) {
+        // No-op: same-faction pairs are never reported. Pickup is in on_think.
+    }
+
+    fn on_die(self: Self, entity_id: u64) {
+        let etype = get_script_type(entity_id);
+        let def = get_def(etype);
+        if (def.explode_as != ET_NONE) {
+            let px = get_position_x(entity_id);
+            let py = get_position_y(entity_id);
+            let explode_def = get_def(def.explode_as);
+            spawn_entity(def.explode_as, px, py, 0.0, 0.0, 0.0, get_faction(entity_id), explode_def.hitpoints, explode_def.radius, explode_def.lifetime, explode_def.fade, explode_def.fps);
+        }
+    }
+}
+
+impl Entity for Projectile {
+    fn on_think(self: Self, entity_id: u64, age: f32) {
+    }
+
+    fn on_collide(self: Self, entity_id: u64, other_id: u64) {
+    }
+
+    fn on_die(self: Self, entity_id: u64) {
+        let def = get_def(ET_PROJECTILE);
+        if (def.explode_as != ET_NONE) {
+            let px = get_position_x(entity_id);
+            let py = get_position_y(entity_id);
+            let explode_def = get_def(def.explode_as);
+            spawn_entity(def.explode_as, px, py, 0.0, 0.0, 0.0, get_faction(entity_id), explode_def.hitpoints, explode_def.radius, explode_def.lifetime, explode_def.fade, explode_def.fps);
+        }
+    }
+}
+
+impl Entity for Explosion {
+    fn on_think(self: Self, entity_id: u64, age: f32) {
+    }
+
+    fn on_collide(self: Self, entity_id: u64, other_id: u64) {
+    }
+
+    fn on_die(self: Self, entity_id: u64) {
+    }
+}
+
+// ============================================================
+// Game state: single registry for all entities as trait objects
+// ============================================================
+
+struct GameState {
+    entities: [ u64 => Entity ],
+    next_asteroid: f32,
+    next_mine: f32,
+}
+
+fn new_game_state() -> GameState {
+    let entities: [ u64 => Entity ] = [ => ];
+    GameState { entities: entities, next_asteroid: ASTEROID_FIRST_SPAWN, next_mine: MINE_FIRST_SPAWN }
+}
+
+// ============================================================
+// Entity registration / unregistration
+// ============================================================
+
+fn register_entity(state: GameState, entity_id: u64, entity_type: u16) {
+    match entity_type {
+        ET_PLAYER => {
+            state.entities[entity_id] = Player { shoot_timer: 0.0, shoot_interval: 0.2 };
+        },
+        ET_ASTEROID => {
+            state.entities[entity_id] = Asteroid { };
+        },
+        ET_MINE_RED => {
+            state.entities[entity_id] = Mine { shoot_timer: 0.0, shoot_interval: 1.0, projectile_type: ET_PROJECTILE };
+        },
+        ET_MINE_GREEN => {
+            state.entities[entity_id] = Mine { shoot_timer: 0.0, shoot_interval: 1.0, projectile_type: ET_PROJECTILE };
+        },
+        ET_POWERUP_DUAL => {
+            state.entities[entity_id] = Powerup { weapon_type: ET_POWERUP_DUAL };
+        },
+        ET_POWERUP_TRIPLE => {
+            state.entities[entity_id] = Powerup { weapon_type: ET_POWERUP_TRIPLE };
+        },
+        ET_PROJECTILE => {
+            state.entities[entity_id] = Projectile { };
+        },
+        ET_EXPLOSION => {
+            state.entities[entity_id] = Explosion { };
+        },
+        _ => { },
+    }
+}
+
+fn unregister_entity(state: GameState, entity_id: u64) {
+    state.entities.remove(entity_id);
+}
+
+fn is_registered(state: GameState, entity_id: u64) -> bool {
+    state.entities.get(entity_id) != None
+}
+
+// ============================================================
+// Dispatch: retrieve entity, call trait method
+// ============================================================
+
+// Map values are shared references, so `self` mutations in the handler persist
+// without storing the entity back.
+fn dispatch_on_think(state: GameState, entity_id: u64, age: f32) {
+    let entity_opt = state.entities.get(entity_id);
+    match entity_opt {
+        Some(entity) => {
+            entity.on_think(entity_id, age);
+        },
+        None => { },
+    }
+}
+
+fn dispatch_on_collide(state: GameState, entity_id: u64, other_id: u64) {
+    let entity_opt = state.entities.get(entity_id);
+    match entity_opt {
+        Some(entity) => {
+            entity.on_collide(entity_id, other_id);
+        },
+        None => { },
+    }
+}
+
+fn dispatch_on_die(state: GameState, entity_id: u64) {
+    let entity_opt = state.entities.get(entity_id);
+    match entity_opt {
+        Some(entity) => {
+            entity.on_die(entity_id);
+            unregister_entity(state, entity_id);
+        },
+        None => { },
+    }
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+
 fn find_nearest_player(to_entity_id: u64) -> u64 {
     let my_x = get_position_x(to_entity_id);
     let my_y = get_position_y(to_entity_id);
@@ -141,7 +434,7 @@ fn find_nearest_player(to_entity_id: u64) -> u64 {
     let i: i32 = 0;
     while (i < think_count) {
         let other_id = get_think_id(i as u32);
-        if (other_id != to_entity_id && get_script_type(other_id) == 1) {
+        if (other_id != to_entity_id && get_script_type(other_id) == ET_PLAYER) {
             let other_x = get_position_x(other_id);
             let other_y = get_position_y(other_id);
             let dx = other_x - my_x;
@@ -155,4 +448,148 @@ fn find_nearest_player(to_entity_id: u64) -> u64 {
         i = i + 1;
     }
     return best_id;
+}
+
+// ============================================================
+// Spawners
+// ============================================================
+// Periodic edge spawning. Timer semantics mirror the old Rust Periodic:
+// fires when age >= next, then next = age + interval - min(age - next, interval)
+// (catches up missed intervals after frame hitches).
+
+fn spawn_asteroid() {
+    let angle = get_rand_range(-PI, PI);
+    let px = WORLD_CENTER_X + angle.cos() * SPAWN_DISTANCE;
+    let py = WORLD_CENTER_Y + angle.sin() * SPAWN_DISTANCE;
+    if (px < 0.0) { px = 0.0; }
+    if (px > WORLD_WIDTH) { px = WORLD_WIDTH; }
+    if (py < 0.0) { py = 0.0; }
+    if (py > WORLD_HEIGHT) { py = WORLD_HEIGHT; }
+    let faction = get_rand_range(2.0, 100.0) as u32;
+
+    let def = get_def(ET_ASTEROID);
+    // Drift toward the world center.
+    let dir_angle = -angle;
+    let vx = dir_angle.cos() * def.speed;
+    let vy = dir_angle.sin() * def.speed;
+    spawn_entity(ET_ASTEROID, px, py, dir_angle, vx, vy, faction, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
+}
+
+fn spawn_mine(angle: f32, faction: u32) {
+    let px = WORLD_CENTER_X + angle.cos() * SPAWN_DISTANCE;
+    let py = WORLD_CENTER_Y + angle.sin() * SPAWN_DISTANCE;
+    if (px < 0.0) { px = 0.0; }
+    if (px > WORLD_WIDTH) { px = WORLD_WIDTH; }
+    if (py < 0.0) { py = 0.0; }
+    if (py > WORLD_HEIGHT) { py = WORLD_HEIGHT; }
+
+    let mine_type = if (get_rand_range(0.0, 1.0) > 0.5) { ET_MINE_RED } else { ET_MINE_GREEN };
+    let def = get_def(mine_type);
+    // Starts drifting outward; the mine AI steers it toward the player.
+    let vx = angle.cos() * def.speed;
+    let vy = angle.sin() * def.speed;
+    spawn_entity(mine_type, px, py, angle, vx, vy, faction, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
+}
+
+fn spawn_powerup() {
+    let pw_y = get_rand_range(0.0, WORLD_HEIGHT);
+    let pw_type = if (get_rand_range(0.0, 1.0) > 0.5) { ET_POWERUP_DUAL } else { ET_POWERUP_TRIPLE };
+    let def = get_def(pw_type);
+    // Spawns at the right edge and drifts left across the screen.
+    spawn_entity(pw_type, WORLD_WIDTH, pw_y, 0.0, 0.0 - def.speed, 0.0, 0, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
+}
+
+fn update_spawners(state: GameState, age: f32) {
+    if (age >= state.next_asteroid) {
+        spawn_asteroid();
+        let overshoot = age - state.next_asteroid;
+        if (overshoot > ASTEROID_INTERVAL) { overshoot = ASTEROID_INTERVAL; }
+        state.next_asteroid = age + ASTEROID_INTERVAL - overshoot;
+    }
+
+    if (age >= state.next_mine) {
+        let angle = get_rand_range(-PI, PI);
+        let faction = get_rand_range(101.0, 200.0) as u32;
+        if (get_rand_range(0.0, 1.0) > 0.5) {
+            spawn_mine(angle, faction);
+        } else {
+            spawn_powerup();
+        }
+        let overshoot = age - state.next_mine;
+        if (overshoot > MINE_INTERVAL) { overshoot = MINE_INTERVAL; }
+        state.next_mine = age + MINE_INTERVAL - overshoot;
+    }
+}
+
+// ============================================================
+// Main frame loop
+// ============================================================
+// The VM is persistent across frames (created once, resumed via suspend).
+// Therefore `state` lives outside the loop and retains its values between
+// iterations.  Each iteration is one frame.
+
+fn main() {
+    let state = new_game_state();
+
+    while (true) {
+        let age = get_game_time();
+
+        // Handle spawn triggers from Rust
+        let trigger = get_spawn_trigger();
+        if (trigger == TRIGGER_GAME_START) {
+            let def = get_def(ET_PLAYER);
+            spawn_entity(ET_PLAYER, 230.0, 350.0, 0.0, 0.0, 0.0, 0, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
+        }
+
+        // Periodic asteroid / mine / powerup spawning
+        update_spawners(state, age);
+
+        // Register newly appeared entities
+        let think_count = get_think_count();
+        let i: i32 = 0;
+        while (i < think_count) {
+            let entity_id = get_think_id(i as u32);
+
+            if (!is_registered(state, entity_id)) {
+                let entity_type = get_script_type(entity_id);
+                register_entity(state, entity_id, entity_type);
+            }
+
+            i = i + 1;
+        }
+
+        // Dispatch on_think for all scripted entities
+        let i: i32 = 0;
+        while (i < think_count) {
+            let entity_id = get_think_id(i as u32);
+            if (is_alive(entity_id)) {
+                dispatch_on_think(state, entity_id, age);
+            }
+            i = i + 1;
+        }
+
+        // Dispatch on_collide for collision pairs
+        let collision_count = get_collision_count();
+        let j: i32 = 0;
+        while (j < collision_count) {
+            let a = get_collision_id((j * 2) as u32);
+            let b = get_collision_id((j * 2 + 1) as u32);
+            dispatch_on_collide(state, a, b);
+            dispatch_on_collide(state, b, a);
+            j = j + 1;
+        }
+
+        // Dispatch on_die for entities that died since last frame
+        let dying_count = get_dying_count();
+        let k: i32 = 0;
+        while (k < dying_count) {
+            let entity_id = get_dying_id(k as u32);
+            dispatch_on_die(state, entity_id);
+            k = k + 1;
+        }
+
+        suspend;
+    }
+
+    return;
 }

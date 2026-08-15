@@ -7,6 +7,7 @@ use crate::def;
 use crate::def::FactionId;
 use crate::bloom;
 use crate::repository::Repository;
+use crate::scripting;
 use crate::scripting::ScriptingSubsystem;
 
 pub mod component;
@@ -61,21 +62,20 @@ pub struct Level {
     inf             : Arc<Infrastructure>,
     age             : f32,
     _audio_sink     : MixerDeviceSink,
+    context         : Context,
 
     bloom           : postprocessors::Bloom,
     glare           : bloom::Bloom,
-    roidspawn       : Periodic,
-    minespawn       : Periodic,
-    rng             : Rng,
     background      : Texture,
     scripting       : ScriptingSubsystem,
+    game_started    : bool,  // track if GAME_START trigger was sent
 }
 
 impl Level {
 
     pub fn new(input: &Input, context: &Context) -> Self {
 
-        let mut world = hecs::World::new();
+        let world = hecs::World::new();
 
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
@@ -104,7 +104,7 @@ impl Level {
         let mut spawners = def::parse_spawners().unwrap();
         let entities = def::parse_entities(&context, &mut sprites, &factions, &mut spawners, &layers).unwrap();
 
-        entities["player-1"].spawn(&mut world, 0., Some(Vec2(230., 350.)), None, None);
+        // Player is now spawned by Itsy via GAME_START trigger
 
         let infrastructure = Arc::new(Infrastructure {
             audio       : audio,
@@ -116,6 +116,11 @@ impl Level {
             sound       : sounds,
             font        : font,
         });
+
+        // Update LAYERS to point to the Repository inside Infrastructure
+        unsafe {
+            crate::def::entity::LAYERS = &infrastructure.layer as *const Repository<Arc<Layer>>;
+        }
 
         let world_state = WorldState {
             delta       : 0.0,
@@ -136,14 +141,13 @@ impl Level {
             layer_def       : layer_def,
             age             : 0.0,
             _audio_sink     : audio_sink,
-            roidspawn       : Periodic::new(0.0, 0.5),
-            minespawn       : Periodic::new(0.0, 3.73),
-            rng             : Rng::new(123.4),
+            context         : context.clone(),
             bloom           : bloom,
             glare           : bloom::Bloom::new(&context, (1920, 1080), 2, 5, 5.0),
             inf             : infrastructure,
             background      : background,
-            scripting       : ScriptingSubsystem::new(),
+            scripting       : ScriptingSubsystem::new(context.clone()),
+            game_started    : false,
         }
     }
 
@@ -180,25 +184,63 @@ impl Level {
 
         let mut cmd = hecs::CommandBuffer::new();
 
-        system::run_control(&mut self.world, &self.world_state, &mut cmd);
-        system::run_compute(&mut self.world, &self.world_state, &mut cmd);
-        system::run_inertia(&mut self.world, &self.world_state);
-        system::run_collider(&mut self.world, &self.world_state, &mut cmd);
-        system::run_upgrader(&mut self.world, &self.world_state, &mut cmd);
-        self.render_system.run(&mut self.world, &self.world_state);
-        system::run_cleanup(&mut self.world, &self.world_state);
+        // Control system: handles movement for non-scripted entities, returns fire state
+        let control_result = system::run_control(&mut self.world, &self.world_state);
 
         // Detect collisions for scripting subsystem
         let collision_pairs = Self::detect_collision_pairs(&self.world);
         self.scripting.set_collisions(collision_pairs);
 
+        // Configure scripting subsystem
+        self.scripting.set_game_time(age);
+        // The player entity is spawned by Itsy and has no Controlled component,
+        // so run_control won't detect its fire input. Check mouse/keyboard directly.
+        let firing = control_result.firing
+            || self.world_state.inf.input.down(InputId::Mouse1)
+            || self.world_state.inf.input.down(InputId::LControl);
+        self.scripting.set_input_fire(firing);
+
+        // Pass mouse position and keyboard input
+        let mouse_pos = self.world_state.inf.input.mouse();
+        self.scripting.set_mouse_pos(mouse_pos.0 as f32, mouse_pos.1 as f32);
+
+        // Pass mouse delta (reliable even when cursor is grabbed/focused)
+        let mouse_delta = self.world_state.inf.input.mouse_delta();
+        self.scripting.set_mouse_delta(mouse_delta.0 as f32, mouse_delta.1 as f32);
+
+        // key flags: bit 0=W, 1=S, 2=A, 3=D, 4=R-Shift (strafe)
+        let mut keys: u8 = 0;
+        if self.world_state.inf.input.down(InputId::W) { keys |= 1; }
+        if self.world_state.inf.input.down(InputId::S) { keys |= 2; }
+        if self.world_state.inf.input.down(InputId::A) { keys |= 4; }
+        if self.world_state.inf.input.down(InputId::D) { keys |= 8; }
+        if self.world_state.inf.input.down(InputId::RShift) { keys |= 16; }
+        self.scripting.set_input_keys(keys);
+
+        // Send GAME_START trigger on first frame
+        if !self.game_started {
+            self.scripting.set_spawn_trigger(scripting::TRIGGER_GAME_START);
+            self.game_started = true;
+        }
+
+        // Periodic asteroid / mine / powerup spawning is handled in the Itsy script.
+
         // Run scripting subsystem
         self.scripting.run(&mut self.world, &self.world_state, &mut cmd);
 
+        // Apply scripting commands BEFORE inertia so v_fraction changes take effect
+        cmd.run_on(&mut self.world);
+
+        // Shared systems (no compute/upgrader — moved to Itsy)
+        system::run_inertia(&mut self.world, &self.world_state);
+        system::run_collider(&mut self.world, &self.world_state, &mut cmd);
+        self.render_system.run(&mut self.world, &self.world_state);
+        system::run_cleanup(&mut self.world, &self.world_state);
+
+        // Apply collider commands
         cmd.run_on(&mut self.world);
 
         // render layers
-
         renderer.fill().texture(&self.background).blendmode(blendmodes::COPY).draw();
 
         self.inf.font.write(&self.inf.layer["text"],
@@ -229,37 +271,6 @@ impl Level {
 
         for info in &self.layer_def.create {
             self.inf.layer[&info.name].clear();
-        }
-
-        if self.roidspawn.elapsed(age) {
-            let angle = Angle(self.rng.range(-PI, PI));
-            let mut pos = Vec2(800.0, 450.0) + Vec2::from(angle) * 2000.0;
-            let outbound = pos.outbound(((0.0, 0.0), (1920.0, 1080.0))).unwrap();
-            pos -= outbound;
-            let v_max = Vec2::from(-angle) * 100.0;
-            let faction = FactionId(self.rng.range(2., 100.) as usize);
-            self.inf.repository["asteroid"].spawn(&mut self.world, self.age, Some(pos), Some(Angle::from(v_max)), Some(faction));
-        }
-
-        if self.minespawn.elapsed(age) {
-            let angle = Angle(self.rng.range(-PI, PI));
-            let mut pos = Vec2(800.0, 450.0) + Vec2::from(angle) * 2000.0;
-            let outbound = pos.outbound(((0.0, 0.0), (1920.0, 1080.0))).unwrap();
-            let faction = FactionId(self.rng.range(101., 200.) as usize);
-            let pw_y = self.rng.range(0., 1080.);
-            pos -= outbound;
-
-            if self.rng.range(0., 1.) > 0.5 {
-                self.inf.repository["mine-red"].spawn(&mut self.world, self.age, Some(pos), Some(angle), Some(faction));
-            } else {
-                self.inf.repository["mine-green"].spawn(&mut self.world, self.age, Some(pos), Some(angle), Some(faction));
-            }
-
-            if self.rng.range(0., 1.) > 0.5 {
-                self.inf.repository["dual-weapon"].spawn(&mut self.world, self.age, Some(Vec2(1920., pw_y)), None, None);
-            } else {
-                self.inf.repository["triple-weapon"].spawn(&mut self.world, self.age, Some(Vec2(1920., pw_y)), None, None);
-            }
         }
     }
 }

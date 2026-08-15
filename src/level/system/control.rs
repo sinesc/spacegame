@@ -8,6 +8,11 @@ fn flatten(x: i32) -> f32 {
     if x < 0. { -((-x).sqrt()) } else { x.sqrt() }
 }
 
+/// Input result from processing a controlled entity.
+pub struct ControlResult {
+    pub firing: bool,
+}
+
 fn input(input: &Input, input_id: Option<u32>) -> (Vec2, bool, bool, bool) {
     use InputId::*;
     if let Some(input_id) = input_id {
@@ -30,19 +35,19 @@ fn input(input: &Input, input_id: Option<u32>) -> (Vec2, bool, bool, bool) {
     }
 }
 
-pub fn run(world: &mut hecs::World, ws: &WorldState, cmd: &mut hecs::CommandBuffer) {
-    let mut projectiles = Vec::new();
-    let age = ws.age;
+pub fn run(world: &mut hecs::World, ws: &WorldState) -> ControlResult {
+    let mut firing = false;
 
-    for (_entity, (controlled, spatial, inertial, shooter, bounding)) in world.query_mut::<(
+    for (_entity, (controlled, spatial, inertial, bounding)) in world.query_mut::<(
         &component::Controlled,
         &component::Spatial,
         &mut component::Inertial,
-        &mut component::Shooter,
         &component::Bounding,
     )>() {
         let input_id = if ws.take_input { Some(controlled.input_id) } else { None };
         let (v_fraction, shoot, strafe, rotate) = input(&ws.inf.input, input_id);
+
+        firing = firing || shoot;
 
         if controlled.input_id == 1 {
             ws.inf.font.write(
@@ -64,13 +69,7 @@ pub fn run(world: &mut hecs::World, ws: &WorldState, cmd: &mut hecs::CommandBuff
             inertial.v_fraction = v_fraction;
             inertial.motion_type = component::InertialMotionType::FollowVector;
         }
-
-        if shoot && shooter.interval.elapsed(age) {
-            projectiles.push((spatial.position, spatial.angle, bounding.faction, shooter.spawner));
-        }
     }
 
-    for (position, angle, faction, spawner_id) in projectiles {
-        ws.spawner(cmd, spawner_id, angle, Some(position), Some(angle), Some(faction));
-    }
+    ControlResult { firing }
 }

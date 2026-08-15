@@ -12,7 +12,7 @@ use serde_yaml;
 // set up some ugly unsafe global state to work around missing DeserializeSeed in Serde-Yaml
 static mut FACTIONS: *const Vec<String> = 0 as _;
 static mut SPRITES: *mut Repository<Arc<Sprite>> = 0 as _;
-static mut LAYERS: *const Repository<Arc<Layer>> = 0 as _;
+pub static mut LAYERS: *const Repository<Arc<Layer>> = 0 as _;
 static mut SPAWNERS: *const Repository<SpawnerDescriptor, SpawnerId> = 0 as _;
 static mut CONTEXT: *const Context = 0 as _;
 

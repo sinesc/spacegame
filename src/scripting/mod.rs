@@ -7,14 +7,35 @@ use crate::level::component;
 use crate::level::WorldState;
 use hecs;
 use itsy;
-use itsy::internals::binary::heap::HeapRef;
 use std::fs;
+use std::collections::HashMap;
 
 /// The scripting subsystem: owns the Itsy VM and manages the frame cycle.
 pub struct ScriptingSubsystem {
     program : Option<itsy::Program<Api>>,
+    /// Persistent VM so that suspend/resume works and local state survives across frames.
+    vm      : Option<itsy::runtime::VM<Api, ScriptContext>>,
     context : ScriptContext,
+    /// Radiant context for loading sprites
+    radiant_ctx: Context,
+    /// Sprite cache
+    sprite_cache: HashMap<String, Arc<Sprite>>,
 }
+
+// Entity type constants (must match Itsy script)
+pub const ET_NONE       : u16 = 0;
+pub const ET_PLAYER     : u16 = 1;
+pub const ET_ASTEROID   : u16 = 2;
+pub const ET_MINE_RED   : u16 = 3;
+pub const ET_MINE_GREEN : u16 = 4;
+pub const ET_POWERUP_DUAL   : u16 = 5;
+pub const ET_POWERUP_TRIPLE : u16 = 6;
+pub const ET_PROJECTILE     : u16 = 7;
+pub const ET_EXPLOSION      : u16 = 8;
+
+// Spawn triggers (must match Itsy script)
+pub const TRIGGER_NONE      : u32 = 0;
+pub const TRIGGER_GAME_START: u32 = 4;
 
 // Define the Itsy API type.
 itsy::itsy_api! {
@@ -40,6 +61,9 @@ itsy::itsy_api! {
         fn get_script_type(&mut context, id: u64) -> u16 {
             context.entity_data.get(&id).map(|e| e.script_type).unwrap_or(0)
         }
+        fn get_faction(&mut context, id: u64) -> u32 {
+            context.entity_data.get(&id).map(|e| e.faction).unwrap_or(0)
+        }
         fn is_alive(&mut context, id: u64) -> bool {
             context.entity_data.get(&id).map(|e| e.alive).unwrap_or(false)
         }
@@ -55,25 +79,158 @@ itsy::itsy_api! {
         fn get_collision_id(&mut context, index: u32) -> u64 {
             context.collisions.get(index as usize).copied().unwrap_or(0)
         }
-        fn set_action_count(&mut context, count: u32) {
-            context.action_count = count;
+        fn get_game_time(&mut context) -> f32 {
+            context.game_time
         }
-        fn set_action_view_ref(&mut context, ref_: HeapRef) {
-            context.action_view_ref = ref_;
+        fn get_input_fire(&mut context) -> bool {
+            context.input_fire
+        }
+        fn get_mouse_x(&mut context) -> f32 {
+            context.mouse_pos.0
+        }
+        fn get_mouse_y(&mut context) -> f32 {
+            context.mouse_pos.1
+        }
+        fn get_mouse_delta_x(&mut context) -> f32 {
+            context.mouse_delta.0
+        }
+        fn get_mouse_delta_y(&mut context) -> f32 {
+            context.mouse_delta.1
+        }
+        fn get_input_keys(&mut context) -> u8 {
+            context.input_keys
+        }
+        fn get_dying_count(&mut context) -> i32 {
+            context.dying_entities.len() as i32
+        }
+        fn get_dying_id(&mut context, index: u32) -> u64 {
+            context.dying_entities.get(index as usize).copied().unwrap_or(0)
+        }
+        fn get_spawn_trigger(&mut context) -> u32 {
+            let t = context.spawn_trigger;
+            context.spawn_trigger = 0;  // consume trigger
+            t
+        }
+        fn get_rand_range(&mut context, min: f32, max: f32) -> f32 {
+            context.rng.range(min, max)
+        }
+        fn debug_print(&mut _context, msg: String) {
+            eprintln!("ITSY: {}", msg);
+        }
+
+        // --- Direct action API (replaces command buffer) ---
+
+        /// `fade` = number of seconds the entity's visual fades out over, at the end
+        /// of its lifetime (0 = no fading).
+        /// `fps` = sprite animation speed (0 = no animation; frame is then picked
+        /// from the entity's lean, like the original sprite-variant behavior).
+        fn spawn_entity(&mut context, entity_type: u16, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: u32, hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32) {
+            let world = unsafe { &mut *context.world };
+            let cmd = unsafe { &mut *context.cmd };
+            let radiant_ctx = unsafe { &*context.radiant_ctx };
+            let sprite_cache = unsafe { &mut *context.sprite_cache };
+            spawn_entity_from_context(world, cmd, radiant_ctx, sprite_cache, entity_type, px, py, angle, vx, vy, faction as usize, hitpoints, radius, lifetime, fade, fps, context.game_time);
+        }
+        fn destroy_entity(&mut context, entity_id: u64) {
+            let world = unsafe { &mut *context.world };
+            if let Some(entity) = hecs::Entity::from_bits(entity_id) {
+                if let Err(e) = world.despawn(entity) {
+                    eprintln!("destroy_entity(id={}) failed: {:?}", entity_id, e);
+                }
+            }
+        }
+        /// Set v_fraction and motion type. Motion type values match the order of
+        /// component::InertialMotionType: 0=Const, 1=FollowVector (move + face
+        /// movement), 2=StrafeVector (move, keep angle), 3=Detached (rotate only).
+        fn set_v_motion(&mut context, entity_id: u64, motion_type: u32, vx: f32, vy: f32) {
+            let world = unsafe { &mut *context.world };
+            if let Some(entity) = hecs::Entity::from_bits(entity_id) {
+                if let Ok(mut inertial) = world.get::<&mut component::Inertial>(entity) {
+                    inertial.v_fraction = Vec2(vx, vy);
+                    inertial.motion_type = match motion_type {
+                        0 => component::InertialMotionType::Const,
+                        1 => component::InertialMotionType::FollowVector,
+                        2 => component::InertialMotionType::StrafeVector,
+                        _ => component::InertialMotionType::Detached,
+                    };
+                }
+            }
+        }
+        fn set_angle(&mut context, entity_id: u64, angle: f32) {
+            let world = unsafe { &mut *context.world };
+            if let Some(entity) = hecs::Entity::from_bits(entity_id) {
+                if let Ok(mut spatial) = world.get::<&mut component::Spatial>(entity) {
+                    spatial.angle = Angle(angle);
+                }
+            }
+        }
+        fn set_hitpoints(&mut context, entity_id: u64, hp: f32) {
+            let world = unsafe { &mut *context.world };
+            if let Some(entity) = hecs::Entity::from_bits(entity_id) {
+                if let Ok(mut hitpoints) = world.get::<&mut component::Hitpoints>(entity) {
+                    hitpoints.0 = hp;
+                }
+            }
+        }
+        fn apply_damage(&mut context, entity_id: u64, damage: f32) {
+            let world = unsafe { &mut *context.world };
+            if let Some(entity) = hecs::Entity::from_bits(entity_id) {
+                if let Ok(mut hitpoints) = world.get::<&mut component::Hitpoints>(entity) {
+                    hitpoints.0 -= damage;
+                }
+            }
         }
     }
 }
 
 impl ScriptingSubsystem {
-    pub fn new() -> Self {
+    pub fn new(radiant_ctx: Context) -> Self {
         ScriptingSubsystem {
             program: None,
+            vm: None,
             context: ScriptContext::new(),
+            radiant_ctx,
+            sprite_cache: HashMap::new(),
         }
     }
 
+    /// Set the game time for Itsy timers.
+    pub fn set_game_time(&mut self, age: f32) {
+        self.context.game_time = age;
+    }
+
+    /// Set player fire input.
+    pub fn set_input_fire(&mut self, firing: bool) {
+        self.context.input_fire = firing;
+    }
+
+    /// Set mouse position.
+    pub fn set_mouse_pos(&mut self, x: f32, y: f32) {
+        self.context.mouse_pos = (x, y);
+    }
+
+    /// Set mouse delta (movement since last frame).
+    pub fn set_mouse_delta(&mut self, dx: f32, dy: f32) {
+        self.context.mouse_delta = (dx, dy);
+    }
+
+    /// Set keyboard input flags.
+    pub fn set_input_keys(&mut self, keys: u8) {
+        self.context.input_keys = keys;
+    }
+
+    /// Set a spawn trigger for Itsy to process.
+    pub fn set_spawn_trigger(&mut self, trigger: u32) {
+        self.context.spawn_trigger = trigger;
+    }
+
+    /// Mark an entity as dying (for on_die dispatch).
+    pub fn mark_dying(&mut self, entity_id: u64) {
+        self.context.dying_entities.push(entity_id);
+    }
+
     /// Run the Itsy script for one frame.
-    pub fn run(&mut self, world: &mut hecs::World, _ws: &WorldState, cmd: &mut hecs::CommandBuffer) {
+    pub fn run(&mut self, world: &mut hecs::World, ws: &WorldState, cmd: &mut hecs::CommandBuffer) {
         // Build entity snapshot
         self.build_snapshot(world);
 
@@ -93,20 +250,49 @@ impl ScriptingSubsystem {
             }
         }
 
-        let program = self.program.take().unwrap();
-        let mut vm = itsy::runtime::VM::new(program);
-        match vm.run(&mut self.context) {
-            Ok(itsy::runtime::VMState::Suspended) => {
-                // Script suspended — read action buffer
-                self.apply_actions(&vm, world, cmd);
-            }
-            Ok(itsy::runtime::VMState::Terminated) | Ok(itsy::runtime::VMState::Ready) => {
-                // Script finished without suspending; nothing to do
-            }
-            Ok(itsy::runtime::VMState::Error(_)) | Err(_) => {
-                eprintln!("Script error");
+        // Create the persistent VM once (first frame).  On subsequent frames we
+        // resume from the `suspend` instruction, preserving all local state.
+        if self.vm.is_none() {
+            if let Some(program) = self.program.take() {
+                self.vm = Some(itsy::runtime::VM::new(program));
+            } else {
+                return;
             }
         }
+
+        // Take the VM out of self to avoid borrow conflicts between
+        // `vm.run(&mut self.context)` and `self.apply_actions(...)`.
+        let mut vm = self.vm.take().unwrap();
+
+        // Set world/cmd pointers so API functions can access them directly.
+        // Valid only during vm.run().
+        self.context.world = world as *mut hecs::World;
+        self.context.cmd = cmd as *mut hecs::CommandBuffer;
+        self.context.radiant_ctx = &self.radiant_ctx;
+        self.context.sprite_cache = &mut self.sprite_cache;
+
+        match vm.run(&mut self.context) {
+            Ok(itsy::runtime::VMState::Suspended) => {
+                // Script suspended — commands executed directly via API
+            }
+            Ok(itsy::runtime::VMState::Terminated) | Ok(itsy::runtime::VMState::Ready) => {
+                // Script finished without suspending (shouldn't happen with while-loop).
+                // Reset and let it restart on the next frame.
+                eprintln!("Script terminated unexpectedly, resetting VM");
+                vm.reset();
+            }
+            Ok(itsy::runtime::VMState::Error(_)) => {
+                eprintln!("Script error, resetting VM");
+                vm.reset();
+            }
+            Err(e) => {
+                eprintln!("Script error: {:?}, resetting VM", e);
+                vm.reset();
+            }
+        }
+
+        // Put the VM back so it persists for the next frame.
+        self.vm = Some(vm);
     }
 
     /// Set collision pairs from the collider system.
@@ -117,18 +303,26 @@ impl ScriptingSubsystem {
 
     /// Build the entity data snapshot from the ECS world.
     fn build_snapshot(&mut self, world: &hecs::World) {
-        self.context.entity_data.clear();
+        // Save old entity data to detect deaths (entities that were alive last
+        // frame but are no longer in the world).
+        let old_data = std::mem::take(&mut self.context.entity_data);
+
         self.context.think_entities.clear();
         self.context.collisions.clear();
+        self.context.dying_entities.clear();
 
         // Query all entities with Script component
+        let mut new_ids = std::collections::HashSet::new();
         world
-            .query::<(&component::Script, &component::Spatial, &component::Hitpoints, Option<&component::Inertial>)>()
+            .query::<(&component::Script, &component::Spatial, &component::Hitpoints, Option<&component::Inertial>, Option<&component::Bounding>)>()
             .iter()
-            .for_each(|(e, (script, spatial, hp, inertial))| {
+            .for_each(|(e, (script, spatial, hp, inertial, bounding))| {
+                let id = e.to_bits().into();
+                new_ids.insert(id);
                 let vel = inertial.map(|i| (i.v_current.0, i.v_current.1)).unwrap_or((0.0, 0.0));
+                let faction = bounding.map(|b| b.faction.0 as u32).unwrap_or(0);
                 self.context.entity_data.insert(
-                    e.to_bits().into(),
+                    id,
                     EntityData {
                         hitpoints: hp.0,
                         position: (spatial.position.0, spatial.position.1),
@@ -136,131 +330,163 @@ impl ScriptingSubsystem {
                         angle: spatial.angle.0,
                         script_type: script.0,
                         alive: true,
+                        faction: faction,
                     },
                 );
-                self.context.think_entities.push(e.to_bits().into());
+                self.context.think_entities.push(id);
             });
-    }
 
-    /// Read the action buffer from the Itsy heap and apply commands.
-    fn apply_actions(&self, vm: &itsy::runtime::VM<Api, ScriptContext>, world: &mut hecs::World, _cmd: &mut hecs::CommandBuffer) {
-        let ref_ = self.context.action_view_ref;
-        let count = self.context.action_count as usize;
-
-        if count == 0 {
-            return;
-        }
-
-        let heap = &vm.heap;
-        let view_index = ref_.index();
-        let view_obj = heap.item(view_index);
-        let data = &view_obj.data;
-
-        // Command enum layout:
-        // Each slot = discriminant (2 bytes, u16 LE) + max variant payload (20 bytes)
-        // Total slot size = 22 bytes
-        //
-        // Variant discriminants (0-indexed):
-        //   0 = SpawnEntity(entity_def_index: u32, position_x: f32, position_y: f32) — 12 bytes
-        //   1 = DestroyEntity(entity_id: u64) — 8 bytes
-        //   2 = SetVelocity(entity_id: u64, vx: f32, vy: f32) — 16 bytes
-        //   3 = SetAngle(entity_id: u64, angle: f32) — 12 bytes
-        //   4 = SetHitpoints(entity_id: u64, hp: f32) — 12 bytes
-        //   5 = ApplyDamage(entity_id: u64, damage: f32) — 12 bytes
-        //
-        // Payload fields are little-endian: u32=4B, f32=4B, u64=8B
-
-        const SLOT_SIZE: usize = 22; // 2 (disc) + 20 (max payload)
-
-        for i in 0..count {
-            let base = i * SLOT_SIZE;
-            if base + SLOT_SIZE > data.len() {
-                eprintln!("Command buffer overrun at index {}", i);
-                break;
-            }
-
-            // Read discriminant (u16 LE)
-            let disc = u16::from_le_bytes([data[base], data[base + 1]]);
-            let payload = &data[base + 2..base + SLOT_SIZE];
-
-            match disc {
-                0 => {
-                    // SpawnEntity(u32, f32, f32)
-                    let entity_def_index = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
-                    let px = f32::from_le_bytes([payload[4], payload[5], payload[6], payload[7]]);
-                    let py = f32::from_le_bytes([payload[8], payload[9], payload[10], payload[11]]);
-                    eprintln!("CMD SpawnEntity(index={}, pos=({}, {}))", entity_def_index, px, py);
-                    // TODO: requires entity repository access
+        // Detect dead entities: were in the snapshot last frame but are gone now.
+        // Keep their data in entity_data (with alive=false) so the Itsy script can
+        // still look up their type/faction via get_script_type/get_faction, and
+        // dispatch on_die handlers.
+        // Only report entities that were alive last frame — entities already marked
+        // dead in a previous frame should not be re-dispatched.
+        for (id, mut data) in old_data {
+            if !new_ids.contains(&id) {
+                if data.alive {
+                    self.context.dying_entities.push(id);
                 }
-                1 => {
-                    // DestroyEntity(u64)
-                    let entity_id = u64::from_le_bytes([
-                        payload[0], payload[1], payload[2], payload[3],
-                        payload[4], payload[5], payload[6], payload[7],
-                    ]);
-                    if let Some(entity) = hecs::Entity::from_bits(entity_id) {
-                        if let Err(e) = world.despawn(entity) {
-                            eprintln!("CMD DestroyEntity(id={}) failed: {:?}", entity_id, e);
-                        }
-                    }
-                }
-                2 => {
-                    // SetVelocity(u64, f32, f32)
-                    let entity_id = u64::from_le_bytes([
-                        payload[0], payload[1], payload[2], payload[3],
-                        payload[4], payload[5], payload[6], payload[7],
-                    ]);
-                    let vx = f32::from_le_bytes([payload[8], payload[9], payload[10], payload[11]]);
-                    let vy = f32::from_le_bytes([payload[12], payload[13], payload[14], payload[15]]);
-                    if let Some(entity) = hecs::Entity::from_bits(entity_id) {
-                        if let Ok(mut inertial) = world.get::<&mut component::Inertial>(entity) {
-                            inertial.v_current = Vec2(vx, vy);
-                        }
-                    }
-                }
-                3 => {
-                    // SetAngle(u64, f32)
-                    let entity_id = u64::from_le_bytes([
-                        payload[0], payload[1], payload[2], payload[3],
-                        payload[4], payload[5], payload[6], payload[7],
-                    ]);
-                    let angle = f32::from_le_bytes([payload[8], payload[9], payload[10], payload[11]]);
-                    if let Some(entity) = hecs::Entity::from_bits(entity_id) {
-                        if let Ok(mut spatial) = world.get::<&mut component::Spatial>(entity) {
-                            spatial.angle = Angle(angle);
-                        }
-                    }
-                }
-                4 => {
-                    // SetHitpoints(u64, f32)
-                    let entity_id = u64::from_le_bytes([
-                        payload[0], payload[1], payload[2], payload[3],
-                        payload[4], payload[5], payload[6], payload[7],
-                    ]);
-                    let hp = f32::from_le_bytes([payload[8], payload[9], payload[10], payload[11]]);
-                    if let Some(entity) = hecs::Entity::from_bits(entity_id) {
-                        if let Ok(mut hitpoints) = world.get::<&mut component::Hitpoints>(entity) {
-                            hitpoints.0 = hp;
-                        }
-                    }
-                }
-                5 => {
-                    // ApplyDamage(u64, f32)
-                    let entity_id = u64::from_le_bytes([
-                        payload[0], payload[1], payload[2], payload[3],
-                        payload[4], payload[5], payload[6], payload[7],
-                    ]);
-                    let damage = f32::from_le_bytes([payload[8], payload[9], payload[10], payload[11]]);
-                    if let Some(entity) = hecs::Entity::from_bits(entity_id) {
-                        if let Ok(mut hitpoints) = world.get::<&mut component::Hitpoints>(entity) {
-                            hitpoints.0 -= damage;
-                        }
-                    }
-                }
-                _ => {
-                    eprintln!("Unknown command discriminant: {}", disc);
-                }
+                data.alive = false;
+                self.context.entity_data.insert(id, data);
             }
         }
     }
+}
+
+/// Create an ECS entity from Itsy spawn API call (free function for API bridge).
+/// `vx, vy` seed the entity's initial velocity (Const motion applies v_current * delta
+/// each frame, so this is also how entities get their drift speed).
+fn spawn_entity_from_context(world: &mut hecs::World, cmd: &mut hecs::CommandBuffer,
+    radiant_ctx: &Context, sprite_cache: &mut HashMap<String, Arc<Sprite>>,
+    entity_type: u16, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: usize,
+    hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32, game_time: f32) {
+    let mut builder = hecs::EntityBuilder::new();
+
+    // Spatial component (all entities have this)
+    builder.add(component::Spatial {
+        position: Vec2(px, py),
+        angle: Angle(angle),
+        lean: 0.0,
+    });
+
+    // Hitpoints component (all entities have this)
+    builder.add(component::Hitpoints(hitpoints));
+
+    // Bounding component (for collision). Explosions have none, like the original:
+    // they are non-interactive, so they can neither take damage nor damage anything
+    // (previously overlapping explosions killed each other on the next frame).
+    if entity_type != ET_EXPLOSION {
+        builder.add(component::Bounding {
+            radius: radius,
+            faction: crate::def::FactionId(faction),
+        });
+    }
+
+    // Inertial component (most entities have this).
+    // Const motion applies v_current * delta directly and never changes it, so the
+    // initial velocity passed by the script is the entity's constant drift speed.
+    // (The mine AI switches entities to FollowVector via set_v_motion.)
+    // Default speed is 100 px/s (asteroids, mines). The player is 5x that (the
+    // default felt too slow in playtesting).
+    let v_max = if entity_type == ET_PLAYER { 500.0 } else { 100.0 };
+
+    match entity_type {
+        ET_EXPLOSION => {
+            // Explosions don't move
+        }
+        _ => {
+            builder.add(component::Inertial {
+                v_max: Vec2(v_max, v_max),
+                v_fraction: Vec2(0.0, 0.0),
+                v_current: Vec2(vx, vy),
+                trans_motion: 6.0,
+                trans_rest: 3.0,
+                av_max_v0: 7.0,
+                av_max_vmax: 1.4,
+                trans_lean: 10.0,
+                motion_type: component::InertialMotionType::Const,
+            });
+        }
+    }
+
+    // Lifetime component (if specified)
+    // Store absolute expiration time (current age + lifetime) so the cleanup
+    // system can compare against ws.age, matching the pattern in def/entity.rs.
+    if lifetime > 0.0 {
+        builder.add(component::Lifetime(game_time + lifetime));
+    }
+
+    // Fading component (if specified): fade alpha 1 -> 0 over the last `fade`
+    // seconds of the entity's lifetime (render system applies the fade).
+    if fade > 0.0 {
+        builder.add(component::Fading {
+            start: game_time + lifetime - fade,
+            end: game_time + lifetime,
+        });
+    }
+
+    // Script component (so Itsy can track it)
+    builder.add(component::Script(entity_type));
+
+    // Visual component (entity-type-specific).
+    // Explosions are rendered on the effect layer only (original design:
+    // layer: none, effect_layer: effects) — the effects layer is what gets the
+    // bloom pass, which is the explosion's glow.
+    let (sprite_name, layer_name, effect_layer_name, color) = match entity_type {
+        ET_PLAYER     => ("player/speedy_98x72x30.png", "base", "", [0.8, 0.8, 1.0, 1.0]),
+        ET_ASTEROID   => ("asteroid/type1_64x64x60.png", "base", "", [1.0, 1.0, 1.0, 1.0]),
+        ET_MINE_RED   => ("hostile/mine_red_lm_64x64x15x2.png", "base", "", [1.0, 1.0, 1.0, 1.0]),
+        ET_MINE_GREEN => ("hostile/mine_green_lm_64x64x15x2.png", "base", "", [1.0, 1.0, 1.0, 1.0]),
+        ET_POWERUP_DUAL   => ("powerup/ball_v_32x32x18.jpg", "effects", "", [1.5, 1.5, 2.0, 1.0]),
+        ET_POWERUP_TRIPLE => ("powerup/ball_v_32x32x18.jpg", "effects", "", [1.5, 0.5, 0.5, 1.0]),
+        ET_PROJECTILE     => ("projectile/bolt_white_60x36x1.jpg", "effects", "", [1.0, 1.0, 1.5, 1.0]),
+        ET_EXPLOSION      => ("explosion/default_256x256x40.jpg", "", "effects", [1.0, 1.0, 1.0, 1.0]),
+        _ => ("placeholder_16x16x1.png", "base", "", [1.0, 1.0, 1.0, 1.0]),
+    };
+
+    let sprite_path = format!("res/sprite/{}", sprite_name);
+    let sprite = match sprite_cache.get(&sprite_path).cloned() {
+        Some(s) => s,
+        None => {
+            match Sprite::from_file(radiant_ctx, &sprite_path) {
+                Ok(s) => {
+                    let arc = s.arc();
+                    sprite_cache.insert(sprite_path.clone(), arc.clone());
+                    arc
+                }
+                Err(e) => {
+                    eprintln!("Failed to load sprite '{}': {:?}", sprite_path, e);
+                    panic!("Missing sprite: {}", sprite_path);
+                }
+            }
+        }
+    };
+    // Resolve layers from global repository ("" = no layer)
+    let resolve_layer = |name: &str| -> Option<Arc<Layer>> {
+        unsafe {
+            let layers_ptr = crate::def::entity::LAYERS;
+            if layers_ptr.is_null() || name.is_empty() {
+                None
+            } else {
+                (*layers_ptr).name(name).cloned()
+            }
+        }
+    };
+    let layer = resolve_layer(layer_name);
+    let effect_layer = resolve_layer(effect_layer_name);
+
+    builder.add(component::Visual {
+        layer,
+        effect_layer,
+        sprite: sprite,
+        scale: 1.0,
+        effect_scale: 1.0,
+        color: Color(color[0], color[1], color[2], color[3]),
+        effect_color: Color::WHITE,
+        frame_id: 0.0,
+        fps: fps,
+    });
+
+    cmd.spawn(builder.build());
 }

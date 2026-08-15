@@ -1,20 +1,13 @@
 /// Integration test: validate that Itsy scripts compile successfully.
 ///
-/// This test reads every `.itsy` file under `res/script/` and attempts to
-/// compile it against a minimal API stub.  If any script fails to compile
-/// the test panics with the compiler error.
+/// This test compiles every `.itsy` file under `res/script/` against a minimal
+/// API stub using `itsy::build` for detailed error reporting.
 
-use std::fs;
 use std::path::Path;
-
-use itsy::internals::binary::heap::HeapRef;
 
 /// Minimal context that matches the real `ScriptContext` shape.
 #[derive(Clone)]
-struct TestContext {
-    _action_count: u32,
-    _action_view_ref: HeapRef,
-}
+struct TestContext {}
 
 // Stub API matching the function signatures the game script expects.
 itsy::itsy_api! {
@@ -26,13 +19,30 @@ itsy::itsy_api! {
         fn get_velocity_y(&mut _ctx, _id: u64) -> f32 { 0.0 }
         fn get_angle(&mut _ctx, _id: u64) -> f32 { 0.0 }
         fn get_script_type(&mut _ctx, _id: u64) -> u16 { 0 }
+        fn get_faction(&mut _ctx, _id: u64) -> u32 { 0 }
         fn is_alive(&mut _ctx, _id: u64) -> bool { true }
         fn get_think_count(&mut _ctx) -> i32 { 0 }
         fn get_think_id(&mut _ctx, _index: u32) -> u64 { 0 }
         fn get_collision_count(&mut _ctx) -> i32 { 0 }
         fn get_collision_id(&mut _ctx, _index: u32) -> u64 { 0 }
-        fn set_action_count(&mut _ctx, _count: u32) {}
-        fn set_action_view_ref(&mut _ctx, heap_ref: HeapRef) {}
+        fn get_game_time(&mut _ctx) -> f32 { 0.0 }
+        fn get_input_fire(&mut _ctx) -> bool { false }
+        fn get_mouse_x(&mut _ctx) -> f32 { 0.0 }
+        fn get_mouse_y(&mut _ctx) -> f32 { 0.0 }
+        fn get_mouse_delta_x(&mut _ctx) -> f32 { 0.0 }
+        fn get_mouse_delta_y(&mut _ctx) -> f32 { 0.0 }
+        fn get_input_keys(&mut _ctx) -> u8 { 0 }
+        fn get_spawn_trigger(&mut _ctx) -> u32 { 0 }
+        fn get_rand_range(&mut _ctx, _min: f32, _max: f32) -> f32 { 0.0 }
+        fn get_dying_count(&mut _ctx) -> i32 { 0 }
+        fn get_dying_id(&mut _ctx, _index: u32) -> u64 { 0 }
+        fn debug_print(&mut _ctx, _msg: String) { }
+        fn spawn_entity(&mut _ctx, _entity_type: u16, _px: f32, _py: f32, _angle: f32, _vx: f32, _vy: f32, _faction: u32, _hitpoints: f32, _radius: f32, _lifetime: f32, _fade: f32, _fps: u32) {}
+        fn destroy_entity(&mut _ctx, _entity_id: u64) {}
+        fn set_v_motion(&mut _ctx, _entity_id: u64, _motion_type: u32, _vx: f32, _vy: f32) {}
+        fn set_angle(&mut _ctx, _entity_id: u64, _angle: f32) {}
+        fn set_hitpoints(&mut _ctx, _entity_id: u64, _hp: f32) {}
+        fn apply_damage(&mut _ctx, _entity_id: u64, _damage: f32) {}
     }
 }
 
@@ -41,7 +51,7 @@ fn collect_itsy_files(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
     if !dir.is_dir() {
         return;
     }
-    for entry in fs::read_dir(dir).expect("read script dir") {
+    for entry in std::fs::read_dir(dir).expect("read script dir") {
         let entry = entry.expect("read dir entry");
         let path = entry.path();
         if path.is_dir() {
@@ -63,10 +73,10 @@ fn itsy_scripts_compile() {
     }
 
     for file in &files {
-        let source = fs::read_to_string(file)
-            .unwrap_or_else(|e| panic!("failed to read {}: {}", file.display(), e));
-
-        let result = itsy::build_str::<Api>(&source);
-        assert!(result.is_ok(), "compile failed for {}: {:?}", file.display(), result.err());
+        let result = itsy::build::<Api, _>(file);
+        match result {
+            Ok(_) => {},
+            Err(e) => panic!("compile failed for {}:\n{}", file.display(), e),
+        }
     }
 }

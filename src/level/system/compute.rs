@@ -8,12 +8,14 @@ pub fn run(world: &mut hecs::World, ws: &WorldState, cmd: &mut hecs::CommandBuff
     let mut target_pos = Vec2(-1., -1.);
     let age = ws.age;
 
+    // find a player target
     for (_e, (controlled, spatial)) in world.query::<(&component::Controlled, &component::Spatial)>().iter() {
         if controlled.input_id == 1 {
             target_pos = spatial.position;
         }
     }
 
+    // if no player found, shoot something else
     if target_pos.0 == -1. {
         for (_e, (_, spatial)) in world.query::<(&component::Computed, &component::Spatial)>().iter() {
             target_pos = spatial.position;
