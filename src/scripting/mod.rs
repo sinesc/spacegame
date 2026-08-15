@@ -4,9 +4,9 @@ pub use self::context::{ScriptContext, EntityData};
 
 use crate::prelude::*;
 use crate::level::component;
+use crate::level::{Infrastructure, RenderLayer, RenderFilter};
 use crate::level::WorldState;
 use crate::sound::Sound;
-use rodio::mixer::Mixer;
 use hecs;
 use itsy;
 use std::fs;
@@ -24,6 +24,9 @@ pub struct ScriptingSubsystem {
     sprite_cache: HashMap<String, Arc<Sprite>>,
     /// Sound cache (loaded on first play)
     sound_cache: HashMap<String, Sound>,
+    /// Keep the Infrastructure alive for the lifetime of the subsystem
+    /// (`context.infrastructure` points into it).
+    _inf        : Arc<Infrastructure>,
 }
 
 // Entity type constants (must match the ET_* constants in res/script/game.itsy).
@@ -124,10 +127,49 @@ itsy::itsy_api! {
         fn get_sounds(&mut context) -> [ String ] {
             context.sound_list.clone()
         }
-        /// All layer names (from res/def/layer.yaml, in creation order).
-        /// The returned vector index is the layer ID shared between Itsy and Rust.
-        fn get_layers(&mut context) -> [ String ] {
-            context.layer_list.clone()
+        /// Create a new render layer and return its ID (vector index into the
+        /// layer list, shared between Itsy and Rust).
+        /// Layer size = (scale * 1920) x (scale * 1080).
+        /// `blendmode`: 0 = normal, 1 = add, 2 = lighten.
+        fn create_layer(&mut context, scale: f32, blendmode: u32) -> u32 {
+            let inf = unsafe { &mut *context.infrastructure };
+            let layer = Layer::new((scale * 1920., scale * 1080.)).arc();
+            match blendmode {
+                1 => { layer.set_blendmode(blendmodes::ADD); }
+                2 => { layer.set_blendmode(blendmodes::LIGHTEN); }
+                _ => {}
+            }
+            let id = inf.layers.len() as u32;
+            inf.layers.push(layer);
+            id
+        }
+        /// Register a render pass for a layer (in draw order), mirroring the old
+        /// layer.yaml "render" section.
+        /// `filter`: 0 = none, 1 = bloom, 2 = glare. `component` = z-order
+        /// within the layer.
+        fn add_render_layer(&mut context, layer_id: u32, filter: u32, component: u32) {
+            let inf = unsafe { &mut *context.infrastructure };
+            inf.render_layers.push(RenderLayer {
+                layer_id,
+                filter: match filter {
+                    1 => Some(RenderFilter::Bloom),
+                    2 => Some(RenderFilter::Glare),
+                    _ => None,
+                },
+                component,
+            });
+        }
+        /// Draw text in white (alpha 0..=1) on a layer.
+        fn write_text(&mut context, layer_id: u32, msg: String, x: f32, y: f32, alpha: f32) {
+            let inf = unsafe { &mut *context.infrastructure };
+            if let Some(layer) = inf.layers.get(layer_id as usize) {
+                inf.font.write(layer, &msg, (x, y), Color::alpha_pm(alpha));
+            }
+        }
+        /// Tell Rust which layer to use for its own debug text output.
+        fn set_debug_layer(&mut context, layer_id: u32) {
+            let inf = unsafe { &mut *context.infrastructure };
+            inf.debug_layer.store(layer_id, std::sync::atomic::Ordering::Relaxed);
         }
         /// Play a sound file by ID (index into `get_sounds()`).
         /// Files are loaded on first use and cached.
@@ -138,7 +180,7 @@ itsy::itsy_api! {
                 return;
             }
             let name = context.sound_list[id].clone();
-            let audio = unsafe { &*context.audio };
+            let inf = unsafe { &*context.infrastructure };
             let cache = unsafe { &mut *context.sound_cache };
             if cache.get(&name).is_none() {
                 match Sound::load(&name) {
@@ -147,7 +189,7 @@ itsy::itsy_api! {
                 }
             }
             let sound = cache.get(&name).unwrap();
-            audio.add(sound.decoder());
+            inf.audio.add(sound.decoder());
         }
         fn debug_print(&mut _context, msg: String) {
             eprintln!("ITSY: {}", msg);
@@ -219,12 +261,11 @@ itsy::itsy_api! {
 }
 
 impl ScriptingSubsystem {
-    /// `audio` references the Infrastructure, which outlives the scripting
+    /// `inf` references the Infrastructure, which outlives the scripting
     /// subsystem.
-    pub fn new(radiant_ctx: Context, layer_list: Vec<String>, audio: &Mixer) -> Self {
+    pub fn new(radiant_ctx: Context, inf: Arc<Infrastructure>) -> Self {
         let mut context = ScriptContext::new();
-        context.layer_list = layer_list;
-        context.audio = audio;
+        context.infrastructure = Arc::as_ptr(&inf) as *mut Infrastructure;
         ScriptingSubsystem {
             program: None,
             vm: None,
@@ -232,6 +273,7 @@ impl ScriptingSubsystem {
             radiant_ctx,
             sprite_cache: HashMap::new(),
             sound_cache: HashMap::new(),
+            _inf: inf,
         }
     }
 
@@ -395,7 +437,7 @@ impl ScriptingSubsystem {
 /// `vx, vy` seed the entity's initial velocity (Const motion applies v_current * delta
 /// each frame, so this is also how entities get their drift speed).
 /// Visuals (sprite / layers / color) are passed by the script as IDs into
-/// `ScriptContext::sprite_list` / `layer_list`; `u32::MAX` = no layer.
+/// `ScriptContext::sprite_list` / the Infrastructure layer list; `u32::MAX` = no layer.
 /// `entity_type` only drives the Script component, player speed and the
 /// explosion no-move / no-collision rules.
 fn spawn_entity_from_context(ctx: &ScriptContext,
@@ -477,7 +519,7 @@ fn spawn_entity_from_context(ctx: &ScriptContext,
     builder.add(component::Script(entity_type));
 
     // Visual component: sprite and layers are referenced by ID (see
-    // ScriptContext::sprite_list / layer_list); the script resolves names to IDs.
+    // ScriptContext::sprite_list / Infrastructure layers); the script resolves names to IDs.
     // (Explosions are rendered on the effect layer only — the effects layer is
     // what gets the bloom pass, which is the explosion's glow.)
     let sprite_path = if (sprite_id as usize) < ctx.sprite_list.len() {
@@ -502,20 +544,13 @@ fn spawn_entity_from_context(ctx: &ScriptContext,
             }
         }
     };
-    // Resolve layers by ID from the global repository (u32::MAX = no layer).
+    // Resolve layers by ID from the Infrastructure (u32::MAX = no layer).
+    let layers = unsafe { &(*ctx.infrastructure).layers };
     let resolve_layer = |id: u32| -> Option<Arc<Layer>> {
-        if id == u32::MAX || (id as usize) >= ctx.layer_list.len() {
+        if id == u32::MAX {
             return None;
         }
-        let name = ctx.layer_list[id as usize].clone();
-        unsafe {
-            let layers_ptr = crate::def::entity::LAYERS;
-            if layers_ptr.is_null() {
-                None
-            } else {
-                (*layers_ptr).name(&name).cloned()
-            }
-        }
+        layers.get(id as usize).cloned()
     };
     let layer = resolve_layer(layer_id);
     let effect_layer = resolve_layer(effect_layer_id);

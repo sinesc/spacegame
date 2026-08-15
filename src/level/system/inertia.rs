@@ -54,14 +54,16 @@ pub fn run(world: &mut hecs::World, ws: &WorldState) {
 
             let av_current = (target_angle - old_angle).to_radians();
 
-            ws.inf.font.write(
-                &ws.inf.layer["text"],
-                &format!("old_angle: {:.3}\ntarget_angle: {:.3}\nav_current: {:.3}\nav_max: {:.3}",
-                    old_angle.to_degrees(), target_angle.to_degrees(),
-                    (target_angle - old_angle).to_radians().signum(), Angle(av_max).to_degrees()),
-                (10.0, 500.0),
-                Color::alpha_pm(0.4)
-            );
+            if let Some(layer) = ws.inf.debug_layer() {
+                ws.inf.font.write(
+                    layer,
+                    &format!("old_angle: {:.3}\ntarget_angle: {:.3}\nav_current: {:.3}\nav_max: {:.3}",
+                        old_angle.to_degrees(), target_angle.to_degrees(),
+                        (target_angle - old_angle).to_radians().signum(), Angle(av_max).to_degrees()),
+                    (10.0, 500.0),
+                    Color::alpha_pm(0.4)
+                );
+            }
 
             if av_current.abs() > av_max {
                 spatial.angle += Angle(av_max) * av_current.signum();

@@ -36,8 +36,11 @@ itsy::itsy_api! {
         fn get_rand_range(&mut _ctx, _min: f32, _max: f32) -> f32 { 0.0 }
         fn get_sprites(&mut _ctx) -> [ String ] { Vec::new() }
         fn get_sounds(&mut _ctx) -> [ String ] { Vec::new() }
-        fn get_layers(&mut _ctx) -> [ String ] { Vec::new() }
         fn play_sound(&mut _ctx, _id: u32) {}
+        fn create_layer(&mut _ctx, _scale: f32, _blendmode: u32) -> u32 { 0 }
+        fn add_render_layer(&mut _ctx, _layer_id: u32, _filter: u32, _component: u32) {}
+        fn write_text(&mut _ctx, _layer_id: u32, _msg: String, _x: f32, _y: f32, _alpha: f32) {}
+        fn set_debug_layer(&mut _ctx, _layer_id: u32) {}
         fn get_dying_count(&mut _ctx) -> i32 { 0 }
         fn get_dying_id(&mut _ctx, _index: u32) -> u64 { 0 }
         fn debug_print(&mut _ctx, _msg: String) { }

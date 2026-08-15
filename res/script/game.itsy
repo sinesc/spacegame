@@ -8,7 +8,8 @@ use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_vel
           get_think_count, get_think_id,
           get_collision_count, get_collision_id,
           get_game_time, get_input_fire, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_spawn_trigger, get_rand_range,
-          get_sprites, get_sounds, get_layers, play_sound,
+          get_sprites, get_sounds, play_sound,
+          create_layer, add_render_layer, write_text, set_debug_layer,
           get_dying_count, get_dying_id,
           spawn_entity, destroy_entity, set_v_motion, set_angle, set_hitpoints, apply_damage,
           debug_print};
@@ -71,6 +72,16 @@ const MOTION_DETACHED : u32 = 3;  // rotate toward v_fraction, no movement
 // Layer ID meaning "no layer" (Rust treats u32::MAX as absent).
 const LAYER_ID_NONE: u32 = 4294967295;
 
+// Layer blend modes (create_layer).
+const BLEND_NORMAL  : u32 = 0;
+const BLEND_ADD     : u32 = 1;
+const BLEND_LIGHTEN : u32 = 2;
+
+// Render pass filters (add_render_layer).
+const FILTER_NONE  : u32 = 0;
+const FILTER_BLOOM : u32 = 1;
+const FILTER_GLARE : u32 = 2;
+
 // Entity visual fields: sprite is a key into sprite_map (full res/sprite/... path
 // from get_sprites()); layer / effect_layer are keys into layer_map ("" = none,
 // resolved to LAYER_ID_NONE). color_r/g/b tint the sprite (values may exceed 1.0
@@ -123,7 +134,8 @@ fn get_def(entity_type: u16) -> EntityDef {
 
 // Resource ID maps (populated once at startup in main()). Maps are
 // reference types, so their contents can be mutated even though the
-// bindings are const.
+// bindings are const. LAYER_MAP maps friendly names (used in EntityDef) to
+// the IDs returned by create_layer.
 const SPRITE_MAP: [ String => u32 ] = [ => ];
 const LAYER_MAP: [ String => u32 ] = [ => ];
 const SOUND_MAP: [ String => u32 ] = [ => ];
@@ -180,7 +192,7 @@ struct Explosion {
 }
 
 // ============================================================
-// Entity implementations (must be before they are used)
+// Entity implementations
 // ============================================================
 
 impl Entity for Player {
@@ -591,18 +603,27 @@ fn update_spawners(state: GameState, age: f32) {
 fn main() {
     let state = new_game_state();
 
-    // Populate the global resource ID maps (sprite/layer lists are static, so
-    // this runs once).
+    // Create the render layers and passes (moved from res/def/layer.yaml):
+    // base (normal blending), effects (additive, bloomed) and a text layer.
+    let base_layer = create_layer(1.0, BLEND_NORMAL);
+    let effects_layer = create_layer(1.0, BLEND_ADD);
+    let text_layer = create_layer(1.0, BLEND_NORMAL);
+    LAYER_MAP.insert("base", base_layer);
+    LAYER_MAP.insert("effects", effects_layer);
+    LAYER_MAP.insert("text", text_layer);
+    // Rust writes its own debug text (entity count, motion debug) to this layer.
+    set_debug_layer(text_layer);
+    add_render_layer(effects_layer, FILTER_BLOOM, 0);
+    add_render_layer(base_layer, FILTER_NONE, 0);
+    add_render_layer(base_layer, FILTER_GLARE, 1);
+    add_render_layer(effects_layer, FILTER_NONE, 0);
+    add_render_layer(text_layer, FILTER_NONE, 0);
+
+    // Populate the global resource ID maps (static, so this runs once).
     let sprites = get_sprites();
     let i: u64 = 0;
     while (i < sprites.len()) {
         SPRITE_MAP.insert(sprites[i], i as u32);
-        i = i + 1;
-    }
-    let layers = get_layers();
-    let i: u64 = 0;
-    while (i < layers.len()) {
-        LAYER_MAP.insert(layers[i], i as u32);
         i = i + 1;
     }
     let sounds = get_sounds();
@@ -611,10 +632,13 @@ fn main() {
         SOUND_MAP.insert(sounds[i], i as u32);
         i = i + 1;
     }
-    debug_print("loaded {sprites.len()} sprites, {sounds.len()} sounds, {layers.len()} layers");
+    debug_print("loaded {sprites.len()} sprites, {sounds.len()} sounds, 3 layers");
 
     while (true) {
         let age = get_game_time();
+
+        // UI help text (layers are cleared at the end of each frame).
+        write_text(text_layer, "Mouse: move, R-Shift+Mouse: strafe, R-Ctrl+Mouse: rotate, Button1: shoot", 10.0, 740.0, 1.0);
 
         // Handle spawn triggers from Rust
         let trigger = get_spawn_trigger();

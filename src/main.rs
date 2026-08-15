@@ -14,7 +14,6 @@ mod menu;
 mod cmd;
 mod timeframe;
 mod console;
-mod repository;
 mod scripting;
 
 use crate::prelude::*;

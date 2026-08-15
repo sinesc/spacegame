@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use crate::sound::Sound;
-use rodio::mixer::Mixer;
+use crate::level::Infrastructure;
 use hecs;
 
 /// Snapshot of entity state passed to the Itsy script each frame.
@@ -25,8 +25,9 @@ pub struct ScriptContext {
     pub radiant_ctx: *const Context,
     /// Sprite cache pointer (for spawn_entity).
     pub sprite_cache: *mut HashMap<String, Arc<Sprite>>,
-    /// Audio mixer (Infrastructure outlives the scripting subsystem).
-    pub audio: *const Mixer,
+    /// The Infrastructure (layers, render layers, font, audio). Points into the
+    /// Arc<Infrastructure> kept alive by the ScriptingSubsystem.
+    pub infrastructure: *mut Infrastructure,
     /// Sound cache pointer (for play_sound; set before vm.run()).
     pub sound_cache: *mut HashMap<String, Sound>,
 
@@ -60,10 +61,6 @@ pub struct ScriptContext {
     /// Generated once at startup; the vector index is the sound ID
     /// shared between Itsy and Rust.
     pub sound_list: Vec<String>,
-    /// Layer names (from res/def/layer.yaml "create", in creation order).
-    /// The vector index is the layer ID shared between Itsy and Rust.
-    /// `u32::MAX` means "no layer".
-    pub layer_list: Vec<String>,
 }
 
 impl ScriptContext {
@@ -86,8 +83,7 @@ impl ScriptContext {
             rng: Rng::new(123.4),
             sprite_list: list_files_recursive("res/sprite"),
             sound_list: list_files_recursive("res/sound"),
-            layer_list: Vec::new(), // set by ScriptingSubsystem::new from the layer def
-            audio: std::ptr::null(),
+            infrastructure: std::ptr::null_mut(),
             sound_cache: std::ptr::null_mut(),
         }
     }

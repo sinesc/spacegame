@@ -2,20 +2,48 @@ use crate::prelude::*;
 use hecs;
 use rodio::{MixerDeviceSink, DeviceSinkBuilder};
 use rodio::mixer::Mixer;
-use crate::def;
 use crate::bloom;
-use crate::repository::Repository;
 use crate::scripting;
 use crate::scripting::ScriptingSubsystem;
 
 pub mod component;
 mod system;
 
+/// A filtered render pass on a layer (created by the Itsy script via
+/// `add_render_layer`), mirroring the old layer.yaml "render" section.
+#[derive(Clone, Copy, Debug)]
+pub struct RenderLayer {
+    pub layer_id  : u32,
+    pub filter    : Option<RenderFilter>,
+    pub component : u32,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum RenderFilter {
+    Bloom,
+    Glare,
+}
+
 pub struct Infrastructure {
-    input       : Input,
-    audio       : Mixer,
-    layer       : Repository<Arc<Layer>>,
-    font        : Arc<Font>,
+    input         : Input,
+    pub audio     : Mixer,
+    /// Render layers created by the Itsy script (`create_layer`); the vector
+    /// index is the layer ID shared between Itsy and Rust.
+    pub layers    : Vec<Arc<Layer>>,
+    /// Render passes created by the Itsy script (`add_render_layer`), in draw order.
+    pub render_layers : Vec<RenderLayer>,
+    pub font      : Arc<Font>,
+    /// Layer ID used for Rust-side debug text (set by Itsy via `set_debug_layer`);
+    /// `u32::MAX` = not set yet.
+    pub debug_layer : std::sync::atomic::AtomicU32,
+}
+
+impl Infrastructure {
+    /// The layer designated for Rust-side debug text, if the script set one.
+    pub fn debug_layer(&self) -> Option<&Arc<Layer>> {
+        let idx = self.debug_layer.load(std::sync::atomic::Ordering::Relaxed) as usize;
+        self.layers.get(idx)
+    }
 }
 
 #[derive(Clone)]
@@ -31,7 +59,6 @@ pub struct Level {
     world           : hecs::World,
     world_state     : WorldState,
     render_system   : system::Render,
-    layer_def       : def::LayerDef,
     inf             : Arc<Infrastructure>,
     age             : f32,
     _audio_sink     : MixerDeviceSink,
@@ -55,34 +82,17 @@ impl Level {
         audio_sink.log_on_drop(false);
         let audio = audio_sink.mixer().clone();
 
-        let layer_def = def::parse_layers().unwrap();
-        let mut layers = Repository::new();
-
-        for info in &layer_def.create {
-            let layer = Layer::new((info.scale * 1920., info.scale * 1080.)).arc();
-            if let Some(ref blendmode) = info.blendmode {
-                if blendmode == "add" {
-                    layer.set_blendmode(blendmodes::ADD);
-                } else if blendmode == "lighten" {
-                    layer.set_blendmode(blendmodes::LIGHTEN);
-                }
-            }
-            layers.insert(info.name.clone(), layer);
-        }
-
-        // Player is now spawned by Itsy via GAME_START trigger
+        // Render layers are created by the Itsy script (create_layer /
+        // add_render_layer); player is spawned via the GAME_START trigger.
 
         let infrastructure = Arc::new(Infrastructure {
-            audio       : audio,
-            input       : input.clone(),
-            layer       : layers,
-            font        : font,
+            audio         : audio,
+            input         : input.clone(),
+            layers        : Vec::new(),
+            render_layers : Vec::new(),
+            font          : font,
+            debug_layer   : std::sync::atomic::AtomicU32::new(u32::MAX),
         });
-
-        // Update LAYERS to point to the Repository inside Infrastructure
-        unsafe {
-            crate::def::entity::LAYERS = &infrastructure.layer as *const Repository<Arc<Layer>>;
-        }
 
         let world_state = WorldState {
             delta       : 0.0,
@@ -96,25 +106,21 @@ impl Level {
         bloom.clear = false;
         bloom.draw_color = Color::alpha_pm(0.15);
 
-        // Layer names for the scripting subsystem (ID = index into this list).
-        let layer_names: Vec<String> = layer_def.create.iter().map(|i| i.name.clone()).collect();
-
-        // The scripting subsystem holds a raw pointer into the Infrastructure
-        // (audio mixer); keep an Arc so it stays alive as long as the Level does.
+        // The scripting subsystem holds a raw pointer into the Infrastructure;
+        // keep an Arc so it stays alive as long as the Level does.
         let inf_for_scripting = infrastructure.clone();
 
         Level {
             world           : world,
             world_state     : world_state,
             render_system   : system::Render::new(),
-            layer_def       : layer_def,
             age             : 0.0,
             _audio_sink     : audio_sink,
             bloom           : bloom,
             glare           : bloom::Bloom::new(&context, (1920, 1080), 2, 5, 5.0),
             inf             : infrastructure,
             background      : background,
-            scripting       : ScriptingSubsystem::new(context.clone(), layer_names, &inf_for_scripting.audio),
+            scripting       : ScriptingSubsystem::new(context.clone(), inf_for_scripting),
             game_started    : false,
         }
     }
@@ -200,37 +206,35 @@ impl Level {
         self.render_system.run(&mut self.world, &self.world_state);
         system::run_cleanup(&mut self.world, &self.world_state);
 
-        // render layers
+        // render layers (passes created by the Itsy script)
         renderer.fill().texture(&self.background).blendmode(blendmodes::COPY).draw();
 
-        self.inf.font.write(&self.inf.layer["text"],
-            "Mouse: move, R-Shift+Mouse: strafe, R-Ctrl+Mouse: rotate, Button1: shoot",
-            (10.0, 740.0),
-            Color::WHITE
-        );
-
-        for info in &self.layer_def.render {
-            if let Some(ref filter) = info.filter {
-                if filter == "bloom" {
-                    renderer.postprocess(&self.bloom, &(), || {
-                        renderer.fill().color(Color::alpha_mask(0.3)).draw();
-                        renderer.draw_layer(&self.inf.layer[&info.name], info.component);
-                    });
-                } else if filter == "glare" {
-                    renderer.postprocess(&self.glare, &blendmodes::SCREEN, || {
-                        renderer.fill().color(Color::alpha_mask(0.05)).draw();
-                        renderer.draw_layer(&self.inf.layer[&info.name], info.component);
-                    });
-                } else {
-                    panic!("invalid filter name");
+        for info in &self.inf.render_layers {
+            if let Some(layer) = self.inf.layers.get(info.layer_id as usize) {
+                match info.filter {
+                    Some(RenderFilter::Bloom) => {
+                        renderer.postprocess(&self.bloom, &(), || {
+                            renderer.fill().color(Color::alpha_mask(0.3)).draw();
+                            renderer.draw_layer(layer, info.component);
+                        });
+                    }
+                    Some(RenderFilter::Glare) => {
+                        renderer.postprocess(&self.glare, &blendmodes::SCREEN, || {
+                            renderer.fill().color(Color::alpha_mask(0.05)).draw();
+                            renderer.draw_layer(layer, info.component);
+                        });
+                    }
+                    None => {
+                        renderer.draw_layer(layer, info.component);
+                    }
                 }
             } else {
-                renderer.draw_layer(&self.inf.layer[&info.name], 0);
+                eprintln!("render_layers: invalid layer id {}", info.layer_id);
             }
         }
 
-        for info in &self.layer_def.create {
-            self.inf.layer[&info.name].clear();
+        for layer in &self.inf.layers {
+            layer.clear();
         }
     }
 }

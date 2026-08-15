@@ -72,6 +72,8 @@ impl Render {
             self.num_frames = 0;
         }
 
-        ws.inf.font.write(&ws.inf.layer["text"], &format!("Entities: {:?}", num_sprites), (10.0, 72.0), Color::alpha_pm(0.4));
+        if let Some(layer) = ws.inf.debug_layer() {
+            ws.inf.font.write(layer, &format!("Entities: {:?}", num_sprites), (10.0, 72.0), Color::alpha_pm(0.4));
+        }
     }
 }
