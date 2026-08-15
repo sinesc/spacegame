@@ -1,5 +1,3 @@
-use crate::def::FactionId;
-
 /**
  * Bounding Box component
  *
@@ -8,6 +6,6 @@ use crate::def::FactionId;
 #[derive(Clone, Debug, Default)]
 pub struct Bounding {
     pub radius: f32, // !todo starting out simple
-    pub faction: FactionId,
+    pub faction: u16,
 }
 

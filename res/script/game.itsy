@@ -463,7 +463,7 @@ fn play_snd(group: String) {
 
 // Resolves the def's sprite / layer names to IDs via the global resource maps
 // and calls the spawn API. All entity spawning goes through here.
-fn spawn_with_def(entity_type: u16, def: EntityDef, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: u32) {
+fn spawn_with_def(entity_type: u16, def: EntityDef, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: u16) {
     let sprite_name = def.sprite;
     let sprite_id = match SPRITE_MAP.get(sprite_name) {
         Some(id) => id,
@@ -525,7 +525,7 @@ fn spawn_asteroid() {
     if (px > WORLD_WIDTH) { px = WORLD_WIDTH; }
     if (py < 0.0) { py = 0.0; }
     if (py > WORLD_HEIGHT) { py = WORLD_HEIGHT; }
-    let faction = get_rand_range(2.0, 100.0) as u32;
+    let faction = get_rand_range(2.0, 100.0) as u16;
 
     let def = get_def(ET_ASTEROID);
     // Drift toward the world center.
@@ -535,7 +535,7 @@ fn spawn_asteroid() {
     spawn_with_def(ET_ASTEROID, def, px, py, dir_angle, vx, vy, faction);
 }
 
-fn spawn_mine(angle: f32, faction: u32) {
+fn spawn_mine(angle: f32, faction: u16) {
     let px = WORLD_CENTER_X + angle.cos() * SPAWN_DISTANCE;
     let py = WORLD_CENTER_Y + angle.sin() * SPAWN_DISTANCE;
     if (px < 0.0) { px = 0.0; }
@@ -569,7 +569,7 @@ fn update_spawners(state: GameState, age: f32) {
 
     if (age >= state.next_mine) {
         let angle = get_rand_range(-PI, PI);
-        let faction = get_rand_range(101.0, 200.0) as u32;
+        let faction = get_rand_range(101.0, 200.0) as u16;
         if (get_rand_range(0.0, 1.0) > 0.5) {
             spawn_mine(angle, faction);
         } else {

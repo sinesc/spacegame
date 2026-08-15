@@ -58,7 +58,7 @@ itsy::itsy_api! {
         fn get_script_type(&mut context, id: u64) -> u16 {
             context.entity_data.get(&id).map(|e| e.script_type).unwrap_or(0)
         }
-        fn get_faction(&mut context, id: u64) -> u32 {
+        fn get_faction(&mut context, id: u64) -> u16 {
             context.entity_data.get(&id).map(|e| e.faction).unwrap_or(0)
         }
         fn is_alive(&mut context, id: u64) -> bool {
@@ -163,8 +163,8 @@ itsy::itsy_api! {
         /// `get_layers()`; `u32::MAX` as a layer ID means "no layer".
         /// `color_r/g/b` tint the sprite (alpha is always 1.0; values may exceed 1.0
         /// on additive layers).
-        fn spawn_entity(&mut context, entity_type: u16, sprite_id: u32, layer_id: u32, effect_layer_id: u32, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: u32, hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32, color_r: f32, color_g: f32, color_b: f32) {
-            spawn_entity_from_context(&context, entity_type, sprite_id, layer_id, effect_layer_id, px, py, angle, vx, vy, faction as usize, hitpoints, radius, lifetime, fade, fps, color_r, color_g, color_b);
+        fn spawn_entity(&mut context, entity_type: u16, sprite_id: u32, layer_id: u32, effect_layer_id: u32, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: u16, hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32, color_r: f32, color_g: f32, color_b: f32) {
+            spawn_entity_from_context(&context, entity_type, sprite_id, layer_id, effect_layer_id, px, py, angle, vx, vy, faction, hitpoints, radius, lifetime, fade, fps, color_r, color_g, color_b);
         }
         fn destroy_entity(&mut context, entity_id: u64) {
             let world = unsafe { &mut *context.world };
@@ -357,7 +357,7 @@ impl ScriptingSubsystem {
                 let id = e.to_bits().into();
                 new_ids.insert(id);
                 let vel = inertial.map(|i| (i.v_current.0, i.v_current.1)).unwrap_or((0.0, 0.0));
-                let faction = bounding.map(|b| b.faction.0 as u32).unwrap_or(0);
+                let faction = bounding.map(|b| b.faction).unwrap_or(0);
                 self.context.entity_data.insert(
                     id,
                     EntityData {
@@ -400,7 +400,7 @@ impl ScriptingSubsystem {
 /// explosion no-move / no-collision rules.
 fn spawn_entity_from_context(ctx: &ScriptContext,
     entity_type: u16, sprite_id: u32, layer_id: u32, effect_layer_id: u32,
-    px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: usize,
+    px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: u16,
     hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32,
     color_r: f32, color_g: f32, color_b: f32) {
     let cmd = unsafe { &mut *ctx.cmd };
@@ -426,7 +426,7 @@ fn spawn_entity_from_context(ctx: &ScriptContext,
     if entity_type != ET_EXPLOSION {
         builder.add(component::Bounding {
             radius: radius,
-            faction: crate::def::FactionId(faction),
+            faction: faction,
         });
     }
 

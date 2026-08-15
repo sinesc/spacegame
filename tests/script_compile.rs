@@ -19,7 +19,7 @@ itsy::itsy_api! {
         fn get_velocity_y(&mut _ctx, _id: u64) -> f32 { 0.0 }
         fn get_angle(&mut _ctx, _id: u64) -> f32 { 0.0 }
         fn get_script_type(&mut _ctx, _id: u64) -> u16 { 0 }
-        fn get_faction(&mut _ctx, _id: u64) -> u32 { 0 }
+        fn get_faction(&mut _ctx, _id: u64) -> u16 { 0 }
         fn is_alive(&mut _ctx, _id: u64) -> bool { true }
         fn get_think_count(&mut _ctx) -> i32 { 0 }
         fn get_think_id(&mut _ctx, _index: u32) -> u64 { 0 }
@@ -41,7 +41,7 @@ itsy::itsy_api! {
         fn get_dying_count(&mut _ctx) -> i32 { 0 }
         fn get_dying_id(&mut _ctx, _index: u32) -> u64 { 0 }
         fn debug_print(&mut _ctx, _msg: String) { }
-        fn spawn_entity(&mut _ctx, _entity_type: u16, _sprite_id: u32, _layer_id: u32, _effect_layer_id: u32, _px: f32, _py: f32, _angle: f32, _vx: f32, _vy: f32, _faction: u32, _hitpoints: f32, _radius: f32, _lifetime: f32, _fade: f32, _fps: u32, _color_r: f32, _color_g: f32, _color_b: f32) {}
+        fn spawn_entity(&mut _ctx, _entity_type: u16, _sprite_id: u32, _layer_id: u32, _effect_layer_id: u32, _px: f32, _py: f32, _angle: f32, _vx: f32, _vy: f32, _faction: u16, _hitpoints: f32, _radius: f32, _lifetime: f32, _fade: f32, _fps: u32, _color_r: f32, _color_g: f32, _color_b: f32) {}
         fn destroy_entity(&mut _ctx, _entity_id: u64) {}
         fn set_v_motion(&mut _ctx, _entity_id: u64, _motion_type: u32, _vx: f32, _vy: f32) {}
         fn set_angle(&mut _ctx, _entity_id: u64, _angle: f32) {}

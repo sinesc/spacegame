@@ -12,7 +12,7 @@ pub struct EntityData {
     pub angle     : f32,
     pub script_type: u16,
     pub alive     : bool,
-    pub faction   : u32,
+    pub faction   : u16,
 }
 
 /// Context shared between Rust and Itsy via the API.
@@ -39,7 +39,7 @@ pub struct ScriptContext {
     pub game_time: f32,
     /// Player fire input (set by control system).
     pub input_fire: bool,
-    /// Mouse position (set by control system). Note: may be unreliable when cursor is grabbed.  
+    /// Mouse position (set by control system). Note: may be unreliable when cursor is grabbed.
     /// Use `mouse_delta` for relative movement.
     pub mouse_pos: (f32, f32),
     /// Mouse delta since last frame (set by control system). Reliable even when cursor is grabbed.

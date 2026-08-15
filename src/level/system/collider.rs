@@ -1,11 +1,10 @@
 use crate::prelude::*;
 use hecs;
-use crate::def::FactionId;
 use crate::level::component;
 
 pub fn run(world: &mut hecs::World) {
     // Collect entity data to avoid holding world borrows during mutation
-    let entities: Vec<(hecs::Entity, Vec2, f32, FactionId)> = world
+    let entities: Vec<(hecs::Entity, Vec2, f32, u16)> = world
         .query::<(&component::Spatial, &component::Bounding, &component::Hitpoints)>()
         .iter()
         .map(|(e, (s, b, _))| (e, s.position, b.radius, b.faction))

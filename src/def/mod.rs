@@ -5,8 +5,6 @@ pub use self::layer::*;
 pub mod entity;
 pub mod menu;
 pub use self::menu::*;
-pub mod faction;
-pub use self::faction::*;
 
 static MERGE_KEY: std::sync::LazyLock<serde_yaml::Value> =
     std::sync::LazyLock::new(|| serde_yaml::Value::String("<<<".to_string()));

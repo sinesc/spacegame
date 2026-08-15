@@ -3,7 +3,6 @@ use hecs;
 use rodio::{MixerDeviceSink, DeviceSinkBuilder};
 use rodio::mixer::Mixer;
 use crate::def;
-use crate::def::FactionId;
 use crate::bloom;
 use crate::repository::Repository;
 use crate::scripting;
@@ -123,7 +122,7 @@ impl Level {
     /// Detect collision pairs for the scripting subsystem.
     /// Returns flat list: [a, b, c, d, ...] = [(a,b), (c,d)].
     fn detect_collision_pairs(world: &hecs::World) -> Vec<u64> {
-        let entities: Vec<(hecs::Entity, Vec2, f32, FactionId)> = world
+        let entities: Vec<(hecs::Entity, Vec2, f32, u16)> = world
             .query::<(&component::Spatial, &component::Bounding, &component::Hitpoints)>()
             .iter()
             .map(|(e, (s, b, _))| (e, s.position, b.radius, b.faction))
