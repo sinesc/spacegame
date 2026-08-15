@@ -15,7 +15,6 @@ mod cmd;
 mod timeframe;
 mod console;
 mod repository;
-mod completion;
 mod scripting;
 
 use crate::prelude::*;
@@ -41,7 +40,7 @@ fn main() {
 
     let level = Rc::new(RefCell::new(Level::new(&input, &display.context())));
     let menu = Rc::new(Menu::new(&input, &display.context()));
-    let cmd = console::init_cmd(&menu, &level);
+    let cmd = console::init_cmd(&menu);
 
     // game main loop
 

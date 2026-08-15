@@ -11,6 +11,7 @@ pub enum Type {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub enum Param {
     Str(String),
     Int(i32),

@@ -1,4 +1,4 @@
-pub use std::{fs, path, io, fmt, error};
+pub use std::{fs, io, fmt, error};
 pub use std::io::prelude::*;
 pub use std::result::Result;
 pub use std::collections::HashMap;

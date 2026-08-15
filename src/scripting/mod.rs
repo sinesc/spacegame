@@ -23,7 +23,6 @@ pub struct ScriptingSubsystem {
 }
 
 // Entity type constants (must match Itsy script)
-pub const ET_NONE       : u16 = 0;
 pub const ET_PLAYER     : u16 = 1;
 pub const ET_ASTEROID   : u16 = 2;
 pub const ET_MINE_RED   : u16 = 3;
@@ -34,7 +33,6 @@ pub const ET_PROJECTILE     : u16 = 7;
 pub const ET_EXPLOSION      : u16 = 8;
 
 // Spawn triggers (must match Itsy script)
-pub const TRIGGER_NONE      : u32 = 0;
 pub const TRIGGER_GAME_START: u32 = 4;
 
 // Define the Itsy API type.
@@ -224,13 +222,8 @@ impl ScriptingSubsystem {
         self.context.spawn_trigger = trigger;
     }
 
-    /// Mark an entity as dying (for on_die dispatch).
-    pub fn mark_dying(&mut self, entity_id: u64) {
-        self.context.dying_entities.push(entity_id);
-    }
-
     /// Run the Itsy script for one frame.
-    pub fn run(&mut self, world: &mut hecs::World, ws: &WorldState, cmd: &mut hecs::CommandBuffer) {
+    pub fn run(&mut self, world: &mut hecs::World, _ws: &WorldState, cmd: &mut hecs::CommandBuffer) {
         // Build entity snapshot
         self.build_snapshot(world);
 
@@ -357,7 +350,7 @@ impl ScriptingSubsystem {
 /// Create an ECS entity from Itsy spawn API call (free function for API bridge).
 /// `vx, vy` seed the entity's initial velocity (Const motion applies v_current * delta
 /// each frame, so this is also how entities get their drift speed).
-fn spawn_entity_from_context(world: &mut hecs::World, cmd: &mut hecs::CommandBuffer,
+fn spawn_entity_from_context(_world: &mut hecs::World, cmd: &mut hecs::CommandBuffer,
     radiant_ctx: &Context, sprite_cache: &mut HashMap<String, Arc<Sprite>>,
     entity_type: u16, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: usize,
     hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32, game_time: f32) {

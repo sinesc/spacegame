@@ -1,3 +1,5 @@
+#![allow(dead_code)] // kept for re-adding audio support
+
 use crate::prelude::*;
 use std::io;
 use std::convert::AsRef;

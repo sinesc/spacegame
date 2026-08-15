@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InertialMotionType {
     Const,
     FollowVector,
@@ -19,8 +19,7 @@ impl Default for InertialMotionType {
  *
  * Entities with this component accellerate/rotate towards given vector according to trans_motion/rest values.
  */
-#[derive(Clone, Debug, Deserialize, Default)]
-#[serde(default)]
+#[derive(Clone, Debug, Default)]
 pub struct Inertial {
     /// Maximum velocity, needs to be positive.
     pub v_max: Vec2,

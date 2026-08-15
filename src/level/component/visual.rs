@@ -5,15 +5,10 @@ use crate::prelude::*;
  *
  * Entities with this component are rendered.
  */
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Visual {
-    #[serde(deserialize_with = "crate::def::layer_deserialize")]
-    #[serde(default = "crate::def::layer_default")]
     pub layer           : Option<Arc<Layer>>,
-    #[serde(deserialize_with = "crate::def::layer_deserialize")]
-    #[serde(default = "crate::def::layer_default")]
     pub effect_layer    : Option<Arc<Layer>>,
-    #[serde(deserialize_with = "crate::def::sprite_deserialize")]
     pub sprite          : Arc<Sprite>,
     pub scale           : f32,
     pub effect_scale    : f32,

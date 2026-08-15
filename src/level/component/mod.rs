@@ -8,17 +8,8 @@ mod inertial;
 pub use self::inertial::Inertial;
 pub use self::inertial::InertialMotionType;
 
-mod controlled;
-pub use self::controlled::Controlled;
-
-mod computed;
-pub use self::computed::Computed;
-
 mod lifetime;
 pub use self::lifetime::Lifetime;
-
-mod shooter;
-pub use self::shooter::Shooter;
 
 mod fading;
 pub use self::fading::Fading;
@@ -26,14 +17,8 @@ pub use self::fading::Fading;
 mod bounding;
 pub use self::bounding::Bounding;
 
-mod explodes;
-pub use self::explodes::Explodes;
-
 mod hitpoints;
 pub use self::hitpoints::Hitpoints;
-
-mod powerup;
-pub use self::powerup::Powerup;
 
 mod script;
 pub use self::script::Script;

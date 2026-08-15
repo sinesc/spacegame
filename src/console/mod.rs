@@ -3,21 +3,18 @@ use crate::cmd::Cmd;
 use crate::cmd::Type::*;
 use crate::cmd::Param;
 use crate::menu::Menu;
-use crate::level::Level;
 use crate::timeframe::Timeframe;
 
 pub struct CommandContext {
     pub menu            : Rc<Menu>,
-    pub level           : Rc<RefCell<Level>>,
     pub timeframe       : Timeframe,
     pub exit_requested  : bool,
 }
 
-pub fn init_cmd(menu: &Rc<Menu>, level: &Rc<RefCell<Level>>) -> Cmd<CommandContext> {
+pub fn init_cmd(menu: &Rc<Menu>) -> Cmd<CommandContext> {
 
     let mut cmd = Cmd::new(CommandContext {
         menu            : menu.clone(),
-        level           : level.clone(),
         timeframe       : Timeframe::new(),
         exit_requested  : false,
     });

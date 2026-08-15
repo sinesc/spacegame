@@ -5,13 +5,12 @@ use crate::prelude::*;
  *
  * Entities with this component have a position and orientation in space.
  */
-#[derive(Clone, Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Spatial {
     /// Current position
     pub position: Vec2,
     /// Current angle
     pub angle: Angle,
     /// Current lean left/right value
-    #[serde(default)]
     pub lean: f32,
 }

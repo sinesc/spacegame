@@ -15,11 +15,10 @@ mod system;
 
 pub struct Infrastructure {
     input       : Input,
+    #[allow(dead_code)] // kept for re-adding audio support
     audio       : Mixer,
     layer       : Repository<Arc<Layer>>,
-    sprite      : Repository<Arc<Sprite>>,
-    repository  : Repository<def::EntityDescriptor>,
-    spawner     : Repository<def::SpawnerDescriptor, def::SpawnerId>,
+    #[allow(dead_code)] // kept for re-adding audio support
     sound       : Repository<SoundGroup>,
     font        : Arc<Font>,
 }
@@ -33,27 +32,6 @@ pub struct WorldState {
     pub inf         : Arc<Infrastructure>,
 }
 
-impl WorldState {
-    pub fn spawn_lazy(&self, cmd: &mut hecs::CommandBuffer, name: &str, position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
-        self.inf.repository[name].spawn_lazy(cmd, self.age, position, angle, faction);
-    }
-    pub fn spawner(&self, cmd: &mut hecs::CommandBuffer, spawner_id: def::SpawnerId, parent_angle: Angle, parent_position: Option<Vec2>, angle: Option<Angle>, faction: Option<FactionId>) {
-        let spawner = &self.inf.spawner.index(spawner_id);
-        for spawn in &spawner.entities {
-            let pos = match parent_position {
-                Some(parent_position) => parent_position + spawn.position.rotate(parent_angle),
-                None => spawn.position.rotate(parent_angle),
-            };
-            if let Some(ref entity) = spawn.extend {
-                entity.get().unwrap().spawn_lazy(cmd, self.age, Some(pos), angle, faction);
-            }
-            if let Some(ref sound) = spawn.sound {
-                self.inf.audio.add(self.inf.sound[sound].decoder());
-            }
-        }
-    }
-}
-
 pub struct Level {
     world           : hecs::World,
     world_state     : WorldState,
@@ -62,7 +40,6 @@ pub struct Level {
     inf             : Arc<Infrastructure>,
     age             : f32,
     _audio_sink     : MixerDeviceSink,
-    context         : Context,
 
     bloom           : postprocessors::Bloom,
     glare           : bloom::Bloom,
@@ -98,11 +75,7 @@ impl Level {
             layers.insert(info.name.clone(), layer);
         }
 
-        let mut sprites = Repository::new();
-        let factions = def::parse_factions().unwrap();
-        let sounds = def::parse_sounds().unwrap();
-        let mut spawners = def::parse_spawners().unwrap();
-        let entities = def::parse_entities(&context, &mut sprites, &factions, &mut spawners, &layers).unwrap();
+        let sounds = def::parse_sounds().unwrap(); // kept for re-adding audio support
 
         // Player is now spawned by Itsy via GAME_START trigger
 
@@ -110,9 +83,6 @@ impl Level {
             audio       : audio,
             input       : input.clone(),
             layer       : layers,
-            sprite      : sprites,
-            repository  : entities,
-            spawner     : spawners,
             sound       : sounds,
             font        : font,
         });
@@ -141,7 +111,6 @@ impl Level {
             layer_def       : layer_def,
             age             : 0.0,
             _audio_sink     : audio_sink,
-            context         : context.clone(),
             bloom           : bloom,
             glare           : bloom::Bloom::new(&context, (1920, 1080), 2, 5, 5.0),
             inf             : infrastructure,
@@ -184,19 +153,14 @@ impl Level {
 
         let mut cmd = hecs::CommandBuffer::new();
 
-        // Control system: handles movement for non-scripted entities, returns fire state
-        let control_result = system::run_control(&mut self.world, &self.world_state);
-
         // Detect collisions for scripting subsystem
         let collision_pairs = Self::detect_collision_pairs(&self.world);
         self.scripting.set_collisions(collision_pairs);
 
         // Configure scripting subsystem
         self.scripting.set_game_time(age);
-        // The player entity is spawned by Itsy and has no Controlled component,
-        // so run_control won't detect its fire input. Check mouse/keyboard directly.
-        let firing = control_result.firing
-            || self.world_state.inf.input.down(InputId::Mouse1)
+        // Firing input: mouse button 1 or left ctrl
+        let firing = self.world_state.inf.input.down(InputId::Mouse1)
             || self.world_state.inf.input.down(InputId::LControl);
         self.scripting.set_input_fire(firing);
 
@@ -231,14 +195,11 @@ impl Level {
         // Apply scripting commands BEFORE inertia so v_fraction changes take effect
         cmd.run_on(&mut self.world);
 
-        // Shared systems (no compute/upgrader — moved to Itsy)
+        // Shared systems (compute/upgrader/control moved to Itsy)
         system::run_inertia(&mut self.world, &self.world_state);
-        system::run_collider(&mut self.world, &self.world_state, &mut cmd);
+        system::run_collider(&mut self.world);
         self.render_system.run(&mut self.world, &self.world_state);
         system::run_cleanup(&mut self.world, &self.world_state);
-
-        // Apply collider commands
-        cmd.run_on(&mut self.world);
 
         // render layers
         renderer.fill().texture(&self.background).blendmode(blendmodes::COPY).draw();

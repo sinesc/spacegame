@@ -1,13 +1,8 @@
 use crate::prelude::*;
 
-pub mod misc;
-pub use self::misc::*;
 pub mod layer;
 pub use self::layer::*;
 pub mod entity;
-pub use self::entity::*;
-pub mod spawner;
-pub use self::spawner::*;
 pub mod menu;
 pub use self::menu::*;
 pub mod faction;
@@ -52,21 +47,6 @@ fn parse_file<T>(filename: &str) -> Result<T, Error> where T: serde::de::Deseria
     parse_str(&contents)
 }
 
-/// Parses a directory of yaml files.
-fn parse_dir<T>(source: &str, extensions: &[ &str ]) -> Result<T, Error> where T: serde::de::DeserializeOwned {
-
-    let files = find(source, extensions)?;
-    let mut contents = Vec::new();
-
-    for filename in files {
-        let mut f = fs::File::open(&filename)?;
-        f.read_to_end(&mut contents)?;
-        contents.push('\n' as u8);
-    }
-
-    parse_str(&String::from_utf8(contents).unwrap())
-}
-
 /// Parses a yaml string.
 fn parse_str<T>(source: &str) -> Result<T, Error> where T: serde::de::DeserializeOwned {
     match serde_yaml::from_str(source) {
@@ -84,21 +64,6 @@ fn parse_str<T>(source: &str) -> Result<T, Error> where T: serde::de::Deserializ
         }
         Err(error) => Err(Error { description: "Parsing failed".to_string(), cause: Some(Box::new(error)) })
     }
-}
-
-/// Returns a list of files with the given extension in the given path.
-fn find(path: &str, extensions: &[ &str ]) -> io::Result<Vec<path::PathBuf>> {
-    let mut files = Vec::new();
-    let entry_set = fs::read_dir(path)?;
-    let mut entries = entry_set.collect::<Result<Vec<_>, _>>()?;
-    entries.sort_by(|a, b| a.path().cmp(&b.path()));
-    for entry in entries {
-        let extension = entry.path().extension().map_or("", |p| p.to_str().unwrap()).to_string(); // !todo better solution or intended user experience ?
-        if extensions.iter().find(|ext| **ext == extension).is_some() && entry.path().is_file() {
-            files.push(entry.path().to_path_buf());
-        }
-    }
-    Ok(files)
 }
 
 /// Merges values of "<<<" keys into the current map.

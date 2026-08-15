@@ -4,5 +4,5 @@
  *
  * Entities with this component can die from damage.
  */
-#[derive(Clone, Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Hitpoints(pub f32);
