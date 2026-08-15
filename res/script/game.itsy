@@ -8,6 +8,7 @@ use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_vel
           get_think_count, get_think_id,
           get_collision_count, get_collision_id,
           get_game_time, get_input_fire, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_spawn_trigger, get_rand_range,
+          get_sprites, get_sounds, get_layers,
           get_dying_count, get_dying_id,
           spawn_entity, destroy_entity, set_v_motion, set_angle, set_hitpoints, apply_damage,
           debug_print};
@@ -67,7 +68,20 @@ const MOTION_DETACHED : u32 = 3;  // rotate toward v_fraction, no movement
 // Entity type definitions (static data per type)
 // ============================================================
 
+// Layer ID meaning "no layer" (Rust treats u32::MAX as absent).
+const LAYER_ID_NONE: u32 = 4294967295;
+
+// Entity visual fields: sprite is a key into sprite_map (full res/sprite/... path
+// from get_sprites()); layer / effect_layer are keys into layer_map ("" = none,
+// resolved to LAYER_ID_NONE). color_r/g/b tint the sprite (values may exceed 1.0
+// on the additive effects layer).
 struct EntityDef {
+    sprite      : String,
+    layer       : String,
+    effect_layer: String,
+    color_r     : f32,
+    color_g     : f32,
+    color_b     : f32,
     hitpoints   : f32,
     radius      : f32,
     lifetime    : f32,
@@ -79,14 +93,15 @@ struct EntityDef {
 
 // fps = sprite animation speed. 0 = lean-picked frame (player/lean-driven sprites);
 // 30 = original hostile_visual fps (asteroids, mines, powerups, explosions animate).
-const DEF_PLAYER    : EntityDef = EntityDef { hitpoints: 10000.0, radius: 20.0, lifetime: 0.0, explode_as: ET_NONE, speed: 0.0, fade: 0.0, fps: 0 };
-const DEF_ASTEROID  : EntityDef = EntityDef { hitpoints: 100.0,   radius: 16.0, lifetime: 0.0, explode_as: ET_EXPLOSION, speed: 100.0, fade: 0.0, fps: 30 };
-const DEF_MINE_RED  : EntityDef = EntityDef { hitpoints: 1000.0,  radius: 28.0, lifetime: 0.0, explode_as: ET_EXPLOSION, speed: 100.0, fade: 0.0, fps: 30 };
-const DEF_MINE_GREEN: EntityDef = EntityDef { hitpoints: 1000.0,  radius: 28.0, lifetime: 0.0, explode_as: ET_EXPLOSION, speed: 100.0, fade: 0.0, fps: 30 };
-const DEF_POWERUP_D : EntityDef = EntityDef { hitpoints: 50.0,    radius: 16.0, lifetime: 60.0, explode_as: ET_NONE, speed: 100.0, fade: 0.0, fps: 30 };
-const DEF_POWERUP_T : EntityDef = EntityDef { hitpoints: 50.0,    radius: 16.0, lifetime: 60.0, explode_as: ET_NONE, speed: 100.0, fade: 0.0, fps: 30 };
-const DEF_PROJECTILE: EntityDef = EntityDef { hitpoints: 25.0,    radius: 5.0,  lifetime: 1.0,  explode_as: ET_NONE, speed: 500.0, fade: 0.5, fps: 0 };
-const DEF_EXPLOSION : EntityDef = EntityDef { hitpoints: 1.0,     radius: 32.0, lifetime: 1.3,  explode_as: ET_NONE, speed: 0.0, fade: 0.0, fps: 30 };
+// Explosions render on the effect layer only (that is the bloom pass = the glow).
+const DEF_PLAYER    : EntityDef = EntityDef { sprite: "res/sprite/player/speedy_98x72x30.png", layer: "base", effect_layer: "", color_r: 0.8, color_g: 0.8, color_b: 1.0, hitpoints: 10000.0, radius: 20.0, lifetime: 0.0, explode_as: ET_NONE, speed: 0.0, fade: 0.0, fps: 0 };
+const DEF_ASTEROID  : EntityDef = EntityDef { sprite: "res/sprite/asteroid/type1_64x64x60.png", layer: "base", effect_layer: "", color_r: 1.0, color_g: 1.0, color_b: 1.0, hitpoints: 100.0,   radius: 16.0, lifetime: 0.0, explode_as: ET_EXPLOSION, speed: 100.0, fade: 0.0, fps: 30 };
+const DEF_MINE_RED  : EntityDef = EntityDef { sprite: "res/sprite/hostile/mine_red_lm_64x64x15x2.png", layer: "base", effect_layer: "", color_r: 1.0, color_g: 1.0, color_b: 1.0, hitpoints: 1000.0,  radius: 28.0, lifetime: 0.0, explode_as: ET_EXPLOSION, speed: 100.0, fade: 0.0, fps: 30 };
+const DEF_MINE_GREEN: EntityDef = EntityDef { sprite: "res/sprite/hostile/mine_green_lm_64x64x15x2.png", layer: "base", effect_layer: "", color_r: 1.0, color_g: 1.0, color_b: 1.0, hitpoints: 1000.0,  radius: 28.0, lifetime: 0.0, explode_as: ET_EXPLOSION, speed: 100.0, fade: 0.0, fps: 30 };
+const DEF_POWERUP_D : EntityDef = EntityDef { sprite: "res/sprite/powerup/ball_v_32x32x18.jpg", layer: "effects", effect_layer: "", color_r: 1.5, color_g: 1.5, color_b: 2.0, hitpoints: 50.0,    radius: 16.0, lifetime: 60.0, explode_as: ET_NONE, speed: 100.0, fade: 0.0, fps: 30 };
+const DEF_POWERUP_T : EntityDef = EntityDef { sprite: "res/sprite/powerup/ball_v_32x32x18.jpg", layer: "effects", effect_layer: "", color_r: 1.5, color_g: 0.5, color_b: 0.5, hitpoints: 50.0,    radius: 16.0, lifetime: 60.0, explode_as: ET_NONE, speed: 100.0, fade: 0.0, fps: 30 };
+const DEF_PROJECTILE: EntityDef = EntityDef { sprite: "res/sprite/projectile/bolt_white_60x36x1.jpg", layer: "effects", effect_layer: "", color_r: 1.0, color_g: 1.0, color_b: 1.5, hitpoints: 25.0,    radius: 5.0,  lifetime: 1.0,  explode_as: ET_NONE, speed: 500.0, fade: 0.5, fps: 0 };
+const DEF_EXPLOSION : EntityDef = EntityDef { sprite: "res/sprite/explosion/default_256x256x40.jpg", layer: "", effect_layer: "effects", color_r: 1.0, color_g: 1.0, color_b: 1.0, hitpoints: 1.0,     radius: 32.0, lifetime: 1.3,  explode_as: ET_NONE, speed: 0.0, fade: 0.0, fps: 30 };
 
 fn get_def(entity_type: u16) -> EntityDef {
     match entity_type {
@@ -105,6 +120,12 @@ fn get_def(entity_type: u16) -> EntityDef {
 // ============================================================
 // Entity trait: common interface for all entity types
 // ============================================================
+
+// Resource ID maps (populated once at startup in main()). Maps are
+// reference types, so their contents can be mutated even though the
+// bindings are const.
+const SPRITE_MAP: [ String => u32 ] = [ => ];
+const LAYER_MAP: [ String => u32 ] = [ => ];
 
 trait Entity {
     fn on_think(self: Self, entity_id: u64, age: f32);
@@ -180,7 +201,7 @@ impl Entity for Player {
             let def = get_def(ET_PROJECTILE);
             let pvx = angle.cos() * def.speed;
             let pvy = angle.sin() * def.speed;
-            spawn_entity(ET_PROJECTILE, px, py, angle, pvx, pvy, faction, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
+            spawn_with_def(ET_PROJECTILE, def, px, py, angle, pvx, pvy, faction);
 
             self.shoot_timer = age;
         }
@@ -225,7 +246,7 @@ impl Entity for Mine {
                 let def = get_def(self.projectile_type);
                 let vx = nx * def.speed;
                 let vy = ny * def.speed;
-                spawn_entity(self.projectile_type, my_x, my_y, angle, vx, vy, get_faction(entity_id), def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
+                spawn_with_def(self.projectile_type, def, my_x, my_y, angle, vx, vy, get_faction(entity_id));
 
                 self.shoot_timer = age;
             }
@@ -242,7 +263,7 @@ impl Entity for Mine {
             let px = get_position_x(entity_id);
             let py = get_position_y(entity_id);
             let explode_def = get_def(def.explode_as);
-            spawn_entity(def.explode_as, px, py, 0.0, 0.0, 0.0, get_faction(entity_id), explode_def.hitpoints, explode_def.radius, explode_def.lifetime, explode_def.fade, explode_def.fps);
+            spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(entity_id));
         }
     }
 }
@@ -260,7 +281,7 @@ impl Entity for Asteroid {
             let px = get_position_x(entity_id);
             let py = get_position_y(entity_id);
             let explode_def = get_def(def.explode_as);
-            spawn_entity(def.explode_as, px, py, 0.0, 0.0, 0.0, get_faction(entity_id), explode_def.hitpoints, explode_def.radius, explode_def.lifetime, explode_def.fade, explode_def.fps);
+            spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(entity_id));
         }
     }
 }
@@ -291,7 +312,7 @@ impl Entity for Powerup {
             let px = get_position_x(entity_id);
             let py = get_position_y(entity_id);
             let explode_def = get_def(def.explode_as);
-            spawn_entity(def.explode_as, px, py, 0.0, 0.0, 0.0, get_faction(entity_id), explode_def.hitpoints, explode_def.radius, explode_def.lifetime, explode_def.fade, explode_def.fps);
+            spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(entity_id));
         }
     }
 }
@@ -309,7 +330,7 @@ impl Entity for Projectile {
             let px = get_position_x(entity_id);
             let py = get_position_y(entity_id);
             let explode_def = get_def(def.explode_as);
-            spawn_entity(def.explode_as, px, py, 0.0, 0.0, 0.0, get_faction(entity_id), explode_def.hitpoints, explode_def.radius, explode_def.lifetime, explode_def.fade, explode_def.fps);
+            spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(entity_id));
         }
     }
 }
@@ -423,6 +444,28 @@ fn dispatch_on_die(state: GameState, entity_id: u64) {
 // Helpers
 // ============================================================
 
+// Resolves the def's sprite / layer names to IDs via the global resource maps
+// and calls the spawn API. All entity spawning goes through here.
+fn spawn_with_def(entity_type: u16, def: EntityDef, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: u32) {
+    let sprite_name = def.sprite;
+    let sprite_id = match SPRITE_MAP.get(sprite_name) {
+        Some(id) => id,
+        None => {
+            debug_print("missing sprite: {sprite_name}");
+            0
+        },
+    };
+    let layer_id = match LAYER_MAP.get(def.layer) {
+        Some(id) => id,
+        None => LAYER_ID_NONE,
+    };
+    let effect_layer_id = match LAYER_MAP.get(def.effect_layer) {
+        Some(id) => id,
+        None => LAYER_ID_NONE,
+    };
+    spawn_entity(entity_type, sprite_id, layer_id, effect_layer_id, px, py, angle, vx, vy, faction, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps, def.color_r, def.color_g, def.color_b);
+}
+
 fn find_nearest_player(to_entity_id: u64) -> u64 {
     let my_x = get_position_x(to_entity_id);
     let my_y = get_position_y(to_entity_id);
@@ -472,7 +515,7 @@ fn spawn_asteroid() {
     let dir_angle = -angle;
     let vx = dir_angle.cos() * def.speed;
     let vy = dir_angle.sin() * def.speed;
-    spawn_entity(ET_ASTEROID, px, py, dir_angle, vx, vy, faction, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
+    spawn_with_def(ET_ASTEROID, def, px, py, dir_angle, vx, vy, faction);
 }
 
 fn spawn_mine(angle: f32, faction: u32) {
@@ -488,7 +531,7 @@ fn spawn_mine(angle: f32, faction: u32) {
     // Starts drifting outward; the mine AI steers it toward the player.
     let vx = angle.cos() * def.speed;
     let vy = angle.sin() * def.speed;
-    spawn_entity(mine_type, px, py, angle, vx, vy, faction, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
+    spawn_with_def(mine_type, def, px, py, angle, vx, vy, faction);
 }
 
 fn spawn_powerup() {
@@ -496,7 +539,7 @@ fn spawn_powerup() {
     let pw_type = if (get_rand_range(0.0, 1.0) > 0.5) { ET_POWERUP_DUAL } else { ET_POWERUP_TRIPLE };
     let def = get_def(pw_type);
     // Spawns at the right edge and drifts left across the screen.
-    spawn_entity(pw_type, WORLD_WIDTH, pw_y, 0.0, 0.0 - def.speed, 0.0, 0, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
+    spawn_with_def(pw_type, def, WORLD_WIDTH, pw_y, 0.0, 0.0 - def.speed, 0.0, 0);
 }
 
 fn update_spawners(state: GameState, age: f32) {
@@ -531,6 +574,22 @@ fn update_spawners(state: GameState, age: f32) {
 fn main() {
     let state = new_game_state();
 
+    // Populate the global resource ID maps (sprite/layer lists are static, so
+    // this runs once).
+    let sprites = get_sprites();
+    let i: u64 = 0;
+    while (i < sprites.len()) {
+        SPRITE_MAP.insert(sprites[i], i as u32);
+        i = i + 1;
+    }
+    let layers = get_layers();
+    let i: u64 = 0;
+    while (i < layers.len()) {
+        LAYER_MAP.insert(layers[i], i as u32);
+        i = i + 1;
+    }
+    debug_print("loaded {sprites.len()} sprites, {get_sounds().len()} sounds, {layers.len()} layers");
+
     while (true) {
         let age = get_game_time();
 
@@ -538,7 +597,7 @@ fn main() {
         let trigger = get_spawn_trigger();
         if (trigger == TRIGGER_GAME_START) {
             let def = get_def(ET_PLAYER);
-            spawn_entity(ET_PLAYER, 230.0, 350.0, 0.0, 0.0, 0.0, 0, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps);
+            spawn_with_def(ET_PLAYER, def, 230.0, 350.0, 0.0, 0.0, 0.0, 0);
         }
 
         // Periodic asteroid / mine / powerup spawning

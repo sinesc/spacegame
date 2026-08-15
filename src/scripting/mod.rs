@@ -22,15 +22,10 @@ pub struct ScriptingSubsystem {
     sprite_cache: HashMap<String, Arc<Sprite>>,
 }
 
-// Entity type constants (must match Itsy script)
+// Entity type constants (must match the ET_* constants in res/script/game.itsy).
+// Only the ones referenced by the Rust side are kept; the script defines the rest.
 pub const ET_PLAYER     : u16 = 1;
-pub const ET_ASTEROID   : u16 = 2;
-pub const ET_MINE_RED   : u16 = 3;
-pub const ET_MINE_GREEN : u16 = 4;
-pub const ET_POWERUP_DUAL   : u16 = 5;
-pub const ET_POWERUP_TRIPLE : u16 = 6;
-pub const ET_PROJECTILE     : u16 = 7;
-pub const ET_EXPLOSION      : u16 = 8;
+pub const ET_EXPLOSION  : u16 = 8;
 
 // Spawn triggers (must match Itsy script)
 pub const TRIGGER_GAME_START: u32 = 4;
@@ -112,6 +107,23 @@ itsy::itsy_api! {
         fn get_rand_range(&mut context, min: f32, max: f32) -> f32 {
             context.rng.range(min, max)
         }
+        /// All sprite file paths (recursive listing of res/sprite, sorted).
+        /// Generated once on the Rust side; the returned vector index is the
+        /// sprite ID shared between Itsy and Rust.
+        fn get_sprites(&mut context) -> [ String ] {
+            context.sprite_list.clone()
+        }
+        /// All sound file paths (recursive listing of res/sound, sorted).
+        /// Generated once on the Rust side; the returned vector index is the
+        /// sound ID shared between Itsy and Rust.
+        fn get_sounds(&mut context) -> [ String ] {
+            context.sound_list.clone()
+        }
+        /// All layer names (from res/def/layer.yaml, in creation order).
+        /// The returned vector index is the layer ID shared between Itsy and Rust.
+        fn get_layers(&mut context) -> [ String ] {
+            context.layer_list.clone()
+        }
         fn debug_print(&mut _context, msg: String) {
             eprintln!("ITSY: {}", msg);
         }
@@ -122,12 +134,12 @@ itsy::itsy_api! {
         /// of its lifetime (0 = no fading).
         /// `fps` = sprite animation speed (0 = no animation; frame is then picked
         /// from the entity's lean, like the original sprite-variant behavior).
-        fn spawn_entity(&mut context, entity_type: u16, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: u32, hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32) {
-            let world = unsafe { &mut *context.world };
-            let cmd = unsafe { &mut *context.cmd };
-            let radiant_ctx = unsafe { &*context.radiant_ctx };
-            let sprite_cache = unsafe { &mut *context.sprite_cache };
-            spawn_entity_from_context(world, cmd, radiant_ctx, sprite_cache, entity_type, px, py, angle, vx, vy, faction as usize, hitpoints, radius, lifetime, fade, fps, context.game_time);
+        /// `sprite_id` / `layer_id` / `effect_layer_id` index into `get_sprites()` /
+        /// `get_layers()`; `u32::MAX` as a layer ID means "no layer".
+        /// `color_r/g/b` tint the sprite (alpha is always 1.0; values may exceed 1.0
+        /// on additive layers).
+        fn spawn_entity(&mut context, entity_type: u16, sprite_id: u32, layer_id: u32, effect_layer_id: u32, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: u32, hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32, color_r: f32, color_g: f32, color_b: f32) {
+            spawn_entity_from_context(&context, entity_type, sprite_id, layer_id, effect_layer_id, px, py, angle, vx, vy, faction as usize, hitpoints, radius, lifetime, fade, fps, color_r, color_g, color_b);
         }
         fn destroy_entity(&mut context, entity_id: u64) {
             let world = unsafe { &mut *context.world };
@@ -182,11 +194,13 @@ itsy::itsy_api! {
 }
 
 impl ScriptingSubsystem {
-    pub fn new(radiant_ctx: Context) -> Self {
+    pub fn new(radiant_ctx: Context, layer_list: Vec<String>) -> Self {
+        let mut context = ScriptContext::new();
+        context.layer_list = layer_list;
         ScriptingSubsystem {
             program: None,
             vm: None,
-            context: ScriptContext::new(),
+            context,
             radiant_ctx,
             sprite_cache: HashMap::new(),
         }
@@ -350,10 +364,20 @@ impl ScriptingSubsystem {
 /// Create an ECS entity from Itsy spawn API call (free function for API bridge).
 /// `vx, vy` seed the entity's initial velocity (Const motion applies v_current * delta
 /// each frame, so this is also how entities get their drift speed).
-fn spawn_entity_from_context(_world: &mut hecs::World, cmd: &mut hecs::CommandBuffer,
-    radiant_ctx: &Context, sprite_cache: &mut HashMap<String, Arc<Sprite>>,
-    entity_type: u16, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: usize,
-    hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32, game_time: f32) {
+/// Visuals (sprite / layers / color) are passed by the script as IDs into
+/// `ScriptContext::sprite_list` / `layer_list`; `u32::MAX` = no layer.
+/// `entity_type` only drives the Script component, player speed and the
+/// explosion no-move / no-collision rules.
+fn spawn_entity_from_context(ctx: &ScriptContext,
+    entity_type: u16, sprite_id: u32, layer_id: u32, effect_layer_id: u32,
+    px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: usize,
+    hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32,
+    color_r: f32, color_g: f32, color_b: f32) {
+    let cmd = unsafe { &mut *ctx.cmd };
+    let radiant_ctx = unsafe { &*ctx.radiant_ctx };
+    let sprite_cache = unsafe { &mut *ctx.sprite_cache };
+    let game_time = ctx.game_time;
+
     let mut builder = hecs::EntityBuilder::new();
 
     // Spatial component (all entities have this)
@@ -422,23 +446,16 @@ fn spawn_entity_from_context(_world: &mut hecs::World, cmd: &mut hecs::CommandBu
     // Script component (so Itsy can track it)
     builder.add(component::Script(entity_type));
 
-    // Visual component (entity-type-specific).
-    // Explosions are rendered on the effect layer only (original design:
-    // layer: none, effect_layer: effects) — the effects layer is what gets the
-    // bloom pass, which is the explosion's glow.
-    let (sprite_name, layer_name, effect_layer_name, color) = match entity_type {
-        ET_PLAYER     => ("player/speedy_98x72x30.png", "base", "", [0.8, 0.8, 1.0, 1.0]),
-        ET_ASTEROID   => ("asteroid/type1_64x64x60.png", "base", "", [1.0, 1.0, 1.0, 1.0]),
-        ET_MINE_RED   => ("hostile/mine_red_lm_64x64x15x2.png", "base", "", [1.0, 1.0, 1.0, 1.0]),
-        ET_MINE_GREEN => ("hostile/mine_green_lm_64x64x15x2.png", "base", "", [1.0, 1.0, 1.0, 1.0]),
-        ET_POWERUP_DUAL   => ("powerup/ball_v_32x32x18.jpg", "effects", "", [1.5, 1.5, 2.0, 1.0]),
-        ET_POWERUP_TRIPLE => ("powerup/ball_v_32x32x18.jpg", "effects", "", [1.5, 0.5, 0.5, 1.0]),
-        ET_PROJECTILE     => ("projectile/bolt_white_60x36x1.jpg", "effects", "", [1.0, 1.0, 1.5, 1.0]),
-        ET_EXPLOSION      => ("explosion/default_256x256x40.jpg", "", "effects", [1.0, 1.0, 1.0, 1.0]),
-        _ => ("placeholder_16x16x1.png", "base", "", [1.0, 1.0, 1.0, 1.0]),
+    // Visual component: sprite and layers are referenced by ID (see
+    // ScriptContext::sprite_list / layer_list); the script resolves names to IDs.
+    // (Explosions are rendered on the effect layer only — the effects layer is
+    // what gets the bloom pass, which is the explosion's glow.)
+    let sprite_path = if (sprite_id as usize) < ctx.sprite_list.len() {
+        ctx.sprite_list[sprite_id as usize].clone()
+    } else {
+        eprintln!("spawn_entity: invalid sprite_id {}", sprite_id);
+        "res/sprite/placeholder_16x16x1.png".to_string()
     };
-
-    let sprite_path = format!("res/sprite/{}", sprite_name);
     let sprite = match sprite_cache.get(&sprite_path).cloned() {
         Some(s) => s,
         None => {
@@ -455,19 +472,23 @@ fn spawn_entity_from_context(_world: &mut hecs::World, cmd: &mut hecs::CommandBu
             }
         }
     };
-    // Resolve layers from global repository ("" = no layer)
-    let resolve_layer = |name: &str| -> Option<Arc<Layer>> {
+    // Resolve layers by ID from the global repository (u32::MAX = no layer).
+    let resolve_layer = |id: u32| -> Option<Arc<Layer>> {
+        if id == u32::MAX || (id as usize) >= ctx.layer_list.len() {
+            return None;
+        }
+        let name = ctx.layer_list[id as usize].clone();
         unsafe {
             let layers_ptr = crate::def::entity::LAYERS;
-            if layers_ptr.is_null() || name.is_empty() {
+            if layers_ptr.is_null() {
                 None
             } else {
-                (*layers_ptr).name(name).cloned()
+                (*layers_ptr).name(&name).cloned()
             }
         }
     };
-    let layer = resolve_layer(layer_name);
-    let effect_layer = resolve_layer(effect_layer_name);
+    let layer = resolve_layer(layer_id);
+    let effect_layer = resolve_layer(effect_layer_id);
 
     builder.add(component::Visual {
         layer,
@@ -475,7 +496,7 @@ fn spawn_entity_from_context(_world: &mut hecs::World, cmd: &mut hecs::CommandBu
         sprite: sprite,
         scale: 1.0,
         effect_scale: 1.0,
-        color: Color(color[0], color[1], color[2], color[3]),
+        color: Color(color_r, color_g, color_b, 1.0),
         effect_color: Color::WHITE,
         frame_id: 0.0,
         fps: fps,

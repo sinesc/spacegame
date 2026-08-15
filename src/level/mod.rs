@@ -104,6 +104,9 @@ impl Level {
         bloom.clear = false;
         bloom.draw_color = Color::alpha_pm(0.15);
 
+        // Layer names for the scripting subsystem (ID = index into this list).
+        let layer_names: Vec<String> = layer_def.create.iter().map(|i| i.name.clone()).collect();
+
         Level {
             world           : world,
             world_state     : world_state,
@@ -115,7 +118,7 @@ impl Level {
             glare           : bloom::Bloom::new(&context, (1920, 1080), 2, 5, 5.0),
             inf             : infrastructure,
             background      : background,
-            scripting       : ScriptingSubsystem::new(context.clone()),
+            scripting       : ScriptingSubsystem::new(context.clone(), layer_names),
             game_started    : false,
         }
     }

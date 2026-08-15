@@ -46,6 +46,18 @@ pub struct ScriptContext {
     pub dying_entities: Vec<u64>,
     /// Random number generator for the Itsy script (seeded deterministically).
     pub rng: Rng,
+    /// Sprite file paths (recursive listing of res/sprite, sorted).
+    /// Generated once at startup; the vector index is the sprite ID
+    /// shared between Itsy and Rust.
+    pub sprite_list: Vec<String>,
+    /// Sound file paths (recursive listing of res/sound, sorted).
+    /// Generated once at startup; the vector index is the sound ID
+    /// shared between Itsy and Rust.
+    pub sound_list: Vec<String>,
+    /// Layer names (from res/def/layer.yaml "create", in creation order).
+    /// The vector index is the layer ID shared between Itsy and Rust.
+    /// `u32::MAX` means "no layer".
+    pub layer_list: Vec<String>,
 }
 
 impl ScriptContext {
@@ -66,6 +78,57 @@ impl ScriptContext {
             spawn_trigger: 0,
             dying_entities: Vec::new(),
             rng: Rng::new(123.4),
+            sprite_list: list_files_recursive("res/sprite"),
+            sound_list: list_files_recursive("res/sound"),
+            layer_list: Vec::new(), // set by ScriptingSubsystem::new from the layer def
         }
+    }
+}
+
+/// Recursively lists all files under `path`, returning project-root-relative
+/// paths in a stable (sorted) order so vector indices stay deterministic.
+fn list_files_recursive(path: &str) -> Vec<String> {
+    let mut result = Vec::new();
+    list_files_recursive_inner(path, &mut result);
+    result.sort();
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lists_sprite_and_sound_files() {
+        let sprites = list_files_recursive("res/sprite");
+        let sounds = list_files_recursive("res/sound");
+        assert!(sprites.len() > 0, "expected sprite files");
+        assert!(sounds.len() > 0, "expected sound files");
+        assert!(sprites.iter().all(|p| p.starts_with("res/sprite/")));
+        assert!(sounds.iter().all(|p| p.starts_with("res/sound/")));
+        // stable ordering: sorted
+        let mut sorted = sprites.clone();
+        sorted.sort();
+        assert_eq!(sprites, sorted);
+    }
+}
+
+fn list_files_recursive_inner(path: &str, out: &mut Vec<String>) {
+    let Ok(entries) = fs::read_dir(path) else {
+        eprintln!("list_files_recursive: cannot read directory '{}'", path);
+        return;
+    };
+    let mut subdirs = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if entry.path().is_dir() {
+            subdirs.push(format!("{}/{}", path, name));
+        } else {
+            out.push(format!("{}/{}", path, name));
+        }
+    }
+    subdirs.sort();
+    for sub in subdirs {
+        list_files_recursive_inner(&sub, out);
     }
 }
