@@ -46,6 +46,12 @@ const MINE_INTERVAL: f32 = 8.0;
 const ASTEROID_FIRST_SPAWN: f32 = 4.0;
 const MINE_FIRST_SPAWN: f32 = 12.0;
 
+// Player weapon levels (old spawners player-weapon-single/dual/triple from
+// res/def/spawner/weapon.yaml). Powerups upgrade the player's weapon.
+const WEAPON_SINGLE: u16 = 0;
+const WEAPON_DUAL   : u16 = 1;
+const WEAPON_TRIPLE : u16 = 2;
+
 // ============================================================
 // Entity type definitions (static data per type)
 // ============================================================
@@ -107,6 +113,12 @@ fn get_def(entity_type: u16) -> EntityDef {
 const SPRITE_MAP: [ String => u32 ] = [ => ];
 const LAYER_MAP: [ String => u32 ] = [ => ];
 const SOUND_MAP: [ String => u32 ] = [ => ];
+
+// Current player weapon per player ECS id (WEAPON_*). Set to WEAPON_SINGLE on
+// registration, replaced on powerup pickup (Powerup::on_think), cleared in
+// Player::on_die. A plain data global so trait handlers can read/write it
+// (trait methods cannot take the GameState that holds the entity map).
+const PLAYER_WEAPON: [ u64 => u16 ] = [ => ];
 
 // Sound groups: name -> variant file names (keys of SOUND_MAP). Moved here
 // from res/def/sound.yaml (2026-08); the script picks a variant at random.
@@ -285,8 +297,8 @@ struct Asteroid {
 }
 
 struct Powerup {
-    id:         u64,
-    weapon_type: u16,
+    id:     u64,
+    weapon: u16,
 }
 
 struct Projectile {
@@ -334,14 +346,34 @@ impl Entity for Player {
             let angle = get_angle(self.id);
             let faction = get_faction(self.id);
 
-            let def = get_def(ET_PROJECTILE);
-            let pvx = angle.cos() * def.speed;
-            let pvy = angle.sin() * def.speed;
-            spawn_with_def(ET_PROJECTILE, def, px, py, angle, pvx, pvy, faction);
+            // Weapon patterns (old spawners player-weapon-single/dual/triple;
+            // the old spawner ignored per-shot yaml angles, so every shot
+            // fires along the ship angle):
+            //   dual   = 2 cyan shots [10, -25] / [10, 25], lifetime 1.5
+            //   triple = 1 orange shot [35, 0] + 2 yellow shots
+            //            [10, -25] / [10, 25], lifetime 2.0
+            let weapon = match PLAYER_WEAPON.get(self.id) {
+                Some(w) => w,
+                None => WEAPON_SINGLE,
+            };
+            if (weapon == WEAPON_DUAL) {
+                fire_shot(px, py, angle, 10.0, -25.0, 1.0, 1.5, 1.5, 1.5, 1.0, faction);
+                fire_shot(px, py, angle, 10.0,  25.0, 1.0, 1.5, 1.5, 1.5, 1.0, faction);
+            } else if (weapon == WEAPON_TRIPLE) {
+                fire_shot(px, py, angle, 35.0,   0.0, 1.5, 1.0, 1.0, 2.0, 1.5, faction);
+                fire_shot(px, py, angle, 10.0, -25.0, 1.5, 1.5, 1.0, 2.0, 1.5, faction);
+                fire_shot(px, py, angle, 10.0,  25.0, 1.5, 1.5, 1.0, 2.0, 1.5, faction);
+            } else {
+                fire_shot(px, py, angle, 35.0, 0.0, 1.0, 1.0, 1.5, 1.0, 0.5, faction);
+            }
             play_snd("projectile/pew");
 
             self.shoot_timer = age;
         }
+    }
+
+    fn on_die(self: Self) {
+        PLAYER_WEAPON.remove(self.id);
     }
 }
 
@@ -420,6 +452,10 @@ impl Entity for Powerup {
             let dy = get_position_y(player_id) - get_position_y(self.id);
             // Pickup radius: powerup (16) + player (20)
             if (dx * dx + dy * dy < 1296.0) {
+                // Upgrade (old upgrader system: shooter.spawner = powerup.spawner,
+                // unconditional — picking up dual while triple downgrades too).
+                PLAYER_WEAPON.insert(player_id, self.weapon);
+                debug_print("powerup picked up, player weapon -> {self.weapon}");
                 destroy_entity(self.id);
             }
         }
@@ -483,6 +519,7 @@ fn register_entity(state: GameState, entity_id: u64, entity_type: u16) {
     match entity_type {
         ET_PLAYER => {
             state.entities[entity_id] = Player { id: entity_id, shoot_timer: 0.0, shoot_interval: 0.2 };
+            PLAYER_WEAPON.insert(entity_id, WEAPON_SINGLE);
         },
         ET_ASTEROID => {
             state.entities[entity_id] = Asteroid { id: entity_id };
@@ -494,10 +531,10 @@ fn register_entity(state: GameState, entity_id: u64, entity_type: u16) {
             state.entities[entity_id] = Mine { id: entity_id, shoot_timer: 0.0, shoot_interval: 1.0, projectile_type: ET_PROJECTILE };
         },
         ET_POWERUP_DUAL => {
-            state.entities[entity_id] = Powerup { id: entity_id, weapon_type: ET_POWERUP_DUAL };
+            state.entities[entity_id] = Powerup { id: entity_id, weapon: WEAPON_DUAL };
         },
         ET_POWERUP_TRIPLE => {
-            state.entities[entity_id] = Powerup { id: entity_id, weapon_type: ET_POWERUP_TRIPLE };
+            state.entities[entity_id] = Powerup { id: entity_id, weapon: WEAPON_TRIPLE };
         },
         ET_PROJECTILE => {
             state.entities[entity_id] = Projectile { id: entity_id };
@@ -599,6 +636,20 @@ fn spawn_with_def(entity_type: u16, def: EntityDef, px: f32, py: f32, angle: f32
         None => LAYER_ID_NONE,
     };
     spawn_entity(entity_type, sprite_id, layer_id, effect_layer_id, px, py, angle, vx, vy, faction, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps, def.color_r, def.color_g, def.color_b);
+}
+
+// Spawns a player weapon shot (bolt sprite on the effects layer, same
+// hitpoints / radius / speed as DEF_PROJECTILE) with per-shot color /
+// lifetime / fade. off_x / off_y is the spawn offset in the ship's local
+// frame, rotated by the ship angle (old spawner: parent_position +
+// spawn.position.rotate(parent_angle)). The shot flies along the ship angle.
+fn fire_shot(px: f32, py: f32, ship_angle: f32, off_x: f32, off_y: f32, cr: f32, cg: f32, cb: f32, lifetime: f32, fade: f32, faction: u16) {
+    let x = px + ship_angle.cos() * off_x - ship_angle.sin() * off_y;
+    let y = py + ship_angle.sin() * off_x + ship_angle.cos() * off_y;
+    let def = EntityDef { sprite: "res/sprite/projectile/bolt_white_60x36x1.jpg", layer: "effects", effect_layer: "", color_r: cr, color_g: cg, color_b: cb, hitpoints: 25.0, radius: 5.0, lifetime: lifetime, explode_as: ET_NONE, speed: 500.0, fade: fade, fps: 0 };
+    let vx = ship_angle.cos() * def.speed;
+    let vy = ship_angle.sin() * def.speed;
+    spawn_with_def(ET_PROJECTILE, def, x, y, ship_angle, vx, vy, faction);
 }
 
 fn find_nearest_player(to_entity_id: u64) -> u64 {
