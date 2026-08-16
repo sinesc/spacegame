@@ -38,15 +38,18 @@ pub struct ScriptContext {
     /// Entity IDs needing scripted logic this frame.
     pub think_entities: Vec<u64>,
     pub game_time: f32,
-    /// Player fire input (set by control system).
-    pub input_fire: bool,
     /// Mouse position (set by control system). Note: may be unreliable when cursor is grabbed.
     /// Use `mouse_delta` for relative movement.
     pub mouse_pos: (f32, f32),
     /// Mouse delta since last frame (set by control system). Reliable even when cursor is grabbed.
     pub mouse_delta: (f32, f32),
-    /// Keyboard input flags.
-    pub input_keys: u8,  // bit 0=W, 1=S, 2=A, 3=D, 4=R-Shift (strafe)
+    /// Keyboard input masks (see KEY_* constants in scripting/mod.rs).
+    /// `input_keys` = keys currently held down.
+    pub input_keys: u16,
+    /// Keys pressed this frame, including repeat events while held.
+    pub input_pressed: u16,
+    /// Keys pressed this frame, initial press only (no repeats).
+    pub input_edge: u16,
     /// Spawn trigger from Rust (set each frame, consumed by Itsy).
     pub spawn_trigger: u32,
     /// Entities marked as dying this frame (for on_die dispatch).
@@ -74,10 +77,11 @@ impl ScriptContext {
             collisions: Vec::new(),
             think_entities: Vec::new(),
             game_time: 0.0,
-            input_fire: false,
             mouse_pos: (0.0, 0.0),
             mouse_delta: (0.0, 0.0),
             input_keys: 0,
+            input_pressed: 0,
+            input_edge: 0,
             spawn_trigger: 0,
             dying_entities: Vec::new(),
             rng: Rng::new(123.4),

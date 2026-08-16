@@ -205,10 +205,6 @@ impl Level {
 
         // Configure scripting subsystem
         self.scripting.set_game_time(age);
-        // Firing input: mouse button 1 or left ctrl
-        let firing = self.world_state.inf.input.down(InputId::Mouse1)
-            || self.world_state.inf.input.down(InputId::LControl);
-        self.scripting.set_input_fire(firing);
 
         // Pass mouse position and keyboard input
         let mouse_pos = self.world_state.inf.input.mouse();
@@ -218,14 +214,30 @@ impl Level {
         let mouse_delta = self.world_state.inf.input.mouse_delta();
         self.scripting.set_mouse_delta(mouse_delta.0 as f32, mouse_delta.1 as f32);
 
-        // key flags: bit 0=W, 1=S, 2=A, 3=D, 4=R-Shift (strafe)
-        let mut keys: u8 = 0;
-        if self.world_state.inf.input.down(InputId::W) { keys |= 1; }
-        if self.world_state.inf.input.down(InputId::S) { keys |= 2; }
-        if self.world_state.inf.input.down(InputId::A) { keys |= 4; }
-        if self.world_state.inf.input.down(InputId::D) { keys |= 8; }
-        if self.world_state.inf.input.down(InputId::RShift) { keys |= 16; }
-        self.scripting.set_input_keys(keys);
+        // Input masks: one bit per key (see KEY_* in scripting/mod.rs).
+        // `keys` = held down, `pressed` = pressed this frame (incl. repeats),
+        // `edge` = initial press this frame (no repeats).
+        let input = &self.world_state.inf.input;
+        let mut keys = 0u16;
+        let mut pressed = 0u16;
+        let mut edge = 0u16;
+        let mut add_key = |key: InputId, bit: u16| {
+            if input.down(key) { keys |= bit; }
+            if input.pressed(key, true) { pressed |= bit; }
+            if input.pressed(key, false) { edge |= bit; }
+        };
+        add_key(InputId::W, scripting::KEY_W);
+        add_key(InputId::S, scripting::KEY_S);
+        add_key(InputId::A, scripting::KEY_A);
+        add_key(InputId::D, scripting::KEY_D);
+        add_key(InputId::RShift, scripting::KEY_RSHIFT);
+        add_key(InputId::CursorUp, scripting::KEY_CURSOR_UP);
+        add_key(InputId::CursorDown, scripting::KEY_CURSOR_DOWN);
+        add_key(InputId::Return, scripting::KEY_RETURN);
+        add_key(InputId::Escape, scripting::KEY_ESCAPE);
+        add_key(InputId::Mouse1, scripting::KEY_MOUSE1);
+        add_key(InputId::LControl, scripting::KEY_LCONTROL);
+        self.scripting.set_input_state(keys, pressed, edge);
 
         // Send GAME_START trigger on first frame
         if !self.game_started {

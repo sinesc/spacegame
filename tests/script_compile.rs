@@ -26,12 +26,13 @@ itsy::itsy_api! {
         fn get_collision_count(&mut _ctx) -> i32 { 0 }
         fn get_collision_id(&mut _ctx, _index: u32) -> u64 { 0 }
         fn get_game_time(&mut _ctx) -> f32 { 0.0 }
-        fn get_input_fire(&mut _ctx) -> bool { false }
         fn get_mouse_x(&mut _ctx) -> f32 { 0.0 }
         fn get_mouse_y(&mut _ctx) -> f32 { 0.0 }
         fn get_mouse_delta_x(&mut _ctx) -> f32 { 0.0 }
         fn get_mouse_delta_y(&mut _ctx) -> f32 { 0.0 }
-        fn get_input_keys(&mut _ctx) -> u8 { 0 }
+        fn get_input_keys(&mut _ctx) -> u16 { 0 }
+        fn get_input_pressed(&mut _ctx) -> u16 { 0 }
+        fn get_input_edge(&mut _ctx) -> u16 { 0 }
         fn get_spawn_trigger(&mut _ctx) -> u32 { 0 }
         fn get_rand_range(&mut _ctx, _min: f32, _max: f32) -> f32 { 0.0 }
         fn get_sprites(&mut _ctx) -> [ String ] { Vec::new() }
@@ -47,10 +48,6 @@ itsy::itsy_api! {
         fn request_exit(&mut _ctx) {}
         fn request_level_restart(&mut _ctx) {}
         fn toggle_fullscreen(&mut _ctx) {}
-        fn menu_key_up(&mut _ctx) -> bool { false }
-        fn menu_key_down(&mut _ctx) -> bool { false }
-        fn menu_key_return(&mut _ctx) -> bool { false }
-        fn menu_key_escape(&mut _ctx) -> bool { false }
         fn get_dying_count(&mut _ctx) -> i32 { 0 }
         fn get_dying_id(&mut _ctx, _index: u32) -> u64 { 0 }
         fn debug_print(&mut _ctx, _msg: String) { }

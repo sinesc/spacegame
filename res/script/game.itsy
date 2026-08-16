@@ -7,11 +7,10 @@ use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_vel
           get_angle, get_script_type, is_alive, get_faction,
           get_think_count, get_think_id,
           get_collision_count, get_collision_id,
-          get_game_time, get_input_fire, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_spawn_trigger, get_rand_range,
+          get_game_time, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_input_pressed, get_input_edge, get_spawn_trigger, get_rand_range,
           get_sprites, get_sounds, play_sound,
           create_layer, add_render_layer, write_text, write_menu_text, set_debug_layer,
           pause_time, resume_time, request_exit, request_level_restart, toggle_fullscreen,
-          menu_key_up, menu_key_down, menu_key_return, menu_key_escape,
           get_dying_count, get_dying_id,
           spawn_entity, destroy_entity, set_v_motion, set_angle, set_hitpoints, apply_damage,
           debug_print};
@@ -29,6 +28,25 @@ const ET_POWERUP_DUAL   : u16 = 5;
 const ET_POWERUP_TRIPLE : u16 = 6;
 const ET_PROJECTILE     : u16 = 7;
 const ET_EXPLOSION      : u16 = 8;
+
+// ============================================================
+// Input key bits (must match KEY_* constants in src/scripting/mod.rs).
+// get_input_keys()      = keys currently held down
+// get_input_pressed()   = keys pressed this frame (incl. repeat while held)
+// get_input_edge()      = keys pressed this frame (initial press only)
+// ============================================================
+
+const KEY_W           : u16 = 1;
+const KEY_S           : u16 = 2;
+const KEY_A           : u16 = 4;
+const KEY_D           : u16 = 8;
+const KEY_RSHIFT      : u16 = 16;
+const KEY_CURSOR_UP   : u16 = 32;
+const KEY_CURSOR_DOWN : u16 = 64;
+const KEY_RETURN      : u16 = 128;
+const KEY_ESCAPE      : u16 = 256;
+const KEY_MOUSE1      : u16 = 512;
+const KEY_LCONTROL    : u16 = 1024;
 
 // ============================================================
 // Spawn triggers (Rust -> Itsy)
@@ -249,7 +267,7 @@ fn run_menu_action(action: String) -> MenuState {
 // Per-frame menu handling: Escape toggles ("main"), cursor moves the selection,
 // Return runs the selected item's action. Items are drawn onto the menu layer.
 fn menu_process(state: MenuState, menu_layer: u32) -> MenuState {
-    if (menu_key_escape()) {
+    if ((get_input_edge() & KEY_ESCAPE) != 0u16) {
         if (state.group == "") {
             state = menu_show("main");
         } else {
@@ -259,11 +277,11 @@ fn menu_process(state: MenuState, menu_layer: u32) -> MenuState {
     if (state.group != "") {
         let def = get_menu_group(state.group);
         if (def.items.len() > 0) {
-            if (menu_key_down()) {
+            if ((get_input_pressed() & KEY_CURSOR_DOWN) != 0u16) {
                 let max_index = def.items.len() - 1;
                 if (state.index as u64 < max_index) { state.index = state.index + 1; }
             }
-            if (menu_key_up()) {
+            if ((get_input_pressed() & KEY_CURSOR_UP) != 0u16) {
                 if (state.index > 0) { state.index = state.index - 1; }
             }
             // draw items (selected = alpha 0.3, others 0.1, like the old menu)
@@ -280,7 +298,7 @@ fn menu_process(state: MenuState, menu_layer: u32) -> MenuState {
                 pos_y = pos_y + sy;
                 i = i + 1;
             }
-            if (menu_key_return()) {
+            if ((get_input_pressed() & KEY_RETURN) != 0u16) {
                 let item = def.items[state.index as u64];
                 state = run_menu_action(item.action);
             }
@@ -357,11 +375,11 @@ impl Entity for Player {
         // R-Shift: strafe (move without rotating).  Default: FollowVector
         // (move and face the movement direction).
         let keys = get_input_keys();
-        let mode = if ((keys & 16u8) != 0u8) { MOTION_STRAFE } else { MOTION_FOLLOW };
+        let mode = if ((keys & KEY_RSHIFT) != 0u16) { MOTION_STRAFE } else { MOTION_FOLLOW };
         set_v_motion(self.id, mode, vx, vy);
 
-        // Shoot
-        let firing = get_input_fire();
+        // Shoot: mouse button 1 or left ctrl
+        let firing = ((keys & (KEY_MOUSE1 | KEY_LCONTROL)) != 0u16);
         if (firing && age - self.shoot_timer >= self.shoot_interval) {
             let px = get_position_x(self.id);
             let py = get_position_y(self.id);

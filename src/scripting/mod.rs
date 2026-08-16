@@ -34,6 +34,20 @@ pub struct ScriptingSubsystem {
 pub const ET_PLAYER     : u16 = 1;
 pub const ET_EXPLOSION  : u16 = 8;
 
+/// Key bits for the input masks passed to Itsy each frame (`set_input_state`).
+/// Must match the KEY_* constants in res/script/game.itsy.
+pub const KEY_W           : u16 = 1;
+pub const KEY_S           : u16 = 2;
+pub const KEY_A           : u16 = 4;
+pub const KEY_D           : u16 = 8;
+pub const KEY_RSHIFT      : u16 = 16;
+pub const KEY_CURSOR_UP   : u16 = 32;
+pub const KEY_CURSOR_DOWN : u16 = 64;
+pub const KEY_RETURN      : u16 = 128;
+pub const KEY_ESCAPE      : u16 = 256;
+pub const KEY_MOUSE1      : u16 = 512;
+pub const KEY_LCONTROL    : u16 = 1024;
+
 // Spawn triggers (must match Itsy script)
 pub const TRIGGER_GAME_START: u32 = 4;
 
@@ -82,9 +96,6 @@ itsy::itsy_api! {
         fn get_game_time(&mut context) -> f32 {
             context.game_time
         }
-        fn get_input_fire(&mut context) -> bool {
-            context.input_fire
-        }
         fn get_mouse_x(&mut context) -> f32 {
             context.mouse_pos.0
         }
@@ -97,8 +108,18 @@ itsy::itsy_api! {
         fn get_mouse_delta_y(&mut context) -> f32 {
             context.mouse_delta.1
         }
-        fn get_input_keys(&mut context) -> u8 {
+        /// Keys currently held down (level-triggered `down` semantics).
+        fn get_input_keys(&mut context) -> u16 {
             context.input_keys
+        }
+        /// Keys pressed this frame, including repeat events while held
+        /// (edge-triggered `pressed(key, true)` semantics).
+        fn get_input_pressed(&mut context) -> u16 {
+            context.input_pressed
+        }
+        /// Keys pressed this frame, initial press only (no repeats).
+        fn get_input_edge(&mut context) -> u16 {
+            context.input_edge
         }
         fn get_dying_count(&mut context) -> i32 {
             context.dying_entities.len() as i32
@@ -197,26 +218,6 @@ itsy::itsy_api! {
         fn request_level_restart(&mut context) {
             let inf = unsafe { &mut *context.infrastructure };
             inf.restart_requested.store(true, std::sync::atomic::Ordering::Relaxed);
-        }
-        /// Cursor-up pressed this frame (key-repeat enabled while held).
-        fn menu_key_up(&mut context) -> bool {
-            let inf = unsafe { &*context.infrastructure };
-            inf.input.pressed(InputId::CursorUp, true)
-        }
-        /// Cursor-down pressed this frame (key-repeat enabled while held).
-        fn menu_key_down(&mut context) -> bool {
-            let inf = unsafe { &*context.infrastructure };
-            inf.input.pressed(InputId::CursorDown, true)
-        }
-        /// Return/Enter pressed this frame (key-repeat enabled while held).
-        fn menu_key_return(&mut context) -> bool {
-            let inf = unsafe { &*context.infrastructure };
-            inf.input.pressed(InputId::Return, true)
-        }
-        /// Escape pressed this frame (one-shot edge, no repeats).
-        fn menu_key_escape(&mut context) -> bool {
-            let inf = unsafe { &*context.infrastructure };
-            inf.input.pressed(InputId::Escape, false)
         }
         /// Toggle windowed/fullscreen mode (starts in the mode the game was launched with).
         fn toggle_fullscreen(&mut context) {
@@ -340,11 +341,6 @@ impl ScriptingSubsystem {
         self.context.game_time = age;
     }
 
-    /// Set player fire input.
-    pub fn set_input_fire(&mut self, firing: bool) {
-        self.context.input_fire = firing;
-    }
-
     /// Set mouse position.
     pub fn set_mouse_pos(&mut self, x: f32, y: f32) {
         self.context.mouse_pos = (x, y);
@@ -355,9 +351,13 @@ impl ScriptingSubsystem {
         self.context.mouse_delta = (dx, dy);
     }
 
-    /// Set keyboard input flags.
-    pub fn set_input_keys(&mut self, keys: u8) {
+    /// Set the keyboard input masks for this frame (see KEY_* constants).
+    /// `keys` = currently held down, `pressed` = pressed this frame (incl. repeats),
+    /// `edge` = initial press this frame (no repeats).
+    pub fn set_input_state(&mut self, keys: u16, pressed: u16, edge: u16) {
         self.context.input_keys = keys;
+        self.context.input_pressed = pressed;
+        self.context.input_edge = edge;
     }
 
     /// Set a spawn trigger for Itsy to process.
