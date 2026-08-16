@@ -1,7 +1,9 @@
-/// Integration test: validate that Itsy scripts compile successfully.
+/// Integration test: validate that the Itsy script compiles successfully.
 ///
-/// This test compiles every `.itsy` file under `res/script/` against a minimal
-/// API stub using `itsy::build` for detailed error reporting.
+/// This test compiles the entry script `res/script/game.itsy` against a minimal
+/// API stub using `itsy::build` for detailed error reporting. Submodules
+/// (declared with `mod name;`, e.g. `menu.itsy`) are loaded and checked
+/// transitively; only the root module needs a `main` entry function.
 
 use std::path::Path;
 
@@ -95,37 +97,17 @@ itsy::itsy_api! {
     }
 }
 
-/// Recursively collect all `.itsy` files under `dir`.
-fn collect_itsy_files(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
-    if !dir.is_dir() {
-        return;
-    }
-    for entry in std::fs::read_dir(dir).expect("read script dir") {
-        let entry = entry.expect("read dir entry");
-        let path = entry.path();
-        if path.is_dir() {
-            collect_itsy_files(&path, out);
-        } else if path.extension().map_or(false, |e| e == "itsy") {
-            out.push(path);
-        }
-    }
-}
-
 #[test]
 fn itsy_scripts_compile() {
-    let script_dir = Path::new("res/script");
-    let mut files = Vec::new();
-    collect_itsy_files(script_dir, &mut files);
+    let entry = Path::new("res/script/game.itsy");
 
-    if files.is_empty() {
-        panic!("no .itsy files found under {}", script_dir.display());
+    if !entry.is_file() {
+        panic!("entry script {} not found", entry.display());
     }
 
-    for file in &files {
-        let result = itsy::build::<Api, _>(file);
-        match result {
-            Ok(_) => {},
-            Err(e) => panic!("compile failed for {}:\n{}", file.display(), e),
-        }
+    let result = itsy::build::<Api, _>(entry);
+    match result {
+        Ok(_) => {},
+        Err(e) => panic!("compile failed:\n{}", e),
     }
 }

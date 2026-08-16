@@ -1,0 +1,142 @@
+// Menu module: in-game menu handling (groups, input, actions, rendering).
+// Loaded by game.itsy via `mod menu;` and referenced there as menu::...
+// (original source: res/def/menu.yaml + src/menu/mod.rs).
+
+use Api::{get_input_pressed, get_input_edge, write_menu_text,
+          pause_time, resume_time, request_exit, request_level_restart, toggle_fullscreen,
+          KEY_CURSOR_UP, KEY_CURSOR_DOWN, KEY_RETURN, KEY_ESCAPE,
+          debug_print};
+
+// Menu item: `label` is drawn with write_menu_text; `action` is a single token
+// dispatched by run_menu_action (the old "; "-chained console command strings
+// became one token each). Per-item stride 0.0 = use the group's stride.
+struct MenuItem {
+    label   : String,
+    action  : String,
+    stride_x: f32,
+    stride_y: f32,
+}
+
+// Menu group: left/top/strides are fractional (multiplied by 1920 x 1080).
+struct MenuGroup {
+    left    : f32,
+    top     : f32,
+    stride_x: f32,
+    stride_y: f32,
+    items   : [ MenuItem ],
+}
+
+// Menu state: group "" = hidden.
+struct MenuState {
+    group: String,
+    index: u32,
+}
+
+// The "ingame" group is data for the future (Escape opens "main", like the
+// old menu_toggle). Unknown groups yield an empty menu (pause + nothing
+// drawn, Escape closes it).
+fn get_menu_group(name: String) -> MenuGroup {
+    if (name == "main") {
+        MenuGroup { left: 0.3, top: 0.1, stride_x: 0.0, stride_y: 0.1, items: [
+            MenuItem { label: "New Game",    action: "start",       stride_x: 0.0, stride_y: 0.0 },
+            MenuItem { label: "Load Game",   action: "savegames",   stride_x: 0.0, stride_y: 0.0 },
+            MenuItem { label: "Options",     action: "options",     stride_x: 0.0, stride_y: 0.15 },
+            MenuItem { label: "Quit Game",   action: "exit",        stride_x: 0.0, stride_y: 0.0 },
+        ]}
+    } else if (name == "ingame") {
+        MenuGroup { left: 0.3, top: 0.1, stride_x: 0.0, stride_y: 0.1, items: [
+            MenuItem { label: "Resume Game",   action: "resume",        stride_x: 0.0, stride_y: 0.15 },
+            MenuItem { label: "Options",       action: "options",       stride_x: 0.0, stride_y: 0.0 },
+            MenuItem { label: "Exit to Menu",  action: "quit_to_menu",  stride_x: 0.0, stride_y: 0.0 },
+        ]}
+    } else if (name == "options") {
+        MenuGroup { left: 0.3, top: 0.1, stride_x: 0.0, stride_y: 0.1, items: [
+            MenuItem { label: "Fullscreen",  action: "fullscreen",  stride_x: 0.0, stride_y: 0.0 },
+            MenuItem { label: "Main Menu",   action: "main",        stride_x: 0.0, stride_y: 0.0 },
+        ]}
+    } else {
+        MenuGroup { left: 0.3, top: 0.1, stride_x: 0.0, stride_y: 0.1, items: [ ] }
+    }
+}
+
+fn menu_show(group: String) -> MenuState {
+    pause_time();
+    MenuState { group: group, index: 0 }
+}
+
+fn menu_hide() -> MenuState {
+    resume_time();
+    MenuState { group: "", index: 0 }
+}
+
+// Executes a menu item's action; returns the new menu state.
+fn run_menu_action(action: String) -> MenuState {
+    if (action == "resume") {
+        menu_hide()
+    } else if (action == "start") {
+        menu_hide();
+        request_level_restart();
+        MenuState { group: "", index: 0 }
+    } else if (action == "quit_to_menu") {
+        request_level_restart();
+        menu_show("main")
+    } else if (action == "options") {
+        menu_show("options")
+    } else if (action == "main") {
+        menu_show("main")
+    } else if (action == "savegames") {
+        menu_show("savegames")
+    } else if (action == "exit") {
+        request_exit();
+        MenuState { group: "", index: 0 }
+    } else if (action == "fullscreen") {
+        toggle_fullscreen();
+        MenuState { group: "options", index: 0 }
+    } else {
+        debug_print("menu: unknown action {action}");
+        MenuState { group: "", index: 0 }
+    }
+}
+
+// Per-frame menu handling: Escape toggles ("main"), cursor moves the selection,
+// Return runs the selected item's action. Items are drawn onto the menu layer.
+fn menu_process(state: MenuState, menu_layer: u32) -> MenuState {
+    if ((get_input_edge() & KEY_ESCAPE) != 0u16) {
+        if (state.group == "") {
+            state = menu_show("main");
+        } else {
+            state = menu_hide();
+        }
+    }
+    if (state.group != "") {
+        let def = get_menu_group(state.group);
+        if (def.items.len() > 0) {
+            if ((get_input_pressed() & KEY_CURSOR_DOWN) != 0u16) {
+                let max_index = def.items.len() - 1;
+                if (state.index as u64 < max_index) { state.index = state.index + 1; }
+            }
+            if ((get_input_pressed() & KEY_CURSOR_UP) != 0u16) {
+                if (state.index > 0) { state.index = state.index - 1; }
+            }
+            // draw items (selected = alpha 0.3, others 0.1, like the old menu)
+            let pos_x: f32 = def.left;
+            let pos_y: f32 = def.top;
+            let i: u64 = 0;
+            while (i < def.items.len()) {
+                let item = def.items[i];
+                let alpha = if (i == state.index as u64) { 0.3 } else { 0.1 };
+                write_menu_text(menu_layer, item.label, pos_x * 1920.0, pos_y * 1080.0, alpha);
+                let sx = if (item.stride_x != 0.0) { item.stride_x } else { def.stride_x };
+                let sy = if (item.stride_y != 0.0) { item.stride_y } else { def.stride_y };
+                pos_x = pos_x + sx;
+                pos_y = pos_y + sy;
+                i = i + 1;
+            }
+            if ((get_input_pressed() & KEY_RETURN) != 0u16) {
+                let item = def.items[state.index as u64];
+                state = run_menu_action(item.action);
+            }
+        }
+    }
+    state
+}

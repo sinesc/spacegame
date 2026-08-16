@@ -9,7 +9,6 @@ use crate::level::WorldState;
 use crate::sound::Sound;
 use hecs;
 use itsy;
-use std::fs;
 use std::collections::HashMap;
 
 /// The scripting subsystem: owns the Itsy VM and manages the frame cycle.
@@ -402,17 +401,13 @@ impl ScriptingSubsystem {
         // Build entity snapshot
         self.build_snapshot(world);
 
-        // Load and compile the script once
+        // Load and compile the script once (itsy::build also resolves `mod` declarations,
+        // e.g. `mod menu;` -> res/script/menu.itsy, relative to the source file).
         if self.program.is_none() {
-            let source = match fs::read_to_string("res/script/game.itsy") {
-                Ok(s) => s,
-                Err(_) => return, // no script file, skip
-            };
-
-            match itsy::build_str::<Api>(&source) {
+            match itsy::build::<Api, _>("res/script/game.itsy") {
                 Ok(p) => { self.program = Some(p); }
                 Err(e) => {
-                    eprintln!("Script compile error: {:?}", e);
+                    eprintln!("Script compile error: {}", e);
                     return;
                 }
             }
