@@ -755,6 +755,9 @@ fn main() {
     set_debug_layer(text_layer);
     add_render_layer(effects_layer, FILTER_BLOOM, 0);
     add_render_layer(base_layer, FILTER_NONE, 0);
+    // Lightmap component (1) is also drawn crisp on top, as in the radiant-rs
+    // glare demo — the glare pass alone only adds the blurred glow.
+    add_render_layer(base_layer, FILTER_NONE, 1);
     add_render_layer(base_layer, FILTER_GLARE, 1);
     add_render_layer(effects_layer, FILTER_NONE, 0);
     add_render_layer(text_layer, FILTER_NONE, 0);
