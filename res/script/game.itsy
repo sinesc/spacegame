@@ -46,12 +46,6 @@ const MINE_INTERVAL: f32 = 8.0;
 const ASTEROID_FIRST_SPAWN: f32 = 4.0;
 const MINE_FIRST_SPAWN: f32 = 12.0;
 
-// Player weapon levels (old spawners player-weapon-single/dual/triple from
-// res/def/spawner/weapon.yaml). Powerups upgrade the player's weapon.
-const WEAPON_SINGLE: u16 = 0;
-const WEAPON_DUAL   : u16 = 1;
-const WEAPON_TRIPLE : u16 = 2;
-
 // ============================================================
 // Entity type definitions (static data per type)
 // ============================================================
@@ -103,6 +97,89 @@ fn get_def(entity_type: u16) -> EntityDef {
 }
 
 // ============================================================
+// Weapons
+// ============================================================
+
+// Weapon interface: a fire pattern plus its own cooldown. fire() fires the
+// pattern at the ship's (x, y) along `angle` when the cooldown has elapsed
+// (measured against `age`, the current game time) and returns true only when
+// a shot actually went out. fire_shot() is a default single-shot spawner
+// (bolt sprite on the effects layer, same hitpoints / radius / speed as
+// DEF_PROJECTILE): off_x / off_y is the spawn offset in the ship's local
+// frame, rotated by `angle` (old spawner: parent_position +
+// spawn.position.rotate(parent_angle)); the shot flies along `angle` (the old
+// spawner ignored per-shot yaml angles, e.g. triple's ±0.1).
+trait Weapon {
+    fn fire(self: Self, x: f32, y: f32, angle: f32, faction: u16, age: f32) -> bool;
+
+    fn fire_shot(self: Self, x: f32, y: f32, angle: f32, off_x: f32, off_y: f32, cr: f32, cg: f32, cb: f32, lifetime: f32, fade: f32, faction: u16) {
+        let sx = x + angle.cos() * off_x - angle.sin() * off_y;
+        let sy = y + angle.sin() * off_x + angle.cos() * off_y;
+        let def = EntityDef { sprite: "res/sprite/projectile/bolt_white_60x36x1.jpg", layer: "effects", effect_layer: "", color_r: cr, color_g: cg, color_b: cb, hitpoints: 25.0, radius: 5.0, lifetime: lifetime, explode_as: ET_NONE, speed: 500.0, fade: fade, fps: 0 };
+        let vx = angle.cos() * def.speed;
+        let vy = angle.sin() * def.speed;
+        spawn_with_def(ET_PROJECTILE, def, sx, sy, angle, vx, vy, faction);
+    }
+}
+
+// Weapon patterns (old spawners player-weapon-single/dual/triple from
+// res/def/spawner/weapon.yaml). Each holds its own cooldown so weapon types
+// can later have different fire rates.
+struct WeaponSingle {
+    shoot_timer   : f32,
+    shoot_interval: f32,
+}
+
+struct WeaponDual {
+    shoot_timer   : f32,
+    shoot_interval: f32,
+}
+
+struct WeaponTriple {
+    shoot_timer   : f32,
+    shoot_interval: f32,
+}
+
+impl Weapon for WeaponSingle {
+    fn fire(self: Self, x: f32, y: f32, angle: f32, faction: u16, age: f32) -> bool {
+        if (age - self.shoot_timer >= self.shoot_interval) {
+            self.fire_shot(x, y, angle, 35.0, 0.0, 1.0, 1.0, 1.5, 1.0, 0.5, faction);
+            self.shoot_timer = age;
+            return true;
+        }
+        return false;
+    }
+}
+
+impl Weapon for WeaponDual {
+    fn fire(self: Self, x: f32, y: f32, angle: f32, faction: u16, age: f32) -> bool {
+        if (age - self.shoot_timer >= self.shoot_interval) {
+            // 2 cyan shots from [10, -25] / [10, 25], lifetime 1.5.
+            self.fire_shot(x, y, angle, 10.0, -25.0, 1.0, 1.5, 1.5, 1.5, 1.0, faction);
+            self.fire_shot(x, y, angle, 10.0,  25.0, 1.0, 1.5, 1.5, 1.5, 1.0, faction);
+            self.shoot_timer = age;
+            return true;
+        }
+        return false;
+    }
+}
+
+impl Weapon for WeaponTriple {
+    fn fire(self: Self, x: f32, y: f32, angle: f32, faction: u16, age: f32) -> bool {
+        if (age - self.shoot_timer >= self.shoot_interval) {
+            // 1 orange shot [35, 0] + 2 yellow shots [10, -25] / [10, 25],
+            // lifetime 2.0.
+            self.fire_shot(x, y, angle, 35.0,   0.0, 1.5, 1.0, 1.0, 2.0, 1.5, faction);
+            self.fire_shot(x, y, angle, 10.0, -25.0, 1.5, 1.5, 1.0, 2.0, 1.5, faction);
+            self.fire_shot(x, y, angle, 10.0,  25.0, 1.5, 1.5, 1.0, 2.0, 1.5, faction);
+            self.shoot_timer = age;
+            return true;
+        }
+        return false;
+    }
+}
+
+// ============================================================
 // Entity trait: common interface for all entity types
 // ============================================================
 
@@ -113,12 +190,6 @@ fn get_def(entity_type: u16) -> EntityDef {
 const SPRITE_MAP: [ String => u32 ] = [ => ];
 const LAYER_MAP: [ String => u32 ] = [ => ];
 const SOUND_MAP: [ String => u32 ] = [ => ];
-
-// Current player weapon per player ECS id (WEAPON_*). Set to WEAPON_SINGLE on
-// registration, replaced on powerup pickup (Powerup::on_think), cleared in
-// Player::on_die. A plain data global so trait handlers can read/write it
-// (trait methods cannot take the GameState that holds the entity map).
-const PLAYER_WEAPON: [ u64 => u16 ] = [ => ];
 
 // Sound groups: name -> variant file names (keys of SOUND_MAP). Moved here
 // from res/def/sound.yaml (2026-08); the script picks a variant at random.
@@ -271,7 +342,18 @@ trait Entity {
     fn on_think(self: Self, age: f32) { }
     fn on_collide(self: Self, other_id: u64) { }
     fn on_die(self: Self) { }
+    // Only shooter entities (Player) override; others ignore weapon swaps.
+    // On the Entity interface (default no-op) so a handler can hand a weapon
+    // to another entity: via ENTITIES, entities are only visible as Entity
+    // trait objects, and concrete fields are not reachable through those.
+    fn set_weapon(self: Self, weapon: Weapon) { }
 }
+
+// Single registry for all entities as trait objects. Global (like the
+// resource maps) because entity handlers cannot receive the GameState that
+// used to hold it (trait methods cannot take it — circular reference in the
+// resolver), yet e.g. Powerup needs to reach the picked-up player.
+const ENTITIES: [ u64 => Entity ] = [ => ];
 
 // ============================================================
 // Per-instance entity state structs
@@ -280,9 +362,8 @@ trait Entity {
 // id is the Rust ECS entity ID (stable for the entity's lifetime). Set at
 // registration; handlers use it for all per-entity API calls.
 struct Player {
-    id            : u64,
-    shoot_timer   : f32,
-    shoot_interval: f32,
+    id    : u64,
+    weapon: Weapon,
 }
 
 struct Mine {
@@ -297,8 +378,8 @@ struct Asteroid {
 }
 
 struct Powerup {
-    id:     u64,
-    weapon: u16,
+    id    : u64,
+    weapon: Weapon,
 }
 
 struct Projectile {
@@ -338,42 +419,22 @@ impl Entity for Player {
         let mode = if ((keys & KEY_RSHIFT) != 0u16) { MOTION_STRAFE } else { MOTION_FOLLOW };
         set_v_motion(self.id, mode, vx, vy);
 
-        // Shoot: mouse button 1 or left ctrl
+        // Shoot: mouse button 1 or left ctrl. The weapon owns its cooldown;
+        // fire returns true only when a shot actually went out.
         let firing = ((keys & (KEY_MOUSE1 | KEY_LCONTROL)) != 0u16);
-        if (firing && age - self.shoot_timer >= self.shoot_interval) {
+        if (firing) {
             let px = get_position_x(self.id);
             let py = get_position_y(self.id);
             let angle = get_angle(self.id);
             let faction = get_faction(self.id);
-
-            // Weapon patterns (old spawners player-weapon-single/dual/triple;
-            // the old spawner ignored per-shot yaml angles, so every shot
-            // fires along the ship angle):
-            //   dual   = 2 cyan shots [10, -25] / [10, 25], lifetime 1.5
-            //   triple = 1 orange shot [35, 0] + 2 yellow shots
-            //            [10, -25] / [10, 25], lifetime 2.0
-            let weapon = match PLAYER_WEAPON.get(self.id) {
-                Some(w) => w,
-                None => WEAPON_SINGLE,
-            };
-            if (weapon == WEAPON_DUAL) {
-                fire_shot(px, py, angle, 10.0, -25.0, 1.0, 1.5, 1.5, 1.5, 1.0, faction);
-                fire_shot(px, py, angle, 10.0,  25.0, 1.0, 1.5, 1.5, 1.5, 1.0, faction);
-            } else if (weapon == WEAPON_TRIPLE) {
-                fire_shot(px, py, angle, 35.0,   0.0, 1.5, 1.0, 1.0, 2.0, 1.5, faction);
-                fire_shot(px, py, angle, 10.0, -25.0, 1.5, 1.5, 1.0, 2.0, 1.5, faction);
-                fire_shot(px, py, angle, 10.0,  25.0, 1.5, 1.5, 1.0, 2.0, 1.5, faction);
-            } else {
-                fire_shot(px, py, angle, 35.0, 0.0, 1.0, 1.0, 1.5, 1.0, 0.5, faction);
+            if (self.weapon.fire(px, py, angle, faction, age)) {
+                play_snd("projectile/pew");
             }
-            play_snd("projectile/pew");
-
-            self.shoot_timer = age;
         }
     }
 
-    fn on_die(self: Self) {
-        PLAYER_WEAPON.remove(self.id);
+    fn set_weapon(self: Self, weapon: Weapon) {
+        self.weapon = weapon;
     }
 }
 
@@ -454,8 +515,14 @@ impl Entity for Powerup {
             if (dx * dx + dy * dy < 1296.0) {
                 // Upgrade (old upgrader system: shooter.spawner = powerup.spawner,
                 // unconditional — picking up dual while triple downgrades too).
-                PLAYER_WEAPON.insert(player_id, self.weapon);
-                debug_print("powerup picked up, player weapon -> {self.weapon}");
+                let player_opt = ENTITIES.get(player_id);
+                match player_opt {
+                    Some(player) => {
+                        player.set_weapon(self.weapon);
+                        debug_print("powerup picked up");
+                    },
+                    None => { },
+                };
                 destroy_entity(self.id);
             }
         }
@@ -497,61 +564,58 @@ impl Entity for Explosion {
 }
 
 // ============================================================
-// Game state: single registry for all entities as trait objects
+// Game state: spawner timers (the entity registry is the global ENTITIES)
 // ============================================================
 
 struct GameState {
-    entities: [ u64 => Entity ],
     next_asteroid: f32,
     next_mine: f32,
 }
 
 fn new_game_state() -> GameState {
-    let entities: [ u64 => Entity ] = [ => ];
-    GameState { entities: entities, next_asteroid: ASTEROID_FIRST_SPAWN, next_mine: MINE_FIRST_SPAWN }
+    GameState { next_asteroid: ASTEROID_FIRST_SPAWN, next_mine: MINE_FIRST_SPAWN }
 }
 
 // ============================================================
 // Entity registration / unregistration
 // ============================================================
 
-fn register_entity(state: GameState, entity_id: u64, entity_type: u16) {
+fn register_entity(entity_id: u64, entity_type: u16) {
     match entity_type {
         ET_PLAYER => {
-            state.entities[entity_id] = Player { id: entity_id, shoot_timer: 0.0, shoot_interval: 0.2 };
-            PLAYER_WEAPON.insert(entity_id, WEAPON_SINGLE);
+            ENTITIES[entity_id] = Player { id: entity_id, weapon: WeaponSingle { shoot_timer: 0.0, shoot_interval: 0.2 } };
         },
         ET_ASTEROID => {
-            state.entities[entity_id] = Asteroid { id: entity_id };
+            ENTITIES[entity_id] = Asteroid { id: entity_id };
         },
         ET_MINE_RED => {
-            state.entities[entity_id] = Mine { id: entity_id, shoot_timer: 0.0, shoot_interval: 1.0, projectile_type: ET_PROJECTILE };
+            ENTITIES[entity_id] = Mine { id: entity_id, shoot_timer: 0.0, shoot_interval: 1.0, projectile_type: ET_PROJECTILE };
         },
         ET_MINE_GREEN => {
-            state.entities[entity_id] = Mine { id: entity_id, shoot_timer: 0.0, shoot_interval: 1.0, projectile_type: ET_PROJECTILE };
+            ENTITIES[entity_id] = Mine { id: entity_id, shoot_timer: 0.0, shoot_interval: 1.0, projectile_type: ET_PROJECTILE };
         },
         ET_POWERUP_DUAL => {
-            state.entities[entity_id] = Powerup { id: entity_id, weapon: WEAPON_DUAL };
+            ENTITIES[entity_id] = Powerup { id: entity_id, weapon: WeaponDual { shoot_timer: 0.0, shoot_interval: 0.2 } };
         },
         ET_POWERUP_TRIPLE => {
-            state.entities[entity_id] = Powerup { id: entity_id, weapon: WEAPON_TRIPLE };
+            ENTITIES[entity_id] = Powerup { id: entity_id, weapon: WeaponTriple { shoot_timer: 0.0, shoot_interval: 0.2 } };
         },
         ET_PROJECTILE => {
-            state.entities[entity_id] = Projectile { id: entity_id };
+            ENTITIES[entity_id] = Projectile { id: entity_id };
         },
         ET_EXPLOSION => {
-            state.entities[entity_id] = Explosion { id: entity_id };
+            ENTITIES[entity_id] = Explosion { id: entity_id };
         },
         _ => { },
     }
 }
 
-fn unregister_entity(state: GameState, entity_id: u64) {
-    state.entities.remove(entity_id);
+fn unregister_entity(entity_id: u64) {
+    ENTITIES.remove(entity_id);
 }
 
-fn is_registered(state: GameState, entity_id: u64) -> bool {
-    state.entities.get(entity_id) != None
+fn is_registered(entity_id: u64) -> bool {
+    ENTITIES.get(entity_id) != None
 }
 
 // ============================================================
@@ -560,8 +624,8 @@ fn is_registered(state: GameState, entity_id: u64) -> bool {
 
 // Map values are shared references, so `self` mutations in the handler persist
 // without storing the entity back.
-fn dispatch_on_think(state: GameState, entity_id: u64, age: f32) {
-    let entity_opt = state.entities.get(entity_id);
+fn dispatch_on_think(entity_id: u64, age: f32) {
+    let entity_opt = ENTITIES.get(entity_id);
     match entity_opt {
         Some(entity) => {
             entity.on_think(age);
@@ -570,8 +634,8 @@ fn dispatch_on_think(state: GameState, entity_id: u64, age: f32) {
     }
 }
 
-fn dispatch_on_collide(state: GameState, entity_id: u64, other_id: u64) {
-    let entity_opt = state.entities.get(entity_id);
+fn dispatch_on_collide(entity_id: u64, other_id: u64) {
+    let entity_opt = ENTITIES.get(entity_id);
     match entity_opt {
         Some(entity) => {
             entity.on_collide(other_id);
@@ -580,12 +644,12 @@ fn dispatch_on_collide(state: GameState, entity_id: u64, other_id: u64) {
     }
 }
 
-fn dispatch_on_die(state: GameState, entity_id: u64) {
-    let entity_opt = state.entities.get(entity_id);
+fn dispatch_on_die(entity_id: u64) {
+    let entity_opt = ENTITIES.get(entity_id);
     match entity_opt {
         Some(entity) => {
             entity.on_die();
-            unregister_entity(state, entity_id);
+            unregister_entity(entity_id);
         },
         None => { },
     }
@@ -636,20 +700,6 @@ fn spawn_with_def(entity_type: u16, def: EntityDef, px: f32, py: f32, angle: f32
         None => LAYER_ID_NONE,
     };
     spawn_entity(entity_type, sprite_id, layer_id, effect_layer_id, px, py, angle, vx, vy, faction, def.hitpoints, def.radius, def.lifetime, def.fade, def.fps, def.color_r, def.color_g, def.color_b);
-}
-
-// Spawns a player weapon shot (bolt sprite on the effects layer, same
-// hitpoints / radius / speed as DEF_PROJECTILE) with per-shot color /
-// lifetime / fade. off_x / off_y is the spawn offset in the ship's local
-// frame, rotated by the ship angle (old spawner: parent_position +
-// spawn.position.rotate(parent_angle)). The shot flies along the ship angle.
-fn fire_shot(px: f32, py: f32, ship_angle: f32, off_x: f32, off_y: f32, cr: f32, cg: f32, cb: f32, lifetime: f32, fade: f32, faction: u16) {
-    let x = px + ship_angle.cos() * off_x - ship_angle.sin() * off_y;
-    let y = py + ship_angle.sin() * off_x + ship_angle.cos() * off_y;
-    let def = EntityDef { sprite: "res/sprite/projectile/bolt_white_60x36x1.jpg", layer: "effects", effect_layer: "", color_r: cr, color_g: cg, color_b: cb, hitpoints: 25.0, radius: 5.0, lifetime: lifetime, explode_as: ET_NONE, speed: 500.0, fade: fade, fps: 0 };
-    let vx = ship_angle.cos() * def.speed;
-    let vy = ship_angle.sin() * def.speed;
-    spawn_with_def(ET_PROJECTILE, def, x, y, ship_angle, vx, vy, faction);
 }
 
 fn find_nearest_player(to_entity_id: u64) -> u64 {
@@ -825,9 +875,9 @@ fn main() {
         while (i < think_count) {
             let entity_id = get_think_id(i as u32);
 
-            if (!is_registered(state, entity_id)) {
+            if (!is_registered(entity_id)) {
                 let entity_type = get_script_type(entity_id);
-                register_entity(state, entity_id, entity_type);
+                register_entity(entity_id, entity_type);
             }
 
             i = i + 1;
@@ -838,7 +888,7 @@ fn main() {
         while (i < think_count) {
             let entity_id = get_think_id(i as u32);
             if (is_alive(entity_id)) {
-                dispatch_on_think(state, entity_id, age);
+                dispatch_on_think(entity_id, age);
             }
             i = i + 1;
         }
@@ -849,8 +899,8 @@ fn main() {
         while (j < collision_count) {
             let a = get_collision_id((j * 2) as u32);
             let b = get_collision_id((j * 2 + 1) as u32);
-            dispatch_on_collide(state, a, b);
-            dispatch_on_collide(state, b, a);
+            dispatch_on_collide(a, b);
+            dispatch_on_collide(b, a);
             j = j + 1;
         }
 
@@ -859,7 +909,7 @@ fn main() {
         let k: i32 = 0;
         while (k < dying_count) {
             let entity_id = get_dying_id(k as u32);
-            dispatch_on_die(state, entity_id);
+            dispatch_on_die(entity_id);
             k = k + 1;
         }
 
