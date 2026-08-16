@@ -1,13 +1,12 @@
-pub use std::{fs, io, fmt, error};
+pub use std::fs;
 pub use std::io::prelude::*;
-pub use std::result::Result;
 pub use std::collections::HashMap;
 pub use std::sync::Arc;
 pub use std::time::{Duration, Instant};
 pub use std::rc::Rc;
 pub use std::cell::RefCell;
 pub use std::fmt::Debug;
-pub use radiant_utils::maths::{Angle, Vec2, lerp, approach, min, max, clamp};
+pub use radiant_utils::maths::{Angle, Vec2, lerp, approach, min, clamp};
 pub use radiant_utils::util::{Periodic, Rng};
 pub use radiant_utils::loops::renderloop;
-pub use radiant::{Layer, Sprite, Color, Input, InputId, Font, Renderer, Texture, Context, Display, blendmodes, postprocessors};
+pub use radiant::{Layer, Sprite, Color, Input, InputId, Font, Renderer, Texture, Context, Display, Monitor, blendmodes, postprocessors};

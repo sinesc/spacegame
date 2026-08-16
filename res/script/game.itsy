@@ -9,7 +9,9 @@ use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_vel
           get_collision_count, get_collision_id,
           get_game_time, get_input_fire, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_spawn_trigger, get_rand_range,
           get_sprites, get_sounds, play_sound,
-          create_layer, add_render_layer, write_text, set_debug_layer,
+          create_layer, add_render_layer, write_text, write_menu_text, set_debug_layer,
+          pause_time, resume_time, request_exit, request_level_restart, toggle_fullscreen,
+          menu_key_up, menu_key_down, menu_key_return, menu_key_escape,
           get_dying_count, get_dying_id,
           spawn_entity, destroy_entity, set_v_motion, set_angle, set_hitpoints, apply_damage,
           debug_print};
@@ -148,6 +150,144 @@ const SOUND_GROUPS: [ String => [ String ] ] = [
     "damage/explosion_large" => [ "res/sound/damage/explosion1.ogg", "res/sound/damage/explosion2.ogg" ],
     "projectile/powerup"     => [ "res/sound/projectile/powerup1.ogg" ],
 ];
+
+// ============================================================
+// Menu (moved from res/def/menu.yaml + src/menu/mod.rs)
+// ============================================================
+
+// Menu item: `label` is drawn with write_menu_text; `action` is a single token
+// dispatched by run_menu_action (the old "; "-chained console command strings
+// became one token each). Per-item stride 0.0 = use the group's stride.
+struct MenuItem {
+    label   : String,
+    action  : String,
+    stride_x: f32,
+    stride_y: f32,
+}
+
+// Menu group: left/top/strides are fractional (multiplied by 1920 x 1080).
+struct MenuGroup {
+    left    : f32,
+    top     : f32,
+    stride_x: f32,
+    stride_y: f32,
+    items   : [ MenuItem ],
+}
+
+// Menu state: group "" = hidden.
+struct MenuState {
+    group: String,
+    index: u32,
+}
+
+// The "ingame" group is data for the future (Escape opens "main", like the
+// old menu_toggle). Unknown groups yield an empty menu (pause + nothing
+// drawn, Escape closes it).
+fn get_menu_group(name: String) -> MenuGroup {
+    if (name == "main") {
+        MenuGroup { left: 0.3, top: 0.1, stride_x: 0.0, stride_y: 0.1, items: [
+            MenuItem { label: "New Game",    action: "start",       stride_x: 0.0, stride_y: 0.0 },
+            MenuItem { label: "Load Game",   action: "savegames",   stride_x: 0.0, stride_y: 0.0 },
+            MenuItem { label: "Options",     action: "options",     stride_x: 0.0, stride_y: 0.15 },
+            MenuItem { label: "Quit Game",   action: "exit",        stride_x: 0.0, stride_y: 0.0 },
+        ]}
+    } else if (name == "ingame") {
+        MenuGroup { left: 0.3, top: 0.1, stride_x: 0.0, stride_y: 0.1, items: [
+            MenuItem { label: "Resume Game",   action: "resume",        stride_x: 0.0, stride_y: 0.15 },
+            MenuItem { label: "Options",       action: "options",       stride_x: 0.0, stride_y: 0.0 },
+            MenuItem { label: "Exit to Menu",  action: "quit_to_menu",  stride_x: 0.0, stride_y: 0.0 },
+        ]}
+    } else if (name == "options") {
+        MenuGroup { left: 0.3, top: 0.1, stride_x: 0.0, stride_y: 0.1, items: [
+            MenuItem { label: "Fullscreen",  action: "fullscreen",  stride_x: 0.0, stride_y: 0.0 },
+            MenuItem { label: "Main Menu",   action: "main",        stride_x: 0.0, stride_y: 0.0 },
+        ]}
+    } else {
+        MenuGroup { left: 0.3, top: 0.1, stride_x: 0.0, stride_y: 0.1, items: [ ] }
+    }
+}
+
+fn menu_show(group: String) -> MenuState {
+    pause_time();
+    MenuState { group: group, index: 0 }
+}
+
+fn menu_hide() -> MenuState {
+    resume_time();
+    MenuState { group: "", index: 0 }
+}
+
+// Executes a menu item's action; returns the new menu state.
+fn run_menu_action(action: String) -> MenuState {
+    if (action == "resume") {
+        menu_hide()
+    } else if (action == "start") {
+        menu_hide();
+        request_level_restart();
+        MenuState { group: "", index: 0 }
+    } else if (action == "quit_to_menu") {
+        request_level_restart();
+        menu_show("main")
+    } else if (action == "options") {
+        menu_show("options")
+    } else if (action == "main") {
+        menu_show("main")
+    } else if (action == "savegames") {
+        menu_show("savegames")
+    } else if (action == "exit") {
+        request_exit();
+        MenuState { group: "", index: 0 }
+    } else if (action == "fullscreen") {
+        toggle_fullscreen();
+        MenuState { group: "options", index: 0 }
+    } else {
+        debug_print("menu: unknown action {action}");
+        MenuState { group: "", index: 0 }
+    }
+}
+
+// Per-frame menu handling: Escape toggles ("main"), cursor moves the selection,
+// Return runs the selected item's action. Items are drawn onto the menu layer.
+fn menu_process(state: MenuState, menu_layer: u32) -> MenuState {
+    if (menu_key_escape()) {
+        if (state.group == "") {
+            state = menu_show("main");
+        } else {
+            state = menu_hide();
+        }
+    }
+    if (state.group != "") {
+        let def = get_menu_group(state.group);
+        if (def.items.len() > 0) {
+            if (menu_key_down()) {
+                let max_index = def.items.len() - 1;
+                if (state.index as u64 < max_index) { state.index = state.index + 1; }
+            }
+            if (menu_key_up()) {
+                if (state.index > 0) { state.index = state.index - 1; }
+            }
+            // draw items (selected = alpha 0.3, others 0.1, like the old menu)
+            let pos_x: f32 = def.left;
+            let pos_y: f32 = def.top;
+            let i: u64 = 0;
+            while (i < def.items.len()) {
+                let item = def.items[i];
+                let alpha = if (i == state.index as u64) { 0.3 } else { 0.1 };
+                write_menu_text(menu_layer, item.label, pos_x * 1920.0, pos_y * 1080.0, alpha);
+                let sx = if (item.stride_x != 0.0) { item.stride_x } else { def.stride_x };
+                let sy = if (item.stride_y != 0.0) { item.stride_y } else { def.stride_y };
+                pos_x = pos_x + sx;
+                pos_y = pos_y + sy;
+                i = i + 1;
+            }
+            if (menu_key_return()) {
+                let item = def.items[state.index as u64];
+                state = run_menu_action(item.action);
+            }
+        }
+    }
+    state
+}
 
 trait Entity {
     fn on_think(self: Self, age: f32) { }
@@ -618,6 +758,10 @@ fn main() {
     add_render_layer(base_layer, FILTER_GLARE, 1);
     add_render_layer(effects_layer, FILTER_NONE, 0);
     add_render_layer(text_layer, FILTER_NONE, 0);
+    // Menu layer: drawn above the text layer (component 2); the main.rs debug
+    // overlay stays on top of everything.
+    let menu_layer = create_layer(1.0, BLEND_NORMAL);
+    add_render_layer(menu_layer, FILTER_NONE, 2);
 
     // Populate the global resource ID maps (static, so this runs once).
     let sprites = get_sprites();
@@ -632,13 +776,18 @@ fn main() {
         SOUND_MAP.insert(sounds[i], i as u32);
         i = i + 1;
     }
-    debug_print("loaded {sprites.len()} sprites, {sounds.len()} sounds, 3 layers");
+    debug_print("loaded {sprites.len()} sprites, {sounds.len()} sounds, 4 layers");
+
+    let menu_state = MenuState { group: "", index: 0 };
 
     while (true) {
         let age = get_game_time();
 
         // UI help text (layers are cleared at the end of each frame).
         write_text(text_layer, "Mouse: move, R-Shift+Mouse: strafe, R-Ctrl+Mouse: rotate, Button1: shoot", 10.0, 740.0, 1.0);
+
+        // Menu handling (Escape toggles, cursor navigation, item actions).
+        menu_state = menu_process(menu_state, menu_layer);
 
         // Handle spawn triggers from Rust
         let trigger = get_spawn_trigger();

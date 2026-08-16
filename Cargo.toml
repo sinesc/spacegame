@@ -8,12 +8,7 @@ authors = ["Dennis Möhlmann <dmo479@gmail.com>"]
 hecs = "0.10"
 radiant-rs = { version = "0.15", features = [ "serialize-serde" ] }
 radiant-utils = { version = "0.5", features = [ "serialize-serde" ] }
-serde = "1.0"
-serde_yaml = "0.7.3"
-serde_derive = "1.0"
-yaml-merge-keys = { version = "0.2.0", features = [ "serde_yaml" ] }
 rodio = { version = "0.22", default-features = false, features = ["playback", "lewton"] }
-unicode-segmentation = "1.2.1"
 itsy = "0.5"
 itsy-derive = "0.5"
 

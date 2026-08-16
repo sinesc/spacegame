@@ -171,6 +171,64 @@ itsy::itsy_api! {
             let inf = unsafe { &mut *context.infrastructure };
             inf.debug_layer.store(layer_id, std::sync::atomic::Ordering::Relaxed);
         }
+        /// Draw menu text (80 px bold font) in white (alpha 0..=1) on a layer.
+        fn write_menu_text(&mut context, layer_id: u32, msg: String, x: f32, y: f32, alpha: f32) {
+            let inf = unsafe { &*context.infrastructure };
+            if let Some(layer) = inf.layers.get(layer_id as usize) {
+                inf.menu_font.write(layer, &msg, (x, y), Color::alpha_pm(alpha));
+            }
+        }
+        /// Lerp the game time rate to 0 over 500 ms (pause, e.g. when the menu opens).
+        fn pause_time(&mut context) {
+            let inf = unsafe { &mut *context.infrastructure };
+            inf.timeframe.lerp_rate(0.0, Duration::from_millis(500));
+        }
+        /// Lerp the game time rate back to 1 over 500 ms (resume).
+        fn resume_time(&mut context) {
+            let inf = unsafe { &mut *context.infrastructure };
+            inf.timeframe.lerp_rate(1.0, Duration::from_millis(500));
+        }
+        /// Ask the main loop to exit the game.
+        fn request_exit(&mut context) {
+            let inf = unsafe { &mut *context.infrastructure };
+            inf.exit_requested.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        /// Ask the main loop to rebuild the level (fresh VM, layers, game time).
+        fn request_level_restart(&mut context) {
+            let inf = unsafe { &mut *context.infrastructure };
+            inf.restart_requested.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        /// Cursor-up pressed this frame (key-repeat enabled while held).
+        fn menu_key_up(&mut context) -> bool {
+            let inf = unsafe { &*context.infrastructure };
+            inf.input.pressed(InputId::CursorUp, true)
+        }
+        /// Cursor-down pressed this frame (key-repeat enabled while held).
+        fn menu_key_down(&mut context) -> bool {
+            let inf = unsafe { &*context.infrastructure };
+            inf.input.pressed(InputId::CursorDown, true)
+        }
+        /// Return/Enter pressed this frame (key-repeat enabled while held).
+        fn menu_key_return(&mut context) -> bool {
+            let inf = unsafe { &*context.infrastructure };
+            inf.input.pressed(InputId::Return, true)
+        }
+        /// Escape pressed this frame (one-shot edge, no repeats).
+        fn menu_key_escape(&mut context) -> bool {
+            let inf = unsafe { &*context.infrastructure };
+            inf.input.pressed(InputId::Escape, false)
+        }
+        /// Toggle windowed/fullscreen mode (starts in the mode the game was launched with).
+        fn toggle_fullscreen(&mut context) {
+            let inf = unsafe { &mut *context.infrastructure };
+            if inf.fullscreen.load(std::sync::atomic::Ordering::Relaxed) {
+                inf.display.set_windowed();
+                inf.fullscreen.store(false, std::sync::atomic::Ordering::Relaxed);
+            } else if let Some(monitor) = &inf.monitor {
+                inf.display.set_fullscreen(Some(monitor.clone())).unwrap();
+                inf.fullscreen.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
         /// Play a sound file by ID (index into `get_sounds()`).
         /// Files are loaded on first use and cached.
         fn play_sound(&mut context, id: u32) {

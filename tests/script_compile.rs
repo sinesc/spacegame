@@ -41,6 +41,16 @@ itsy::itsy_api! {
         fn add_render_layer(&mut _ctx, _layer_id: u32, _filter: u32, _component: u32) {}
         fn write_text(&mut _ctx, _layer_id: u32, _msg: String, _x: f32, _y: f32, _alpha: f32) {}
         fn set_debug_layer(&mut _ctx, _layer_id: u32) {}
+        fn write_menu_text(&mut _ctx, _layer_id: u32, _msg: String, _x: f32, _y: f32, _alpha: f32) {}
+        fn pause_time(&mut _ctx) {}
+        fn resume_time(&mut _ctx) {}
+        fn request_exit(&mut _ctx) {}
+        fn request_level_restart(&mut _ctx) {}
+        fn toggle_fullscreen(&mut _ctx) {}
+        fn menu_key_up(&mut _ctx) -> bool { false }
+        fn menu_key_down(&mut _ctx) -> bool { false }
+        fn menu_key_return(&mut _ctx) -> bool { false }
+        fn menu_key_escape(&mut _ctx) -> bool { false }
         fn get_dying_count(&mut _ctx) -> i32 { 0 }
         fn get_dying_id(&mut _ctx, _index: u32) -> u64 { 0 }
         fn debug_print(&mut _ctx, _msg: String) { }

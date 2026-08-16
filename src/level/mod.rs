@@ -5,6 +5,7 @@ use rodio::mixer::Mixer;
 use crate::bloom;
 use crate::scripting;
 use crate::scripting::ScriptingSubsystem;
+use crate::timeframe::Timeframe;
 
 pub mod component;
 mod system;
@@ -25,7 +26,7 @@ pub enum RenderFilter {
 }
 
 pub struct Infrastructure {
-    input         : Input,
+    pub input     : Input,
     pub audio     : Mixer,
     /// Render layers created by the Itsy script (`create_layer`); the vector
     /// index is the layer ID shared between Itsy and Rust.
@@ -33,6 +34,18 @@ pub struct Infrastructure {
     /// Render passes created by the Itsy script (`add_render_layer`), in draw order.
     pub render_layers : Vec<RenderLayer>,
     pub font      : Arc<Font>,
+    /// Font for Itsy-side menu text (Arial 80 bold).
+    pub menu_font : Arc<Font>,
+    /// Game time; the Itsy script pauses/resumes it (pause_time / resume_time).
+    pub timeframe : Timeframe,
+    /// Set by the Itsy script (`request_exit`); checked by the main loop.
+    pub exit_requested    : std::sync::atomic::AtomicBool,
+    /// Set by the Itsy script (`request_level_restart`); the main loop rebuilds the level.
+    pub restart_requested : std::sync::atomic::AtomicBool,
+    /// Display handle for the `toggle_fullscreen` API.
+    pub display   : Arc<Display>,
+    pub monitor   : Option<Monitor>,
+    pub fullscreen: std::sync::atomic::AtomicBool,
     /// Layer ID used for Rust-side debug text (set by Itsy via `set_debug_layer`);
     /// `u32::MAX` = not set yet.
     pub debug_layer : std::sync::atomic::AtomicU32,
@@ -48,11 +61,9 @@ impl Infrastructure {
 
 #[derive(Clone)]
 pub struct WorldState {
-    pub age         : f32,
-    pub delta       : f32,
-    pub take_input  : bool,
-    pub paused      : bool,
-    pub inf         : Arc<Infrastructure>,
+    pub age   : f32,
+    pub delta : f32,
+    pub inf   : Arc<Infrastructure>,
 }
 
 pub struct Level {
@@ -72,12 +83,14 @@ pub struct Level {
 
 impl Level {
 
-    pub fn new(input: &Input, context: &Context) -> Self {
+    pub fn new(input: &Input, display: Arc<Display>, monitor: Option<Monitor>, fullscreen: bool) -> Self {
 
         let world = hecs::World::new();
 
+        let context = display.context().clone();
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
-        let background = Texture::from_file(context, "res/background/blue.jpg").unwrap();
+        let menu_font = Font::builder(&context).family("Arial").size(80.0).bold().build().unwrap().arc();
+        let background = Texture::from_file(&context, "res/background/blue.jpg").unwrap();
         let mut audio_sink = DeviceSinkBuilder::open_default_sink().unwrap();
         audio_sink.log_on_drop(false);
         let audio = audio_sink.mixer().clone();
@@ -86,20 +99,25 @@ impl Level {
         // add_render_layer); player is spawned via the GAME_START trigger.
 
         let infrastructure = Arc::new(Infrastructure {
-            audio         : audio,
-            input         : input.clone(),
-            layers        : Vec::new(),
-            render_layers : Vec::new(),
-            font          : font,
-            debug_layer   : std::sync::atomic::AtomicU32::new(u32::MAX),
+            audio             : audio,
+            input             : input.clone(),
+            layers            : Vec::new(),
+            render_layers     : Vec::new(),
+            font              : font,
+            menu_font         : menu_font,
+            timeframe         : Timeframe::new(),
+            exit_requested    : std::sync::atomic::AtomicBool::new(false),
+            restart_requested : std::sync::atomic::AtomicBool::new(false),
+            display           : display,
+            monitor           : monitor,
+            fullscreen        : std::sync::atomic::AtomicBool::new(fullscreen),
+            debug_layer       : std::sync::atomic::AtomicU32::new(u32::MAX),
         });
 
         let world_state = WorldState {
-            delta       : 0.0,
-            age         : 0.0,
-            take_input  : true,
-            paused      : false,
-            inf         : infrastructure.clone(),
+            delta : 0.0,
+            age   : 0.0,
+            inf   : infrastructure.clone(),
         };
 
         let mut bloom = postprocessors::Bloom::new(&context, (1920u32, 1080u32), 2);
@@ -148,12 +166,35 @@ impl Level {
         pairs
     }
 
-    pub fn process(&mut self, renderer: &Renderer, age: f32, delta: f32, take_input: bool, paused: bool) {
+    /// Elapsed game time in seconds (read by the main loop for age/delta).
+    pub fn game_age(&self) -> f64 {
+        Timeframe::duration_to_secs(self.inf.timeframe.elapsed())
+    }
+
+    /// Current game time rate (0 = paused, 1 = normal).
+    pub fn game_rate(&self) -> f64 {
+        self.inf.timeframe.rate()
+    }
+
+    /// True if the Itsy script requested a game exit.
+    pub fn exit_requested(&self) -> bool {
+        self.inf.exit_requested.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// True if the Itsy script requested a level restart.
+    pub fn restart_requested(&self) -> bool {
+        self.inf.restart_requested.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Current fullscreen state (may have been toggled by the Itsy script).
+    pub fn is_fullscreen(&self) -> bool {
+        self.inf.fullscreen.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn process(&mut self, renderer: &Renderer, age: f32, delta: f32) {
 
         self.world_state.age = age;
         self.world_state.delta = delta;
-        self.world_state.take_input = take_input;
-        self.world_state.paused = paused;
         self.age = age;
 
         let mut cmd = hecs::CommandBuffer::new();
