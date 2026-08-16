@@ -13,50 +13,20 @@ use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_vel
           pause_time, resume_time, request_exit, request_level_restart, toggle_fullscreen,
           get_dying_count, get_dying_id,
           spawn_entity, destroy_entity, set_v_motion, set_angle, set_hitpoints, apply_damage,
-          debug_print};
+          debug_print,
+          // shared protocol constants (defined once in the Rust itsy_api! macro, available as Api::NAME)
+          KEY_W, KEY_S, KEY_A, KEY_D, KEY_RSHIFT, KEY_CURSOR_UP, KEY_CURSOR_DOWN, KEY_RETURN, KEY_ESCAPE, KEY_MOUSE1, KEY_LCONTROL,
+          ET_NONE, ET_PLAYER, ET_ASTEROID, ET_MINE_RED, ET_MINE_GREEN, ET_POWERUP_DUAL, ET_POWERUP_TRIPLE, ET_PROJECTILE, ET_EXPLOSION,
+          TRIGGER_NONE, TRIGGER_GAME_START,
+          MOTION_CONST, MOTION_FOLLOW, MOTION_STRAFE, MOTION_DETACHED,
+          BLEND_NORMAL, BLEND_ADD, BLEND_LIGHTEN,
+          FILTER_NONE, FILTER_BLOOM, FILTER_GLARE,
+          LAYER_ID_NONE};
 
 // ============================================================
-// Entity type IDs (must match Rust constants)
-// ============================================================
-
-const ET_NONE       : u16 = 0;
-const ET_PLAYER     : u16 = 1;
-const ET_ASTEROID   : u16 = 2;
-const ET_MINE_RED   : u16 = 3;
-const ET_MINE_GREEN : u16 = 4;
-const ET_POWERUP_DUAL   : u16 = 5;
-const ET_POWERUP_TRIPLE : u16 = 6;
-const ET_PROJECTILE     : u16 = 7;
-const ET_EXPLOSION      : u16 = 8;
-
-// ============================================================
-// Input key bits (must match KEY_* constants in src/scripting/mod.rs).
-// get_input_keys()      = keys currently held down
-// get_input_pressed()   = keys pressed this frame (incl. repeat while held)
-// get_input_edge()      = keys pressed this frame (initial press only)
-// ============================================================
-
-const KEY_W           : u16 = 1;
-const KEY_S           : u16 = 2;
-const KEY_A           : u16 = 4;
-const KEY_D           : u16 = 8;
-const KEY_RSHIFT      : u16 = 16;
-const KEY_CURSOR_UP   : u16 = 32;
-const KEY_CURSOR_DOWN : u16 = 64;
-const KEY_RETURN      : u16 = 128;
-const KEY_ESCAPE      : u16 = 256;
-const KEY_MOUSE1      : u16 = 512;
-const KEY_LCONTROL    : u16 = 1024;
-
-// ============================================================
-// Spawn triggers (Rust -> Itsy)
-// ============================================================
-
-const TRIGGER_NONE      : u32 = 0;
-const TRIGGER_GAME_START: u32 = 4;
-
-// ============================================================
-// Spawner constants
+// Spawner constants (Itsy-only). The Rust<->Itsy protocol constants
+// (ET_*, KEY_*, TRIGGER_*, MOTION_*, BLEND_*, FILTER_* and LAYER_ID_NONE)
+// are defined once in the Rust itsy_api! macro and imported above via `use`.
 // ============================================================
 
 const PI: f32 = 3.14159265;
@@ -77,30 +47,8 @@ const ASTEROID_FIRST_SPAWN: f32 = 4.0;
 const MINE_FIRST_SPAWN: f32 = 12.0;
 
 // ============================================================
-// Inertial motion types (must match Rust InertialMotionType order)
-// ============================================================
-
-const MOTION_CONST    : u32 = 0;
-const MOTION_FOLLOW   : u32 = 1;  // move + face movement direction
-const MOTION_STRAFE   : u32 = 2;  // move, keep current angle
-const MOTION_DETACHED : u32 = 3;  // rotate toward v_fraction, no movement
-
-// ============================================================
 // Entity type definitions (static data per type)
 // ============================================================
-
-// Layer ID meaning "no layer" (Rust treats u32::MAX as absent).
-const LAYER_ID_NONE: u32 = 4294967295;
-
-// Layer blend modes (create_layer).
-const BLEND_NORMAL  : u32 = 0;
-const BLEND_ADD     : u32 = 1;
-const BLEND_LIGHTEN : u32 = 2;
-
-// Render pass filters (add_render_layer).
-const FILTER_NONE  : u32 = 0;
-const FILTER_BLOOM : u32 = 1;
-const FILTER_GLARE : u32 = 2;
 
 // Entity visual fields: sprite is a key into sprite_map (full res/sprite/... path
 // from get_sprites()); layer / effect_layer are keys into layer_map ("" = none,

@@ -12,6 +12,41 @@ struct TestContext {}
 // Stub API matching the function signatures the game script expects.
 itsy::itsy_api! {
     pub Api<TestContext> {
+        // Shared protocol constants (must stay in sync with src/scripting/mod.rs).
+        const KEY_W           : u16 = 1;
+        const KEY_S           : u16 = 2;
+        const KEY_A           : u16 = 4;
+        const KEY_D           : u16 = 8;
+        const KEY_RSHIFT      : u16 = 16;
+        const KEY_CURSOR_UP   : u16 = 32;
+        const KEY_CURSOR_DOWN : u16 = 64;
+        const KEY_RETURN      : u16 = 128;
+        const KEY_ESCAPE      : u16 = 256;
+        const KEY_MOUSE1      : u16 = 512;
+        const KEY_LCONTROL    : u16 = 1024;
+        const ET_NONE         : u16 = 0;
+        const ET_PLAYER       : u16 = 1;
+        const ET_ASTEROID     : u16 = 2;
+        const ET_MINE_RED     : u16 = 3;
+        const ET_MINE_GREEN   : u16 = 4;
+        const ET_POWERUP_DUAL : u16 = 5;
+        const ET_POWERUP_TRIPLE : u16 = 6;
+        const ET_PROJECTILE   : u16 = 7;
+        const ET_EXPLOSION    : u16 = 8;
+        const TRIGGER_NONE      : u32 = 0;
+        const TRIGGER_GAME_START: u32 = 4;
+        const MOTION_CONST    : u32 = 0;
+        const MOTION_FOLLOW   : u32 = 1;
+        const MOTION_STRAFE   : u32 = 2;
+        const MOTION_DETACHED : u32 = 3;
+        const BLEND_NORMAL  : u32 = 0;
+        const BLEND_ADD     : u32 = 1;
+        const BLEND_LIGHTEN : u32 = 2;
+        const FILTER_NONE  : u32 = 0;
+        const FILTER_BLOOM : u32 = 1;
+        const FILTER_GLARE : u32 = 2;
+        const LAYER_ID_NONE : u32 = u32::MAX;
+
         fn get_hitpoints(&mut _ctx, _id: u64) -> f32 { 0.0 }
         fn get_position_x(&mut _ctx, _id: u64) -> f32 { 0.0 }
         fn get_position_y(&mut _ctx, _id: u64) -> f32 { 0.0 }

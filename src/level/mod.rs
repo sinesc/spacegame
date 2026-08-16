@@ -3,7 +3,7 @@ use hecs;
 use rodio::{MixerDeviceSink, DeviceSinkBuilder};
 use rodio::mixer::Mixer;
 use crate::bloom;
-use crate::scripting;
+use crate::scripting::Api;
 use crate::scripting::ScriptingSubsystem;
 use crate::timeframe::Timeframe;
 
@@ -226,22 +226,22 @@ impl Level {
             if input.pressed(key, true) { pressed |= bit; }
             if input.pressed(key, false) { edge |= bit; }
         };
-        add_key(InputId::W, scripting::KEY_W);
-        add_key(InputId::S, scripting::KEY_S);
-        add_key(InputId::A, scripting::KEY_A);
-        add_key(InputId::D, scripting::KEY_D);
-        add_key(InputId::RShift, scripting::KEY_RSHIFT);
-        add_key(InputId::CursorUp, scripting::KEY_CURSOR_UP);
-        add_key(InputId::CursorDown, scripting::KEY_CURSOR_DOWN);
-        add_key(InputId::Return, scripting::KEY_RETURN);
-        add_key(InputId::Escape, scripting::KEY_ESCAPE);
-        add_key(InputId::Mouse1, scripting::KEY_MOUSE1);
-        add_key(InputId::LControl, scripting::KEY_LCONTROL);
+        add_key(InputId::W, Api::KEY_W);
+        add_key(InputId::S, Api::KEY_S);
+        add_key(InputId::A, Api::KEY_A);
+        add_key(InputId::D, Api::KEY_D);
+        add_key(InputId::RShift, Api::KEY_RSHIFT);
+        add_key(InputId::CursorUp, Api::KEY_CURSOR_UP);
+        add_key(InputId::CursorDown, Api::KEY_CURSOR_DOWN);
+        add_key(InputId::Return, Api::KEY_RETURN);
+        add_key(InputId::Escape, Api::KEY_ESCAPE);
+        add_key(InputId::Mouse1, Api::KEY_MOUSE1);
+        add_key(InputId::LControl, Api::KEY_LCONTROL);
         self.scripting.set_input_state(keys, pressed, edge);
 
         // Send GAME_START trigger on first frame
         if !self.game_started {
-            self.scripting.set_spawn_trigger(scripting::TRIGGER_GAME_START);
+            self.scripting.set_spawn_trigger(Api::TRIGGER_GAME_START);
             self.game_started = true;
         }
 

@@ -29,31 +29,63 @@ pub struct ScriptingSubsystem {
     _inf        : Arc<Infrastructure>,
 }
 
-// Entity type constants (must match the ET_* constants in res/script/game.itsy).
-// Only the ones referenced by the Rust side are kept; the script defines the rest.
-pub const ET_PLAYER     : u16 = 1;
-pub const ET_EXPLOSION  : u16 = 8;
-
-/// Key bits for the input masks passed to Itsy each frame (`set_input_state`).
-/// Must match the KEY_* constants in res/script/game.itsy.
-pub const KEY_W           : u16 = 1;
-pub const KEY_S           : u16 = 2;
-pub const KEY_A           : u16 = 4;
-pub const KEY_D           : u16 = 8;
-pub const KEY_RSHIFT      : u16 = 16;
-pub const KEY_CURSOR_UP   : u16 = 32;
-pub const KEY_CURSOR_DOWN : u16 = 64;
-pub const KEY_RETURN      : u16 = 128;
-pub const KEY_ESCAPE      : u16 = 256;
-pub const KEY_MOUSE1      : u16 = 512;
-pub const KEY_LCONTROL    : u16 = 1024;
-
-// Spawn triggers (must match Itsy script)
-pub const TRIGGER_GAME_START: u32 = 4;
-
 // Define the Itsy API type.
+//
+// The Rust<->Itsy protocol constants (key bits, entity types, spawn triggers,
+// motion/blend/filter encodings and the "no layer" sentinel) are declared once,
+// before any function, and become associated constants on `Api`. Rust code
+// refers to them as `Api::KEY_W`; the Itsy script refers to the same definition
+// (as `Api::KEY_W`, or bare `KEY_W` after `use Api::KEY_W`). This makes the
+// macro the single source of truth, so the two sides can never drift.
 itsy::itsy_api! {
     pub Api<ScriptContext> {
+        // Input key bits (the masks passed to Itsy each frame via set_input_state).
+        const KEY_W           : u16 = 1;
+        const KEY_S           : u16 = 2;
+        const KEY_A           : u16 = 4;
+        const KEY_D           : u16 = 8;
+        const KEY_RSHIFT      : u16 = 16;
+        const KEY_CURSOR_UP   : u16 = 32;
+        const KEY_CURSOR_DOWN : u16 = 64;
+        const KEY_RETURN      : u16 = 128;
+        const KEY_ESCAPE      : u16 = 256;
+        const KEY_MOUSE1      : u16 = 512;
+        const KEY_LCONTROL    : u16 = 1024;
+
+        // Entity type IDs.
+        const ET_NONE         : u16 = 0;
+        const ET_PLAYER       : u16 = 1;
+        const ET_ASTEROID     : u16 = 2;
+        const ET_MINE_RED     : u16 = 3;
+        const ET_MINE_GREEN   : u16 = 4;
+        const ET_POWERUP_DUAL : u16 = 5;
+        const ET_POWERUP_TRIPLE : u16 = 6;
+        const ET_PROJECTILE   : u16 = 7;
+        const ET_EXPLOSION    : u16 = 8;
+
+        // Spawn triggers (Rust -> Itsy).
+        const TRIGGER_NONE      : u32 = 0;
+        const TRIGGER_GAME_START: u32 = 4;
+
+        // Inertial motion types (set_v_motion; order matches component::InertialMotionType).
+        const MOTION_CONST    : u32 = 0;
+        const MOTION_FOLLOW   : u32 = 1;  // move + face movement direction
+        const MOTION_STRAFE   : u32 = 2;  // move, keep current angle
+        const MOTION_DETACHED : u32 = 3;  // rotate toward v_fraction, no movement
+
+        // Layer blend modes (create_layer).
+        const BLEND_NORMAL  : u32 = 0;
+        const BLEND_ADD     : u32 = 1;
+        const BLEND_LIGHTEN : u32 = 2;
+
+        // Render pass filters (add_render_layer).
+        const FILTER_NONE  : u32 = 0;
+        const FILTER_BLOOM : u32 = 1;
+        const FILTER_GLARE : u32 = 2;
+
+        // "No layer" sentinel for layer / effect_layer IDs (Rust treats it as absent).
+        const LAYER_ID_NONE : u32 = u32::MAX;
+
         fn get_hitpoints(&mut context, id: u64) -> f32 {
             context.entity_data.get(&id).map(|e| e.hitpoints).unwrap_or(0.0)
         }
@@ -156,8 +188,8 @@ itsy::itsy_api! {
             let inf = unsafe { &mut *context.infrastructure };
             let layer = Layer::new((scale * 1920., scale * 1080.)).arc();
             match blendmode {
-                1 => { layer.set_blendmode(blendmodes::ADD); }
-                2 => { layer.set_blendmode(blendmodes::LIGHTEN); }
+                Api::BLEND_ADD     => { layer.set_blendmode(blendmodes::ADD); }
+                Api::BLEND_LIGHTEN => { layer.set_blendmode(blendmodes::LIGHTEN); }
                 _ => {}
             }
             let id = inf.layers.len() as u32;
@@ -173,8 +205,8 @@ itsy::itsy_api! {
             inf.render_layers.push(RenderLayer {
                 layer_id,
                 filter: match filter {
-                    1 => Some(RenderFilter::Bloom),
-                    2 => Some(RenderFilter::Glare),
+                    Api::FILTER_BLOOM => Some(RenderFilter::Bloom),
+                    Api::FILTER_GLARE => Some(RenderFilter::Glare),
                     _ => None,
                 },
                 component,
@@ -284,9 +316,9 @@ itsy::itsy_api! {
                 if let Ok(mut inertial) = world.get::<&mut component::Inertial>(entity) {
                     inertial.v_fraction = Vec2(vx, vy);
                     inertial.motion_type = match motion_type {
-                        0 => component::InertialMotionType::Const,
-                        1 => component::InertialMotionType::FollowVector,
-                        2 => component::InertialMotionType::StrafeVector,
+                        Api::MOTION_CONST  => component::InertialMotionType::Const,
+                        Api::MOTION_FOLLOW => component::InertialMotionType::FollowVector,
+                        Api::MOTION_STRAFE => component::InertialMotionType::StrafeVector,
                         _ => component::InertialMotionType::Detached,
                     };
                 }
@@ -523,7 +555,7 @@ fn spawn_entity_from_context(ctx: &ScriptContext,
     // Bounding component (for collision). Explosions have none, like the original:
     // they are non-interactive, so they can neither take damage nor damage anything
     // (previously overlapping explosions killed each other on the next frame).
-    if entity_type != ET_EXPLOSION {
+    if entity_type != Api::ET_EXPLOSION {
         builder.add(component::Bounding {
             radius: radius,
             faction: faction,
@@ -536,10 +568,10 @@ fn spawn_entity_from_context(ctx: &ScriptContext,
     // (The mine AI switches entities to FollowVector via set_v_motion.)
     // Default speed is 100 px/s (asteroids, mines). The player is 5x that (the
     // default felt too slow in playtesting).
-    let v_max = if entity_type == ET_PLAYER { 500.0 } else { 100.0 };
+    let v_max = if entity_type == Api::ET_PLAYER { 500.0 } else { 100.0 };
 
     match entity_type {
-        ET_EXPLOSION => {
+        Api::ET_EXPLOSION => {
             // Explosions don't move
         }
         _ => {
@@ -605,7 +637,7 @@ fn spawn_entity_from_context(ctx: &ScriptContext,
     // Resolve layers by ID from the Infrastructure (u32::MAX = no layer).
     let layers = unsafe { &(*ctx.infrastructure).layers };
     let resolve_layer = |id: u32| -> Option<Arc<Layer>> {
-        if id == u32::MAX {
+        if id == Api::LAYER_ID_NONE {
             return None;
         }
         layers.get(id as usize).cloned()
