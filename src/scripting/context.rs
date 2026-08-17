@@ -26,7 +26,7 @@ pub struct ScriptContext {
     /// Sprite cache pointer (for spawn_entity).
     pub sprite_cache: *mut HashMap<String, Arc<Sprite>>,
     /// The Infrastructure (layers, render layers, font, audio). Points into the
-    /// Arc<Infrastructure> kept alive by the ScriptingSubsystem.
+    /// Arc<Infrastructure> kept alive by the Scripting system.
     pub infrastructure: *mut Infrastructure,
     /// Sound cache pointer (for play_sound; set before vm.run()).
     pub sound_cache: *mut HashMap<String, Sound>,
@@ -102,22 +102,6 @@ fn list_files_recursive(path: &str) -> Vec<String> {
     result
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn lists_sprite_files() {
-        let sprites = list_files_recursive("res/sprite");
-        assert!(sprites.len() > 0, "expected sprite files");
-        assert!(sprites.iter().all(|p| p.starts_with("res/sprite/")));
-        // stable ordering: sorted
-        let mut sorted = sprites.clone();
-        sorted.sort();
-        assert_eq!(sprites, sorted);
-    }
-}
-
 fn list_files_recursive_inner(path: &str, out: &mut Vec<String>) {
     let Ok(entries) = fs::read_dir(path) else {
         eprintln!("list_files_recursive: cannot read directory '{}'", path);
@@ -135,5 +119,21 @@ fn list_files_recursive_inner(path: &str, out: &mut Vec<String>) {
     subdirs.sort();
     for sub in subdirs {
         list_files_recursive_inner(&sub, out);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lists_sprite_files() {
+        let sprites = list_files_recursive("res/sprite");
+        assert!(sprites.len() > 0, "expected sprite files");
+        assert!(sprites.iter().all(|p| p.starts_with("res/sprite/")));
+        // stable ordering: sorted
+        let mut sorted = sprites.clone();
+        sorted.sort();
+        assert_eq!(sprites, sorted);
     }
 }

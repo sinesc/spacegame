@@ -4,7 +4,7 @@ use rodio::{MixerDeviceSink, DeviceSinkBuilder};
 use rodio::mixer::Mixer;
 use crate::bloom;
 use crate::scripting::Api;
-use crate::scripting::ScriptingSubsystem;
+use self::system::Scripting;
 use crate::timeframe::Timeframe;
 
 pub mod component;
@@ -73,11 +73,10 @@ pub struct Level {
     inf             : Arc<Infrastructure>,
     age             : f32,
     _audio_sink     : MixerDeviceSink,
-
     bloom           : postprocessors::Bloom,
     glare           : bloom::Bloom,
     background      : Texture,
-    scripting       : ScriptingSubsystem,
+    scripting       : Scripting,
     game_started    : bool,  // track if GAME_START trigger was sent
 }
 
@@ -138,7 +137,7 @@ impl Level {
             glare           : bloom::Bloom::new(&context, (1920, 1080), 2, 5, 5.0),
             inf             : infrastructure,
             background      : background,
-            scripting       : ScriptingSubsystem::new(context.clone(), inf_for_scripting),
+            scripting       : Scripting::new(context.clone(), inf_for_scripting),
             game_started    : false,
         }
     }
