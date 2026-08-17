@@ -1,12 +1,8 @@
 mod context;
 
-pub use self::context::{ScriptContext, EntityData};
+pub use self::context::{ScriptContext, EntityData, ApiOp, SpawnRequest};
 
 use crate::prelude::*;
-use crate::level::component;
-use crate::level::{RenderLayer, RenderFilter};
-use crate::sound::Sound;
-use hecs;
 use itsy;
 
 // Define the Itsy API type.
@@ -165,15 +161,11 @@ itsy::itsy_api! {
         /// Layer size = (scale * 1920) x (scale * 1080).
         /// `blendmode`: 0 = normal, 1 = add, 2 = lighten.
         fn create_layer(&mut context, scale: f32, blendmode: u32) -> u32 {
-            let inf = unsafe { &mut *context.infrastructure };
-            let layer = Layer::new((scale * 1920., scale * 1080.)).arc();
-            match blendmode {
-                Api::BLEND_ADD     => { layer.set_blendmode(blendmodes::ADD); }
-                Api::BLEND_LIGHTEN => { layer.set_blendmode(blendmodes::LIGHTEN); }
-                _ => {}
-            }
-            let id = inf.layers.len() as u32;
-            inf.layers.push(layer);
+            // The ID is the layers-vector index the executor will assign
+            // (FIFO; only CreateLayer ops append to the vector).
+            let id = context.next_layer_id;
+            context.next_layer_id += 1;
+            context.pending.push(ApiOp::CreateLayer { scale, blend: blendmode });
             id
         }
         /// Register a render pass for a layer (in draw order), mirroring the old
@@ -181,92 +173,57 @@ itsy::itsy_api! {
         /// `filter`: 0 = none, 1 = bloom, 2 = glare. `component` = z-order
         /// within the layer.
         fn add_render_layer(&mut context, layer_id: u32, filter: u32, component: u32) {
-            let inf = unsafe { &mut *context.infrastructure };
-            inf.render_layers.push(RenderLayer {
-                layer_id,
-                filter: match filter {
-                    Api::FILTER_BLOOM => Some(RenderFilter::Bloom),
-                    Api::FILTER_GLARE => Some(RenderFilter::Glare),
-                    _ => None,
-                },
-                component,
-            });
+            context.pending.push(ApiOp::AddRenderLayer { layer_id, filter, component });
         }
         /// Draw text in white (alpha 0..=1) on a layer.
         fn write_text(&mut context, layer_id: u32, msg: String, x: f32, y: f32, alpha: f32) {
-            let inf = unsafe { &mut *context.infrastructure };
-            if let Some(layer) = inf.layers.get(layer_id as usize) {
-                inf.font.write(layer, &msg, (x, y), Color::alpha_pm(alpha));
-            }
+            context.pending.push(ApiOp::WriteText { layer_id, msg, x, y, alpha, menu: false });
         }
         /// Tell Rust which layer to use for its own debug text output.
         fn set_debug_layer(&mut context, layer_id: u32) {
-            let inf = unsafe { &mut *context.infrastructure };
-            inf.debug_layer.store(layer_id, std::sync::atomic::Ordering::Relaxed);
+            context.pending.push(ApiOp::SetDebugLayer(layer_id));
         }
         /// Draw menu text (80 px bold font) in white (alpha 0..=1) on a layer.
         fn write_menu_text(&mut context, layer_id: u32, msg: String, x: f32, y: f32, alpha: f32) {
-            let inf = unsafe { &*context.infrastructure };
-            if let Some(layer) = inf.layers.get(layer_id as usize) {
-                inf.menu_font.write(layer, &msg, (x, y), Color::alpha_pm(alpha));
-            }
+            context.pending.push(ApiOp::WriteText { layer_id, msg, x, y, alpha, menu: true });
         }
         /// Lerp the game time rate to 0 over 500 ms (pause, e.g. when the menu opens).
         fn pause_time(&mut context) {
-            let inf = unsafe { &mut *context.infrastructure };
-            inf.timeframe.lerp_rate(0.0, Duration::from_millis(500));
+            context.pending.push(ApiOp::PauseTime);
         }
         /// Lerp the game time rate back to 1 over 500 ms (resume).
         fn resume_time(&mut context) {
-            let inf = unsafe { &mut *context.infrastructure };
-            inf.timeframe.lerp_rate(1.0, Duration::from_millis(500));
+            context.pending.push(ApiOp::ResumeTime);
         }
         /// Ask the main loop to exit the game.
         fn request_exit(&mut context) {
-            let inf = unsafe { &mut *context.infrastructure };
-            inf.exit_requested.store(true, std::sync::atomic::Ordering::Relaxed);
+            context.pending.push(ApiOp::RequestExit);
         }
         /// Ask the main loop to rebuild the level (fresh VM, layers, game time).
         fn request_level_restart(&mut context) {
-            let inf = unsafe { &mut *context.infrastructure };
-            inf.restart_requested.store(true, std::sync::atomic::Ordering::Relaxed);
+            context.pending.push(ApiOp::RequestLevelRestart);
         }
         /// Toggle windowed/fullscreen mode (starts in the mode the game was launched with).
         fn toggle_fullscreen(&mut context) {
-            let inf = unsafe { &mut *context.infrastructure };
-            if inf.fullscreen.load(std::sync::atomic::Ordering::Relaxed) {
-                inf.display.set_windowed();
-                inf.fullscreen.store(false, std::sync::atomic::Ordering::Relaxed);
-            } else if let Some(monitor) = &inf.monitor {
-                inf.display.set_fullscreen(Some(monitor.clone())).unwrap();
-                inf.fullscreen.store(true, std::sync::atomic::Ordering::Relaxed);
-            }
+            context.pending.push(ApiOp::ToggleFullscreen);
         }
         /// Play a sound file by ID (index into `get_sounds()`).
         /// Files are loaded on first use and cached.
         fn play_sound(&mut context, id: u32) {
-            let id = id as usize;
-            if id >= context.sound_list.len() {
+            if (id as usize) >= context.sound_list.len() {
                 eprintln!("play_sound: invalid id {}", id);
                 return;
             }
-            let name = context.sound_list[id].clone();
-            let inf = unsafe { &*context.infrastructure };
-            let cache = unsafe { &mut *context.sound_cache };
-            if cache.get(&name).is_none() {
-                match Sound::load(&name) {
-                    Ok(sound) => { cache.insert(name.clone(), sound); }
-                    Err(e) => { eprintln!("play_sound: failed to load '{}': {}", name, e); return; }
-                }
-            }
-            let sound = cache.get(&name).unwrap();
-            inf.audio.add(sound.decoder());
+            context.pending.push(ApiOp::PlaySound { id });
         }
         fn debug_print(&mut _context, msg: String) {
             eprintln!("ITSY: {}", msg);
         }
 
-        // --- Direct action API (replaces command buffer) ---
+        // --- Action API ---
+        // API calls record operations in `context.pending`; the Scripting
+        // system executes them after vm.run() (request queue — this is what
+        // keeps the API free of raw pointers to the world/infrastructure).
 
         /// `fade` = number of seconds the entity's visual fades out over, at the end
         /// of its lifetime (0 = no fading).
@@ -277,193 +234,31 @@ itsy::itsy_api! {
         /// `color_r/g/b` tint the sprite (alpha is always 1.0; values may exceed 1.0
         /// on additive layers).
         fn spawn_entity(&mut context, entity_type: u16, sprite_id: u32, layer_id: u32, effect_layer_id: u32, px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: u16, hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32, color_r: f32, color_g: f32, color_b: f32) {
-            spawn_entity_from_context(&context, entity_type, sprite_id, layer_id, effect_layer_id, px, py, angle, vx, vy, faction, hitpoints, radius, lifetime, fade, fps, color_r, color_g, color_b);
+            context.pending.push(ApiOp::Spawn(SpawnRequest {
+                entity_type, sprite_id, layer_id, effect_layer_id,
+                px, py, angle, vx, vy, faction,
+                hitpoints, radius, lifetime, fade, fps,
+                color_r, color_g, color_b,
+                game_time: context.game_time,
+            }));
         }
         fn destroy_entity(&mut context, entity_id: u64) {
-            let world = unsafe { &mut *context.world };
-            if let Some(entity) = hecs::Entity::from_bits(entity_id) {
-                if let Err(e) = world.despawn(entity) {
-                    eprintln!("destroy_entity(id={}) failed: {:?}", entity_id, e);
-                }
-            }
+            context.pending.push(ApiOp::Despawn(entity_id));
         }
         /// Set v_fraction and motion type. Motion type values match the order of
         /// component::InertialMotionType: 0=Const, 1=FollowVector (move + face
         /// movement), 2=StrafeVector (move, keep angle), 3=Detached (rotate only).
         fn set_v_motion(&mut context, entity_id: u64, motion_type: u32, vx: f32, vy: f32) {
-            let world = unsafe { &mut *context.world };
-            if let Some(entity) = hecs::Entity::from_bits(entity_id) {
-                if let Ok(mut inertial) = world.get::<&mut component::Inertial>(entity) {
-                    inertial.v_fraction = Vec2(vx, vy);
-                    inertial.motion_type = match motion_type {
-                        Api::MOTION_CONST  => component::InertialMotionType::Const,
-                        Api::MOTION_FOLLOW => component::InertialMotionType::FollowVector,
-                        Api::MOTION_STRAFE => component::InertialMotionType::StrafeVector,
-                        _ => component::InertialMotionType::Detached,
-                    };
-                }
-            }
+            context.pending.push(ApiOp::SetVMotion { id: entity_id, motion: motion_type, vx, vy });
         }
         fn set_angle(&mut context, entity_id: u64, angle: f32) {
-            let world = unsafe { &mut *context.world };
-            if let Some(entity) = hecs::Entity::from_bits(entity_id) {
-                if let Ok(mut spatial) = world.get::<&mut component::Spatial>(entity) {
-                    spatial.angle = Angle(angle);
-                }
-            }
+            context.pending.push(ApiOp::SetAngle { id: entity_id, angle });
         }
         fn set_hitpoints(&mut context, entity_id: u64, hp: f32) {
-            let world = unsafe { &mut *context.world };
-            if let Some(entity) = hecs::Entity::from_bits(entity_id) {
-                if let Ok(mut hitpoints) = world.get::<&mut component::Hitpoints>(entity) {
-                    hitpoints.0 = hp;
-                }
-            }
+            context.pending.push(ApiOp::SetHitpoints { id: entity_id, hp });
         }
         fn apply_damage(&mut context, entity_id: u64, damage: f32) {
-            let world = unsafe { &mut *context.world };
-            if let Some(entity) = hecs::Entity::from_bits(entity_id) {
-                if let Ok(mut hitpoints) = world.get::<&mut component::Hitpoints>(entity) {
-                    hitpoints.0 -= damage;
-                }
-            }
+            context.pending.push(ApiOp::ApplyDamage { id: entity_id, damage });
         }
     }
-}
-
-/// Create an ECS entity from Itsy spawn API call (free function for API bridge).
-/// `vx, vy` seed the entity's initial velocity (Const motion applies v_current * delta
-/// each frame, so this is also how entities get their drift speed).
-/// Visuals (sprite / layers / color) are passed by the script as IDs into
-/// `ScriptContext::sprite_list` / the Infrastructure layer list; `u32::MAX` = no layer.
-/// `entity_type` only drives the Script component, player speed and the
-/// explosion no-move / no-collision rules.
-fn spawn_entity_from_context(ctx: &ScriptContext,
-    entity_type: u16, sprite_id: u32, layer_id: u32, effect_layer_id: u32,
-    px: f32, py: f32, angle: f32, vx: f32, vy: f32, faction: u16,
-    hitpoints: f32, radius: f32, lifetime: f32, fade: f32, fps: u32,
-    color_r: f32, color_g: f32, color_b: f32) {
-    let cmd = unsafe { &mut *ctx.cmd };
-    let radiant_ctx = unsafe { &*ctx.radiant_ctx };
-    let sprite_cache = unsafe { &mut *ctx.sprite_cache };
-    let game_time = ctx.game_time;
-
-    let mut builder = hecs::EntityBuilder::new();
-
-    // Spatial component (all entities have this)
-    builder.add(component::Spatial {
-        position: Vec2(px, py),
-        angle: Angle(angle),
-        lean: 0.0,
-    });
-
-    // Hitpoints component (all entities have this)
-    builder.add(component::Hitpoints(hitpoints));
-
-    // Bounding component (for collision). Explosions have none, like the original:
-    // they are non-interactive, so they can neither take damage nor damage anything
-    // (previously overlapping explosions killed each other on the next frame).
-    if entity_type != Api::ET_EXPLOSION {
-        builder.add(component::Bounding {
-            radius: radius,
-            faction: faction,
-        });
-    }
-
-    // Inertial component (most entities have this).
-    // Const motion applies v_current * delta directly and never changes it, so the
-    // initial velocity passed by the script is the entity's constant drift speed.
-    // (The mine AI switches entities to FollowVector via set_v_motion.)
-    // Default speed is 100 px/s (asteroids, mines). The player is 5x that (the
-    // default felt too slow in playtesting).
-    let v_max = if entity_type == Api::ET_PLAYER { 500.0 } else { 100.0 };
-
-    match entity_type {
-        Api::ET_EXPLOSION => {
-            // Explosions don't move
-        }
-        _ => {
-            builder.add(component::Inertial {
-                v_max: Vec2(v_max, v_max),
-                v_fraction: Vec2(0.0, 0.0),
-                v_current: Vec2(vx, vy),
-                trans_motion: 6.0,
-                trans_rest: 3.0,
-                av_max_v0: 7.0,
-                av_max_vmax: 1.4,
-                trans_lean: 10.0,
-                motion_type: component::InertialMotionType::Const,
-            });
-        }
-    }
-
-    // Lifetime component (if specified)
-    // Store absolute expiration time (current age + lifetime) so the cleanup
-    // system can compare against ws.age, matching the pattern in def/entity.rs.
-    if lifetime > 0.0 {
-        builder.add(component::Lifetime(game_time + lifetime));
-    }
-
-    // Fading component (if specified): fade alpha 1 -> 0 over the last `fade`
-    // seconds of the entity's lifetime (render system applies the fade).
-    if fade > 0.0 {
-        builder.add(component::Fading {
-            start: game_time + lifetime - fade,
-            end: game_time + lifetime,
-        });
-    }
-
-    // Script component (so Itsy can track it)
-    builder.add(component::Script(entity_type));
-
-    // Visual component: sprite and layers are referenced by ID (see
-    // ScriptContext::sprite_list / Infrastructure layers); the script resolves names to IDs.
-    // (Explosions are rendered on the effect layer only — the effects layer is
-    // what gets the bloom pass, which is the explosion's glow.)
-    let sprite_path = if (sprite_id as usize) < ctx.sprite_list.len() {
-        ctx.sprite_list[sprite_id as usize].clone()
-    } else {
-        eprintln!("spawn_entity: invalid sprite_id {}", sprite_id);
-        "res/sprite/placeholder_16x16x1.png".to_string()
-    };
-    let sprite = match sprite_cache.get(&sprite_path).cloned() {
-        Some(s) => s,
-        None => {
-            match Sprite::from_file(radiant_ctx, &sprite_path) {
-                Ok(s) => {
-                    let arc = s.arc();
-                    sprite_cache.insert(sprite_path.clone(), arc.clone());
-                    arc
-                }
-                Err(e) => {
-                    eprintln!("Failed to load sprite '{}': {:?}", sprite_path, e);
-                    panic!("Missing sprite: {}", sprite_path);
-                }
-            }
-        }
-    };
-    // Resolve layers by ID from the Infrastructure (u32::MAX = no layer).
-    let layers = unsafe { &(*ctx.infrastructure).layers };
-    let resolve_layer = |id: u32| -> Option<Arc<Layer>> {
-        if id == Api::LAYER_ID_NONE {
-            return None;
-        }
-        layers.get(id as usize).cloned()
-    };
-    let layer = resolve_layer(layer_id);
-    let effect_layer = resolve_layer(effect_layer_id);
-
-    builder.add(component::Visual {
-        layer,
-        effect_layer,
-        sprite: sprite,
-        scale: 1.0,
-        effect_scale: 1.0,
-        color: Color(color_r, color_g, color_b, 1.0),
-        effect_color: Color::WHITE,
-        frame_id: 0.0,
-        fps: fps,
-    });
-
-    cmd.spawn(builder.build());
 }

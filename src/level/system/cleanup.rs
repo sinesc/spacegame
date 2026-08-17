@@ -1,12 +1,11 @@
 use hecs;
 use crate::level::component;
-use crate::level::WorldState;
 
-pub fn run(world: &mut hecs::World, ws: &WorldState) {
+pub fn run(world: &mut hecs::World, age: f32) {
     let mut to_despawn = Vec::new();
 
     for (entity, lifetime) in world.query::<&component::Lifetime>().iter() {
-        if lifetime.0 < ws.age {
+        if lifetime.0 < age {
             to_despawn.push(entity);
         }
     }

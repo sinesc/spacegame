@@ -1,8 +1,8 @@
 use crate::prelude::*;
-use crate::scripting::{Api, ScriptContext, EntityData};
+use crate::scripting::{Api, ScriptContext, EntityData, ApiOp, SpawnRequest};
 use crate::level::component;
 use crate::level::Infrastructure;
-use crate::level::WorldState;
+use crate::level::{RenderLayer, RenderFilter};
 use crate::sound::Sound;
 use hecs;
 use itsy;
@@ -20,17 +20,11 @@ pub struct Scripting {
     sprite_cache: HashMap<String, Arc<Sprite>>,
     /// Sound cache (loaded on first play)
     sound_cache: HashMap<String, Sound>,
-    /// Keep the Infrastructure alive for the lifetime of the subsystem
-    /// (`context.infrastructure` points into it).
-    _inf: Arc<Infrastructure>,
 }
 
 impl Scripting {
-    /// `inf` references the Infrastructure, which outlives the scripting
-    /// subsystem.
-    pub fn new(radiant_ctx: Context, inf: Arc<Infrastructure>) -> Self {
-        let mut context = ScriptContext::new();
-        context.infrastructure = Arc::as_ptr(&inf) as *mut Infrastructure;
+    pub fn new(radiant_ctx: Context) -> Self {
+        let context = ScriptContext::new();
         Scripting {
             program: None,
             vm: None,
@@ -38,7 +32,6 @@ impl Scripting {
             radiant_ctx,
             sprite_cache: HashMap::new(),
             sound_cache: HashMap::new(),
-            _inf: inf,
         }
     }
 
@@ -72,7 +65,7 @@ impl Scripting {
     }
 
     /// Run the Itsy script for one frame.
-    pub fn run(&mut self, world: &mut hecs::World, _ws: &WorldState, cmd: &mut hecs::CommandBuffer) {
+    pub fn run(&mut self, world: &mut hecs::World, inf: &mut Infrastructure, cmd: &mut hecs::CommandBuffer) {
         // Build entity snapshot
         self.build_snapshot(world);
 
@@ -99,20 +92,12 @@ impl Scripting {
         }
 
         // Take the VM out of self to avoid borrow conflicts between
-        // `vm.run(&mut self.context)` and `self.apply_actions(...)`.
+        // `vm.run(&mut self.context)` and the executor's `&mut self` below.
         let mut vm = self.vm.take().unwrap();
-
-        // Set world/cmd pointers so API functions can access them directly.
-        // Valid only during vm.run().
-        self.context.world = world as *mut hecs::World;
-        self.context.cmd = cmd as *mut hecs::CommandBuffer;
-        self.context.radiant_ctx = &self.radiant_ctx;
-        self.context.sprite_cache = &mut self.sprite_cache;
-        self.context.sound_cache = &mut self.sound_cache;
 
         match vm.run(&mut self.context) {
             Ok(itsy::runtime::VMState::Suspended) => {
-                // Script suspended — commands executed directly via API
+                // Script suspended — operations recorded in context.pending
             }
             Ok(itsy::runtime::VMState::Terminated) | Ok(itsy::runtime::VMState::Ready) => {
                 // Script finished without suspending (shouldn't happen with while-loop).
@@ -132,6 +117,126 @@ impl Scripting {
 
         // Put the VM back so it persists for the next frame.
         self.vm = Some(vm);
+
+        // Execute the operations recorded by the Itsy API during vm.run(),
+        // in order. World-mutating ops run directly on `world` (before
+        // cmd.run_on, as the previous direct API did); spawns go through
+        // `cmd` and are applied by the caller (Level::process).
+        let pending = std::mem::take(&mut self.context.pending);
+        for op in pending {
+            self.execute(world, cmd, inf, op);
+        }
+    }
+
+    /// Execute one API operation recorded during vm.run() (see ApiOp).
+    fn execute(&mut self, world: &mut hecs::World, cmd: &mut hecs::CommandBuffer, inf: &mut Infrastructure, op: ApiOp) {
+        match op {
+            ApiOp::CreateLayer { scale, blend } => {
+                let layer = Layer::new((scale * 1920., scale * 1080.)).arc();
+                match blend {
+                    Api::BLEND_ADD     => { layer.set_blendmode(blendmodes::ADD); }
+                    Api::BLEND_LIGHTEN => { layer.set_blendmode(blendmodes::LIGHTEN); }
+                    _ => {}
+                }
+                inf.layers.push(layer);
+            }
+            ApiOp::AddRenderLayer { layer_id, filter, component } => {
+                inf.render_layers.push(RenderLayer {
+                    layer_id,
+                    filter: match filter {
+                        Api::FILTER_BLOOM => Some(RenderFilter::Bloom),
+                        Api::FILTER_GLARE => Some(RenderFilter::Glare),
+                        _ => None,
+                    },
+                    component,
+                });
+            }
+            ApiOp::WriteText { layer_id, msg, x, y, alpha, menu } => {
+                if let Some(layer) = inf.layers.get(layer_id as usize) {
+                    let font = if menu { &inf.menu_font } else { &inf.font };
+                    font.write(layer, &msg, (x, y), Color::alpha_pm(alpha));
+                }
+            }
+            ApiOp::SetDebugLayer(layer_id) => {
+                inf.debug_layer = layer_id;
+            }
+            ApiOp::PauseTime => {
+                inf.timeframe.lerp_rate(0.0, Duration::from_millis(500));
+            }
+            ApiOp::ResumeTime => {
+                inf.timeframe.lerp_rate(1.0, Duration::from_millis(500));
+            }
+            ApiOp::RequestExit => {
+                inf.exit_requested = true;
+            }
+            ApiOp::RequestLevelRestart => {
+                inf.restart_requested = true;
+            }
+            ApiOp::ToggleFullscreen => {
+                if inf.fullscreen {
+                    inf.display.set_windowed();
+                    inf.fullscreen = false;
+                } else if let Some(monitor) = &inf.monitor {
+                    inf.display.set_fullscreen(Some(monitor.clone())).unwrap();
+                    inf.fullscreen = true;
+                }
+            }
+            ApiOp::PlaySound { id } => {
+                let name = self.context.sound_list[id as usize].clone();
+                if self.sound_cache.get(&name).is_none() {
+                    match Sound::load(&name) {
+                        Ok(sound) => { self.sound_cache.insert(name.clone(), sound); }
+                        Err(e) => { eprintln!("play_sound: failed to load '{}': {}", name, e); return; }
+                    }
+                }
+                let sound = self.sound_cache.get(&name).unwrap();
+                inf.audio.add(sound.decoder());
+            }
+            ApiOp::Spawn(req) => {
+                self.spawn_entity(req, cmd, inf);
+            }
+            ApiOp::Despawn(entity_id) => {
+                if let Some(entity) = hecs::Entity::from_bits(entity_id) {
+                    if let Err(e) = world.despawn(entity) {
+                        eprintln!("destroy_entity(id={}) failed: {:?}", entity_id, e);
+                    }
+                }
+            }
+            ApiOp::SetVMotion { id, motion, vx, vy } => {
+                if let Some(entity) = hecs::Entity::from_bits(id) {
+                    if let Ok(mut inertial) = world.get::<&mut component::Inertial>(entity) {
+                        inertial.v_fraction = Vec2(vx, vy);
+                        inertial.motion_type = match motion {
+                            Api::MOTION_CONST  => component::InertialMotionType::Const,
+                            Api::MOTION_FOLLOW => component::InertialMotionType::FollowVector,
+                            Api::MOTION_STRAFE => component::InertialMotionType::StrafeVector,
+                            _ => component::InertialMotionType::Detached,
+                        };
+                    }
+                }
+            }
+            ApiOp::SetAngle { id, angle } => {
+                if let Some(entity) = hecs::Entity::from_bits(id) {
+                    if let Ok(mut spatial) = world.get::<&mut component::Spatial>(entity) {
+                        spatial.angle = Angle(angle);
+                    }
+                }
+            }
+            ApiOp::SetHitpoints { id, hp } => {
+                if let Some(entity) = hecs::Entity::from_bits(id) {
+                    if let Ok(mut hitpoints) = world.get::<&mut component::Hitpoints>(entity) {
+                        hitpoints.0 = hp;
+                    }
+                }
+            }
+            ApiOp::ApplyDamage { id, damage } => {
+                if let Some(entity) = hecs::Entity::from_bits(id) {
+                    if let Ok(mut hitpoints) = world.get::<&mut component::Hitpoints>(entity) {
+                        hitpoints.0 -= damage;
+                    }
+                }
+            }
+        }
     }
 
     /// Set collision pairs from the collider system.
@@ -190,5 +295,134 @@ impl Scripting {
                 self.context.entity_data.insert(id, data);
             }
         }
+    }
+
+    /// Create an ECS entity from a queued spawn request.
+    fn spawn_entity(&mut self, req: SpawnRequest, cmd: &mut hecs::CommandBuffer, inf: &Infrastructure) {
+
+        let SpawnRequest {
+            entity_type, sprite_id, layer_id, effect_layer_id,
+            px, py, angle, vx, vy, faction,
+            hitpoints, radius, lifetime, fade, fps,
+            color_r, color_g, color_b, game_time,
+        } = req;
+
+        let mut builder = hecs::EntityBuilder::new();
+
+        let layers = &inf.layers;
+
+        // Spatial component (all entities have this)
+        builder.add(component::Spatial {
+            position: Vec2(px, py),
+            angle: Angle(angle),
+            lean: 0.0,
+        });
+
+        // Hitpoints component (all entities have this)
+        builder.add(component::Hitpoints(hitpoints));
+
+        // Bounding component (for collision). Explosions have none, like the original:
+        // they are non-interactive, so they can neither take damage nor damage anything
+        // (previously overlapping explosions killed each other on the next frame).
+        if entity_type != Api::ET_EXPLOSION {
+            builder.add(component::Bounding {
+                radius: radius,
+                faction: faction,
+            });
+        }
+
+        // Inertial component (most entities have this).
+        // Const motion applies v_current * delta directly and never changes it, so the
+        // initial velocity passed by the script is the entity's constant drift speed.
+        // (The mine AI switches entities to FollowVector via set_v_motion.)
+        let v_max = if entity_type == Api::ET_PLAYER { 750.0 } else { 100.0 };
+
+        match entity_type {
+            Api::ET_EXPLOSION => {
+                // Explosions don't move
+            }
+            _ => {
+                builder.add(component::Inertial {
+                    v_max: Vec2(v_max, v_max),
+                    v_fraction: Vec2(0.0, 0.0),
+                    v_current: Vec2(vx, vy),
+                    trans_motion: 6.0,
+                    trans_rest: 3.0,
+                    av_max_v0: 7.0,
+                    av_max_vmax: 1.4,
+                    trans_lean: 10.0,
+                    motion_type: component::InertialMotionType::Const,
+                });
+            }
+        }
+
+        // Lifetime component (if specified)
+        // Store absolute expiration time (current age + lifetime) so the cleanup
+        // system can compare against ws.age, matching the pattern in def/entity.rs.
+        if lifetime > 0.0 {
+            builder.add(component::Lifetime(game_time + lifetime));
+        }
+
+        // Fading component (if specified): fade alpha 1 -> 0 over the last `fade`
+        // seconds of the entity's lifetime (render system applies the fade).
+        if fade > 0.0 {
+            builder.add(component::Fading {
+                start: game_time + lifetime - fade,
+                end: game_time + lifetime,
+            });
+        }
+
+        // Script component (so Itsy can track it)
+        builder.add(component::Script(entity_type));
+
+        // Visual component: sprite and layers are referenced by ID (see
+        // ScriptContext::sprite_list / Infrastructure layers); the script resolves names to IDs.
+        // (Explosions are rendered on the effect layer only — the effects layer is
+        // what gets the bloom pass, which is the explosion's glow.)
+        let sprite_path = if (sprite_id as usize) < self.context.sprite_list.len() {
+            self.context.sprite_list[sprite_id as usize].clone()
+        } else {
+            eprintln!("spawn_entity: invalid sprite_id {}", sprite_id);
+            "res/sprite/placeholder_16x16x1.png".to_string()
+        };
+        let sprite = match self.sprite_cache.get(&sprite_path).cloned() {
+            Some(s) => s,
+            None => {
+                match Sprite::from_file(&self.radiant_ctx, &sprite_path) {
+                    Ok(s) => {
+                        let arc = s.arc();
+                        self.sprite_cache.insert(sprite_path.clone(), arc.clone());
+                        arc
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to load sprite '{}': {:?}", sprite_path, e);
+                        panic!("Missing sprite: {}", sprite_path);
+                    }
+                }
+            }
+        };
+        // Resolve layers by ID (u32::MAX = no layer).
+        let resolve_layer = |id: u32| -> Option<Arc<Layer>> {
+            if id == Api::LAYER_ID_NONE {
+                return None;
+            }
+            layers.get(id as usize).cloned()
+        };
+        let layer = resolve_layer(layer_id);
+        let effect_layer = resolve_layer(effect_layer_id);
+
+        builder.add(component::Visual {
+            layer,
+            effect_layer,
+            sprite: sprite,
+            scale: 1.0,
+            effect_scale: 1.0,
+            color: Color(color_r, color_g, color_b, 1.0),
+            effect_color: Color::WHITE,
+            frame_id: 0.0,
+            fps: fps,
+        });
+
+        cmd.spawn(builder.build());
     }
 }

@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use hecs;
 use crate::level::component;
-use crate::level::WorldState;
+use crate::level::Infrastructure;
 use std::cmp;
 
 pub struct Render {
@@ -19,8 +19,7 @@ impl Render {
         }
     }
 
-    pub fn run(&mut self, world: &mut hecs::World, ws: &WorldState) {
-        let age = ws.age;
+    pub fn run(&mut self, world: &mut hecs::World, age: f32, delta: f32, inf: &Infrastructure) {
         let mut num_sprites = 0;
 
         for (_entity, (spatial, visual, fading)) in world.query_mut::<(
@@ -59,7 +58,7 @@ impl Render {
             visual.frame_id = if visual.fps == 0 {
                 cmp::min(29, cmp::max(0, (15.0 + (15.0 * spatial.lean)) as i32)) as f32
             } else {
-                visual.frame_id + ws.delta * visual.fps as f32
+                visual.frame_id + delta * visual.fps as f32
             };
 
             num_sprites += 1;
@@ -72,8 +71,8 @@ impl Render {
             self.num_frames = 0;
         }
 
-        if let Some(layer) = ws.inf.debug_layer() {
-            ws.inf.font.write(layer, &format!("Entities: {:?}", num_sprites), (10.0, 72.0), Color::alpha_pm(0.4));
+        if let Some(layer) = inf.debug_layer() {
+            inf.font.write(&layer, &format!("Entities: {:?}", num_sprites), (10.0, 72.0), Color::alpha_pm(0.4));
         }
     }
 }

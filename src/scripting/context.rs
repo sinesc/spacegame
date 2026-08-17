@@ -1,7 +1,4 @@
 use crate::prelude::*;
-use crate::sound::Sound;
-use crate::level::Infrastructure;
-use hecs;
 
 /// Snapshot of entity state passed to the Itsy script each frame.
 #[derive(Clone)]
@@ -15,21 +12,62 @@ pub struct EntityData {
     pub faction   : u16,
 }
 
+/// Parameters for a queued entity spawn (`ApiOp::Spawn`).
+pub struct SpawnRequest {
+    pub entity_type : u16,
+    pub sprite_id   : u32,
+    pub layer_id    : u32,
+    pub effect_layer_id : u32,
+    pub px          : f32,
+    pub py          : f32,
+    pub angle       : f32,
+    pub vx          : f32,
+    pub vy          : f32,
+    pub faction     : u16,
+    pub hitpoints   : f32,
+    pub radius      : f32,
+    pub lifetime    : f32,
+    pub fade        : f32,
+    pub fps         : u32,
+    pub color_r     : f32,
+    pub color_g     : f32,
+    pub color_b     : f32,
+    /// Game time at queue time (used to resolve Lifetime/Fading deadlines).
+    pub game_time   : f32,
+}
+
+/// Operations recorded by the Itsy API during vm.run(). The Scripting system
+/// executes them (in order) after vm.run() returns, with plain borrows of the
+/// ECS world, command buffer, caches and Infrastructure. This keeps the API
+/// functions free of raw pointers.
+pub enum ApiOp {
+    CreateLayer { scale: f32, blend: u32 },
+    AddRenderLayer { layer_id: u32, filter: u32, component: u32 },
+    WriteText { layer_id: u32, msg: String, x: f32, y: f32, alpha: f32, menu: bool },
+    SetDebugLayer(u32),
+    PauseTime,
+    ResumeTime,
+    ToggleFullscreen,
+    RequestExit,
+    RequestLevelRestart,
+    PlaySound { id: u32 },
+    Spawn(SpawnRequest),
+    Despawn(u64),
+    SetVMotion { id: u64, motion: u32, vx: f32, vy: f32 },
+    SetAngle { id: u64, angle: f32 },
+    SetHitpoints { id: u64, hp: f32 },
+    ApplyDamage { id: u64, damage: f32 },
+}
+
 /// Context shared between Rust and Itsy via the API.
 pub struct ScriptContext {
-    /// ECS world pointer (set before vm.run(), valid only during that call).
-    pub world: *mut hecs::World,
-    /// ECS command buffer pointer (set before vm.run(), valid only during that call).
-    pub cmd: *mut hecs::CommandBuffer,
-    /// Radiant context pointer (for sprite loading in spawn_entity).
-    pub radiant_ctx: *const Context,
-    /// Sprite cache pointer (for spawn_entity).
-    pub sprite_cache: *mut HashMap<String, Arc<Sprite>>,
-    /// The Infrastructure (layers, render layers, font, audio). Points into the
-    /// Arc<Infrastructure> kept alive by the Scripting system.
-    pub infrastructure: *mut Infrastructure,
-    /// Sound cache pointer (for play_sound; set before vm.run()).
-    pub sound_cache: *mut HashMap<String, Sound>,
+    /// Operations recorded by API calls during the current vm.run(); drained
+    /// and executed by the Scripting system after vm.run() returns.
+    pub pending: Vec<ApiOp>,
+    /// ID (Infrastructure::layers index) returned by the next create_layer
+    /// call. FIFO execution of CreateLayer ops keeps this in sync with the
+    /// actual layer vector (only CreateLayer appends to it).
+    pub next_layer_id: u32,
 
     /// Snapshot of entity state (rebuilt each frame).
     pub entity_data: HashMap<u64, EntityData>,
@@ -69,10 +107,8 @@ pub struct ScriptContext {
 impl ScriptContext {
     pub fn new() -> Self {
         ScriptContext {
-            world: std::ptr::null_mut(),
-            cmd: std::ptr::null_mut(),
-            radiant_ctx: std::ptr::null(),
-            sprite_cache: std::ptr::null_mut(),
+            pending: Vec::new(),
+            next_layer_id: 0,
             entity_data: HashMap::new(),
             collisions: Vec::new(),
             think_entities: Vec::new(),
@@ -87,8 +123,6 @@ impl ScriptContext {
             rng: Rng::new(123.4),
             sprite_list: list_files_recursive("res/sprite"),
             sound_list: list_files_recursive("res/sound"),
-            infrastructure: std::ptr::null_mut(),
-            sound_cache: std::ptr::null_mut(),
         }
     }
 }

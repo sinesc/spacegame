@@ -1,10 +1,9 @@
 use crate::prelude::*;
 use hecs;
 use crate::level::component;
-use crate::level::WorldState;
+use crate::level::Infrastructure;
 
-pub fn run(world: &mut hecs::World, ws: &WorldState) {
-    let delta = ws.delta;
+pub fn run(world: &mut hecs::World, delta: f32, inf: &Infrastructure) {
 
     for (_entity, (spatial, inertial)) in world.query_mut::<(&mut component::Spatial, &mut component::Inertial)>() {
 
@@ -54,9 +53,9 @@ pub fn run(world: &mut hecs::World, ws: &WorldState) {
 
             let av_current = (target_angle - old_angle).to_radians();
 
-            if let Some(layer) = ws.inf.debug_layer() {
-                ws.inf.font.write(
-                    layer,
+            if let Some(layer) = inf.debug_layer() {
+                inf.font.write(
+                    &layer,
                     &format!("old_angle: {:.3}\ntarget_angle: {:.3}\nav_current: {:.3}\nav_max: {:.3}",
                         old_angle.to_degrees(), target_angle.to_degrees(),
                         (target_angle - old_angle).to_radians().signum(), Angle(av_max).to_degrees()),

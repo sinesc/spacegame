@@ -39,39 +39,29 @@ pub struct Infrastructure {
     /// Game time; the Itsy script pauses/resumes it (pause_time / resume_time).
     pub timeframe : Timeframe,
     /// Set by the Itsy script (`request_exit`); checked by the main loop.
-    pub exit_requested    : std::sync::atomic::AtomicBool,
+    pub exit_requested    : bool,
     /// Set by the Itsy script (`request_level_restart`); the main loop rebuilds the level.
-    pub restart_requested : std::sync::atomic::AtomicBool,
+    pub restart_requested : bool,
     /// Display handle for the `toggle_fullscreen` API.
     pub display   : Arc<Display>,
     pub monitor   : Option<Monitor>,
-    pub fullscreen: std::sync::atomic::AtomicBool,
+    pub fullscreen: bool,
     /// Layer ID used for Rust-side debug text (set by Itsy via `set_debug_layer`);
     /// `u32::MAX` = not set yet.
-    pub debug_layer : std::sync::atomic::AtomicU32,
+    pub debug_layer : u32,
 }
 
 impl Infrastructure {
     /// The layer designated for Rust-side debug text, if the script set one.
-    pub fn debug_layer(&self) -> Option<&Arc<Layer>> {
-        let idx = self.debug_layer.load(std::sync::atomic::Ordering::Relaxed) as usize;
-        self.layers.get(idx)
+    pub fn debug_layer(&self) -> Option<Arc<Layer>> {
+        self.layers.get(self.debug_layer as usize).cloned()
     }
-}
-
-#[derive(Clone)]
-pub struct WorldState {
-    pub age   : f32,
-    pub delta : f32,
-    pub inf   : Arc<Infrastructure>,
 }
 
 pub struct Level {
     world           : hecs::World,
-    world_state     : WorldState,
     render_system   : system::Render,
-    inf             : Arc<Infrastructure>,
-    age             : f32,
+    inf             : Infrastructure,
     _audio_sink     : MixerDeviceSink,
     bloom           : postprocessors::Bloom,
     glare           : bloom::Bloom,
@@ -97,7 +87,7 @@ impl Level {
         // Render layers are created by the Itsy script (create_layer /
         // add_render_layer); player is spawned via the GAME_START trigger.
 
-        let infrastructure = Arc::new(Infrastructure {
+        let infrastructure = Infrastructure {
             audio             : audio,
             input             : input.clone(),
             layers            : Vec::new(),
@@ -105,39 +95,27 @@ impl Level {
             font              : font,
             menu_font         : menu_font,
             timeframe         : Timeframe::new(),
-            exit_requested    : std::sync::atomic::AtomicBool::new(false),
-            restart_requested : std::sync::atomic::AtomicBool::new(false),
+            exit_requested    : false,
+            restart_requested : false,
             display           : display,
             monitor           : monitor,
-            fullscreen        : std::sync::atomic::AtomicBool::new(fullscreen),
-            debug_layer       : std::sync::atomic::AtomicU32::new(u32::MAX),
-        });
-
-        let world_state = WorldState {
-            delta : 0.0,
-            age   : 0.0,
-            inf   : infrastructure.clone(),
+            fullscreen        : fullscreen,
+            debug_layer       : u32::MAX,
         };
 
         let mut bloom = postprocessors::Bloom::new(&context, (1920u32, 1080u32), 2);
         bloom.clear = false;
         bloom.draw_color = Color::alpha_pm(0.15);
 
-        // The scripting subsystem holds a raw pointer into the Infrastructure;
-        // keep an Arc so it stays alive as long as the Level does.
-        let inf_for_scripting = infrastructure.clone();
-
         Level {
             world           : world,
-            world_state     : world_state,
             render_system   : system::Render::new(),
-            age             : 0.0,
             _audio_sink     : audio_sink,
             bloom           : bloom,
             glare           : bloom::Bloom::new(&context, (1920, 1080), 2, 5, 5.0),
             inf             : infrastructure,
             background      : background,
-            scripting       : Scripting::new(context.clone(), inf_for_scripting),
+            scripting       : Scripting::new(context.clone()),
             game_started    : false,
         }
     }
@@ -177,24 +155,20 @@ impl Level {
 
     /// True if the Itsy script requested a game exit.
     pub fn exit_requested(&self) -> bool {
-        self.inf.exit_requested.load(std::sync::atomic::Ordering::Relaxed)
+        self.inf.exit_requested
     }
 
     /// True if the Itsy script requested a level restart.
     pub fn restart_requested(&self) -> bool {
-        self.inf.restart_requested.load(std::sync::atomic::Ordering::Relaxed)
+        self.inf.restart_requested
     }
 
     /// Current fullscreen state (may have been toggled by the Itsy script).
     pub fn is_fullscreen(&self) -> bool {
-        self.inf.fullscreen.load(std::sync::atomic::Ordering::Relaxed)
+        self.inf.fullscreen
     }
 
     pub fn process(&mut self, renderer: &Renderer, age: f32, delta: f32) {
-
-        self.world_state.age = age;
-        self.world_state.delta = delta;
-        self.age = age;
 
         let mut cmd = hecs::CommandBuffer::new();
 
@@ -206,36 +180,39 @@ impl Level {
         self.scripting.set_game_time(age);
 
         // Pass mouse position and keyboard input
-        let mouse_pos = self.world_state.inf.input.mouse();
+        let mouse_pos = self.inf.input.mouse();
         self.scripting.set_mouse_pos(mouse_pos.0 as f32, mouse_pos.1 as f32);
 
         // Pass mouse delta (reliable even when cursor is grabbed/focused)
-        let mouse_delta = self.world_state.inf.input.mouse_delta();
+        let mouse_delta = self.inf.input.mouse_delta();
         self.scripting.set_mouse_delta(mouse_delta.0 as f32, mouse_delta.1 as f32);
 
         // Input masks: one bit per key (see KEY_* in scripting/mod.rs).
         // `keys` = held down, `pressed` = pressed this frame (incl. repeats),
         // `edge` = initial press this frame (no repeats).
-        let input = &self.world_state.inf.input;
-        let mut keys = 0u16;
-        let mut pressed = 0u16;
-        let mut edge = 0u16;
-        let mut add_key = |key: InputId, bit: u16| {
-            if input.down(key) { keys |= bit; }
-            if input.pressed(key, true) { pressed |= bit; }
-            if input.pressed(key, false) { edge |= bit; }
+        let (keys, pressed, edge) = {
+            let input = &self.inf.input;
+            let mut keys = 0u16;
+            let mut pressed = 0u16;
+            let mut edge = 0u16;
+            let mut add_key = |key: InputId, bit: u16| {
+                if input.down(key) { keys |= bit; }
+                if input.pressed(key, true) { pressed |= bit; }
+                if input.pressed(key, false) { edge |= bit; }
+            };
+            add_key(InputId::W, Api::KEY_W);
+            add_key(InputId::S, Api::KEY_S);
+            add_key(InputId::A, Api::KEY_A);
+            add_key(InputId::D, Api::KEY_D);
+            add_key(InputId::RShift, Api::KEY_RSHIFT);
+            add_key(InputId::CursorUp, Api::KEY_CURSOR_UP);
+            add_key(InputId::CursorDown, Api::KEY_CURSOR_DOWN);
+            add_key(InputId::Return, Api::KEY_RETURN);
+            add_key(InputId::Escape, Api::KEY_ESCAPE);
+            add_key(InputId::Mouse1, Api::KEY_MOUSE1);
+            add_key(InputId::LControl, Api::KEY_LCONTROL);
+            (keys, pressed, edge)
         };
-        add_key(InputId::W, Api::KEY_W);
-        add_key(InputId::S, Api::KEY_S);
-        add_key(InputId::A, Api::KEY_A);
-        add_key(InputId::D, Api::KEY_D);
-        add_key(InputId::RShift, Api::KEY_RSHIFT);
-        add_key(InputId::CursorUp, Api::KEY_CURSOR_UP);
-        add_key(InputId::CursorDown, Api::KEY_CURSOR_DOWN);
-        add_key(InputId::Return, Api::KEY_RETURN);
-        add_key(InputId::Escape, Api::KEY_ESCAPE);
-        add_key(InputId::Mouse1, Api::KEY_MOUSE1);
-        add_key(InputId::LControl, Api::KEY_LCONTROL);
         self.scripting.set_input_state(keys, pressed, edge);
 
         // Send GAME_START trigger on first frame
@@ -246,22 +223,22 @@ impl Level {
 
         // Periodic asteroid / mine / powerup spawning is handled in the Itsy script.
 
-        // Run scripting subsystem
-        self.scripting.run(&mut self.world, &self.world_state, &mut cmd);
+        // Run scripting subsystem (mutates self.inf via the &mut reference)
+        self.scripting.run(&mut self.world, &mut self.inf, &mut cmd);
 
         // Apply scripting commands BEFORE inertia so v_fraction changes take effect
         cmd.run_on(&mut self.world);
 
         // Shared systems (compute/upgrader/control moved to Itsy)
-        system::run_inertia(&mut self.world, &self.world_state);
+        system::run_inertia(&mut self.world, delta, &self.inf);
         system::run_collider(&mut self.world);
-        self.render_system.run(&mut self.world, &self.world_state);
-        system::run_cleanup(&mut self.world, &self.world_state);
+        self.render_system.run(&mut self.world, age, delta, &self.inf);
+        system::run_cleanup(&mut self.world, age);
 
         // render layers (passes created by the Itsy script)
         renderer.fill().texture(&self.background).blendmode(blendmodes::COPY).draw();
 
-        for info in &self.inf.render_layers {
+        for info in self.inf.render_layers.iter() {
             if let Some(layer) = self.inf.layers.get(info.layer_id as usize) {
                 match info.filter {
                     Some(RenderFilter::Bloom) => {
@@ -285,7 +262,7 @@ impl Level {
             }
         }
 
-        for layer in &self.inf.layers {
+        for layer in self.inf.layers.iter() {
             layer.clear();
         }
     }
