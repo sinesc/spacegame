@@ -45,6 +45,9 @@ pub enum ApiOp {
     AddRenderLayer { layer_id: u32, filter: u32, component: u32 },
     WriteText { layer_id: u32, msg: String, x: f32, y: f32, alpha: f32, menu: bool },
     SetDebugLayer(u32),
+    /// Draw a background image (index into `background_list`) with a scroll
+    /// offset in screen pixels; the image wraps for infinite scrolling.
+    DrawBackground { id: u32, offset_x: f32, offset_y: f32 },
     PauseTime,
     ResumeTime,
     ToggleFullscreen,
@@ -102,6 +105,10 @@ pub struct ScriptContext {
     /// Generated once at startup; the vector index is the sound ID
     /// shared between Itsy and Rust.
     pub sound_list: Vec<String>,
+    /// Background image file paths (recursive listing of res/background,
+    /// sorted). Generated once at startup; the vector index is the background
+    /// ID shared between Itsy and Rust.
+    pub background_list: Vec<String>,
 }
 
 impl ScriptContext {
@@ -123,6 +130,7 @@ impl ScriptContext {
             rng: Rng::new(123.4),
             sprite_list: list_files_recursive("res/sprite"),
             sound_list: list_files_recursive("res/sound"),
+            background_list: list_files_recursive("res/background"),
         }
     }
 }
@@ -169,5 +177,17 @@ mod tests {
         let mut sorted = sprites.clone();
         sorted.sort();
         assert_eq!(sprites, sorted);
+    }
+
+    #[test]
+    fn lists_background_files() {
+        let backgrounds = list_files_recursive("res/background");
+        assert!(backgrounds.len() > 0, "expected background files");
+        assert!(backgrounds.iter().all(|p| p.starts_with("res/background/")));
+        // stable ordering: sorted
+        let mut sorted = backgrounds.clone();
+        sorted.sort();
+        assert_eq!(backgrounds, sorted);
+        assert!(backgrounds.contains(&"res/background/blue.jpg".to_string()));
     }
 }

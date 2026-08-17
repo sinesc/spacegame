@@ -9,6 +9,7 @@ use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_vel
           get_collision_count, get_collision_id,
           get_game_time, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_spawn_trigger, get_rand_range,
           get_sprites, get_sounds, play_sound,
+          get_backgrounds, draw_background,
           create_layer, add_render_layer, write_text, set_debug_layer,
           get_dying_count, get_dying_id,
           spawn_entity, destroy_entity, set_v_motion, set_angle, set_hitpoints, apply_damage,
@@ -47,6 +48,11 @@ const MINE_INTERVAL: f32 = 8.0;
 // Age at which each spawner first fires.
 const ASTEROID_FIRST_SPAWN: f32 = 4.0;
 const MINE_FIRST_SPAWN: f32 = 12.0;
+
+// Background scroll speed (screen pixels / second). The background is a
+// seamless image scrolled continuously (side-scroller feel); the offset is
+// unbounded and wraps on the Rust side.
+const BG_SCROLL_SPEED: f32 = 25.0;
 
 // ============================================================
 // Entity type definitions (static data per type)
@@ -192,6 +198,7 @@ impl Weapon for WeaponTriple {
 const SPRITE_MAP: [ String => u32 ] = [ => ];
 const LAYER_MAP: [ String => u32 ] = [ => ];
 const SOUND_MAP: [ String => u32 ] = [ => ];
+const BACKGROUND_MAP: [ String => u32 ] = [ => ];
 
 // Sound groups: name -> variant file names (keys of SOUND_MAP). Moved here
 // from res/def/sound.yaml (2026-08); the script picks a variant at random.
@@ -434,10 +441,14 @@ impl Entity for Explosion {
 struct GameState {
     next_asteroid: f32,
     next_mine: f32,
+    /// Background scroll offset (screen pixels, unbounded; wraps on the Rust side).
+    bg_scroll_x: f32,
+    /// Game time of the last frame (for delta, drives the background scroll).
+    last_age: f32,
 }
 
 fn new_game_state() -> GameState {
-    GameState { next_asteroid: ASTEROID_FIRST_SPAWN, next_mine: MINE_FIRST_SPAWN }
+    GameState { next_asteroid: ASTEROID_FIRST_SPAWN, next_mine: MINE_FIRST_SPAWN, bg_scroll_x: 0.0, last_age: 0.0 }
 }
 
 // ============================================================
@@ -710,12 +721,30 @@ fn main() {
         SOUND_MAP.insert(sounds[i], i as u32);
         i = i + 1;
     }
-    debug_print("loaded {sprites.len()} sprites, {sounds.len()} sounds, 4 layers");
+    let backgrounds = get_backgrounds();
+    let i: u64 = 0;
+    while (i < backgrounds.len()) {
+        BACKGROUND_MAP.insert(backgrounds[i], i as u32);
+        i = i + 1;
+    }
+    debug_print("loaded {sprites.len()} sprites, {sounds.len()} sounds, {backgrounds.len()} backgrounds, 4 layers");
 
     let menu_state = menu::MenuState { group: "", index: 0 };
 
     while (true) {
         let age = get_game_time();
+
+        // Background: seamless image scrolled at a constant speed for the
+        // side-scroller feel (stops while time is paused, e.g. in the menu).
+        // draw_background must be called once per frame — the Rust side
+        // rebuilds its list from these calls every frame.
+        let delta = age - state.last_age;
+        state.last_age = age;
+        state.bg_scroll_x = state.bg_scroll_x + BG_SCROLL_SPEED * delta;
+        match BACKGROUND_MAP.get("res/background/blue.jpg") {
+            Some(bg_id) => draw_background(bg_id, state.bg_scroll_x, 0.0),
+            None => debug_print("missing background: res/background/blue.jpg"),
+        };
 
         // UI help text (layers are cleared at the end of each frame).
         write_text(text_layer, "Mouse: move, R-Shift+Mouse: strafe, R-Ctrl+Mouse: rotate, Button1: shoot", 10.0, 740.0, 1.0);

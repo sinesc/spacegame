@@ -74,6 +74,8 @@ itsy::itsy_api! {
         fn get_rand_range(&mut _ctx, _min: f32, _max: f32) -> f32 { 0.0 }
         fn get_sprites(&mut _ctx) -> [ String ] { Vec::new() }
         fn get_sounds(&mut _ctx) -> [ String ] { Vec::new() }
+        fn get_backgrounds(&mut _ctx) -> [ String ] { Vec::new() }
+        fn draw_background(&mut _ctx, _id: u32, _offset_x: f32, _offset_y: f32) {}
         fn play_sound(&mut _ctx, _id: u32) {}
         fn create_layer(&mut _ctx, _scale: f32, _blendmode: u32) -> u32 { 0 }
         fn add_render_layer(&mut _ctx, _layer_id: u32, _filter: u32, _component: u32) {}

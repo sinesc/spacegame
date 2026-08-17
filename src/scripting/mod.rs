@@ -156,6 +156,12 @@ itsy::itsy_api! {
         fn get_sounds(&mut context) -> [ String ] {
             context.sound_list.clone()
         }
+        /// All background image file paths (recursive listing of res/background,
+        /// sorted). Generated once on the Rust side; the returned vector index
+        /// is the background ID shared between Itsy and Rust.
+        fn get_backgrounds(&mut context) -> [ String ] {
+            context.background_list.clone()
+        }
         /// Create a new render layer and return its ID (vector index into the
         /// layer list, shared between Itsy and Rust).
         /// Layer size = (scale * 1920) x (scale * 1080).
@@ -215,6 +221,21 @@ itsy::itsy_api! {
                 return;
             }
             context.pending.push(ApiOp::PlaySound { id });
+        }
+        /// Show a background image (index into `get_backgrounds()`) this frame,
+        /// scrolling it by `offset_x` / `offset_y` screen pixels.
+        /// The image is scaled to cover the display (aspect preserved) and
+        /// wraps around, so any offset (incl. negative / unbounded) gives
+        /// seamless infinite scrolling; increasing `offset_x` moves the image
+        /// left (camera moves right, like in a right-scrolling side-scroller).
+        /// Backgrounds are drawn below all render layers, in call order.
+        /// Call once per frame for every background that should be visible.
+        fn draw_background(&mut context, id: u32, offset_x: f32, offset_y: f32) {
+            if (id as usize) >= context.background_list.len() {
+                eprintln!("draw_background: invalid id {}", id);
+                return;
+            }
+            context.pending.push(ApiOp::DrawBackground { id, offset_x, offset_y });
         }
         fn debug_print(&mut _context, msg: String) {
             eprintln!("ITSY: {}", msg);

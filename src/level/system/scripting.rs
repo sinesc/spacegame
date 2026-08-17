@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::scripting::{Api, ScriptContext, EntityData, ApiOp, SpawnRequest};
 use crate::level::component;
 use crate::level::Infrastructure;
-use crate::level::{RenderLayer, RenderFilter};
+use crate::level::{RenderLayer, RenderFilter, BackgroundDraw};
 use crate::sound::Sound;
 use hecs;
 use itsy;
@@ -20,6 +20,8 @@ pub struct Scripting {
     sprite_cache: HashMap<String, Arc<Sprite>>,
     /// Sound cache (loaded on first play)
     sound_cache: HashMap<String, Sound>,
+    /// Background texture cache (loaded on first draw_background)
+    background_cache: HashMap<String, Arc<Texture>>,
 }
 
 impl Scripting {
@@ -32,6 +34,7 @@ impl Scripting {
             radiant_ctx,
             sprite_cache: HashMap::new(),
             sound_cache: HashMap::new(),
+            background_cache: HashMap::new(),
         }
     }
 
@@ -122,6 +125,9 @@ impl Scripting {
         // in order. World-mutating ops run directly on `world` (before
         // cmd.run_on, as the previous direct API did); spawns go through
         // `cmd` and are applied by the caller (Level::process).
+        // Background draws are rebuilt each frame (the script re-requests
+        // them), so clear the previous frame's list first.
+        inf.background_draws.clear();
         let pending = std::mem::take(&mut self.context.pending);
         for op in pending {
             self.execute(world, cmd, inf, op);
@@ -191,6 +197,23 @@ impl Scripting {
                 }
                 let sound = self.sound_cache.get(&name).unwrap();
                 inf.audio.add(sound.decoder());
+            }
+            ApiOp::DrawBackground { id, offset_x, offset_y } => {
+                let name = self.context.background_list[id as usize].clone();
+                let texture = match self.background_cache.get(&name).cloned() {
+                    Some(t) => t,
+                    None => {
+                        match Texture::from_file(&self.radiant_ctx, &name) {
+                            Ok(t) => {
+                                let arc = Arc::new(t);
+                                self.background_cache.insert(name.clone(), arc.clone());
+                                arc
+                            }
+                            Err(e) => { eprintln!("draw_background: failed to load '{}': {:?}", name, e); return; }
+                        }
+                    }
+                };
+                inf.background_draws.push(BackgroundDraw { texture, offset_x, offset_y });
             }
             ApiOp::Spawn(req) => {
                 self.spawn_entity(req, cmd, inf);
