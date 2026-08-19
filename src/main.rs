@@ -2,13 +2,13 @@ extern crate radiant_rs as radiant;
 
 mod prelude;
 mod sound;
-mod level;
+mod game;
 mod bloom;
 mod timeframe;
 mod scripting;
 
 use crate::prelude::*;
-use crate::level::Level;
+use crate::game::Game;
 
 fn main() {
 
@@ -23,7 +23,7 @@ fn main() {
     let debug_layer = Layer::new((1920., 1080.));
     let debug_font = Font::builder(&display.context()).family("Arial").size(20.0).build().unwrap().arc();
     let input = Input::new(&display);
-    let mut level = Level::new(&input, display.clone(), monitor.clone(), fullscreen);
+    let mut level = Game::new(&input, display.clone(), monitor.clone(), fullscreen);
 
     // game main loop
 
@@ -62,7 +62,7 @@ fn main() {
         // "Exit to Menu"); rebuild the level and keep running.
         if level.restart_requested() {
             let fullscreen_now = level.is_fullscreen();
-            level = Level::new(&input, display.clone(), monitor.clone(), fullscreen_now);
+            level = Game::new(&input, display.clone(), monitor.clone(), fullscreen_now);
             last_age = 0.;
         }
 

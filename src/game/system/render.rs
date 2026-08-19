@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use hecs;
-use crate::level::component;
-use crate::level::Infrastructure;
+use crate::game::component;
+use crate::game::Infrastructure;
 use std::cmp;
 
 pub struct Render {

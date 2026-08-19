@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use hecs;
-use crate::level::component;
+use crate::game::component;
 
 pub fn run(world: &mut hecs::World) {
     // Collect entity data to avoid holding world borrows during mutation

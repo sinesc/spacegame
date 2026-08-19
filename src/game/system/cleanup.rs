@@ -1,5 +1,5 @@
 use hecs;
-use crate::level::component;
+use crate::game::component;
 
 pub fn run(world: &mut hecs::World, age: f32) {
     let mut to_despawn = Vec::new();

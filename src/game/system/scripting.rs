@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use crate::scripting::{Api, ScriptContext, EntityData, ApiOp, SpawnRequest};
-use crate::level::component;
-use crate::level::Infrastructure;
-use crate::level::{RenderLayer, RenderFilter, BackgroundDraw};
+use crate::game::component;
+use crate::game::Infrastructure;
+use crate::game::{RenderLayer, RenderFilter, BackgroundDraw};
 use crate::sound::Sound;
 use hecs;
 use itsy;

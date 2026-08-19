@@ -80,32 +80,34 @@ fn wrap_pos(v: f32, period: f32) -> f32 {
 }
 
 pub struct Infrastructure {
-    pub input     : Input,
-    pub audio     : Mixer,
+    pub input: Input,
+    pub audio: Mixer,
+    /// Audio sink is unused but must stay alive for playback to work.
+    pub _audio_sink: MixerDeviceSink,
     /// Render layers created by the Itsy script (`create_layer`); the vector
     /// index is the layer ID shared between Itsy and Rust.
-    pub layers    : Vec<Arc<Layer>>,
+    pub layers: Vec<Arc<Layer>>,
     /// Render passes created by the Itsy script (`add_render_layer`), in draw order.
-    pub render_layers : Vec<RenderLayer>,
+    pub render_layers: Vec<RenderLayer>,
     /// Background images to show this frame (`draw_background`), in draw order.
     /// Rebuilt by the scripting system each frame (cleared before execution).
-    pub background_draws : Vec<BackgroundDraw>,
-    pub font      : Arc<Font>,
+    pub background_draws: Vec<BackgroundDraw>,
+    pub font: Arc<Font>,
     /// Font for Itsy-side menu text (Arial 80 bold).
-    pub menu_font : Arc<Font>,
+    pub menu_font: Arc<Font>,
     /// Game time; the Itsy script pauses/resumes it (pause_time / resume_time).
-    pub timeframe : Timeframe,
+    pub timeframe: Timeframe,
     /// Set by the Itsy script (`request_exit`); checked by the main loop.
-    pub exit_requested    : bool,
+    pub exit_requested: bool,
     /// Set by the Itsy script (`request_level_restart`); the main loop rebuilds the level.
-    pub restart_requested : bool,
+    pub restart_requested: bool,
     /// Display handle for the `toggle_fullscreen` API.
-    pub display   : Arc<Display>,
-    pub monitor   : Option<Monitor>,
+    pub display: Arc<Display>,
+    pub monitor: Option<Monitor>,
     pub fullscreen: bool,
     /// Layer ID used for Rust-side debug text (set by Itsy via `set_debug_layer`);
     /// `u32::MAX` = not set yet.
-    pub debug_layer : u32,
+    pub debug_layer: u32,
 }
 
 impl Infrastructure {
@@ -115,18 +117,17 @@ impl Infrastructure {
     }
 }
 
-pub struct Level {
+pub struct Game {
     world           : hecs::World,
     render_system   : system::Render,
     inf             : Infrastructure,
-    _audio_sink     : MixerDeviceSink,
     bloom           : postprocessors::Bloom,
     glare           : bloom::Bloom,
     scripting       : Scripting,
     game_started    : bool,  // track if GAME_START trigger was sent
 }
 
-impl Level {
+impl Game {
 
     pub fn new(input: &Input, display: Arc<Display>, monitor: Option<Monitor>, fullscreen: bool) -> Self {
 
@@ -144,6 +145,7 @@ impl Level {
 
         let infrastructure = Infrastructure {
             audio             : audio,
+            _audio_sink       : audio_sink,
             input             : input.clone(),
             layers            : Vec::new(),
             render_layers     : Vec::new(),
@@ -163,10 +165,9 @@ impl Level {
         bloom.clear = false;
         bloom.draw_color = Color::alpha_pm(0.15);
 
-        Level {
+        Game {
             world           : world,
             render_system   : system::Render::new(),
-            _audio_sink     : audio_sink,
             bloom           : bloom,
             glare           : bloom::Bloom::new(&context, (1920, 1080), 2, 5, 5.0),
             inf             : infrastructure,
