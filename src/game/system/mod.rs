@@ -2,7 +2,7 @@ mod inertia;
 pub use self::inertia::run as run_inertia;
 
 mod render;
-pub use self::render::Render;
+pub use self::render::{Render, RenderLayer, BackgroundDraw};
 
 mod cleanup;
 pub use self::cleanup::run as run_cleanup;

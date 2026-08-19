@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::scripting::{Api, ScriptContext, EntityData, ApiOp, SpawnRequest};
 use crate::game::component;
 use crate::game::Infrastructure;
-use crate::game::{RenderLayer, RenderFilter, BackgroundDraw};
+use crate::game::system::render::{RenderLayer, RenderFilter, BackgroundDraw};
 use crate::sound::Sound;
 use hecs;
 use itsy;
