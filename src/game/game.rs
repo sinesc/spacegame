@@ -6,7 +6,8 @@ use crate::scripting::Api;
 use crate::timeframe::Timeframe;
 use system::{RenderLayer, BackgroundDraw};
 
-pub mod component;
+mod component;
+#[path="system/system.rs"]
 mod system;
 
 pub struct Infrastructure {

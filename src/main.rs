@@ -2,9 +2,11 @@ extern crate radiant_rs as radiant;
 
 mod prelude;
 mod sound;
+#[path="game/game.rs"]
 mod game;
 mod bloom;
 mod timeframe;
+#[path="scripting/scripting.rs"]
 mod scripting;
 
 use crate::prelude::*;

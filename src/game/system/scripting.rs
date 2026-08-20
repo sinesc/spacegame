@@ -38,35 +38,6 @@ impl Scripting {
         }
     }
 
-    /// Set the game time for Itsy timers.
-    pub fn set_game_time(&mut self, age: f32) {
-        self.context.game_time = age;
-    }
-
-    /// Set mouse position.
-    pub fn set_mouse_pos(&mut self, x: f32, y: f32) {
-        self.context.mouse_pos = (x, y);
-    }
-
-    /// Set mouse delta (movement since last frame).
-    pub fn set_mouse_delta(&mut self, dx: f32, dy: f32) {
-        self.context.mouse_delta = (dx, dy);
-    }
-
-    /// Set the keyboard input masks for this frame (see KEY_* constants).
-    /// `keys` = currently held down, `pressed` = pressed this frame (incl. repeats),
-    /// `edge` = initial press this frame (no repeats).
-    pub fn set_input_state(&mut self, keys: u16, pressed: u16, edge: u16) {
-        self.context.input_keys = keys;
-        self.context.input_pressed = pressed;
-        self.context.input_edge = edge;
-    }
-
-    /// Set a spawn trigger for Itsy to process.
-    pub fn set_spawn_trigger(&mut self, trigger: u32) {
-        self.context.spawn_trigger = trigger;
-    }
-
     /// Run the Itsy script for one frame.
     pub fn run(&mut self, world: &mut hecs::World, inf: &mut Infrastructure, cmd: &mut hecs::CommandBuffer) {
         // Build entity snapshot
@@ -130,12 +101,47 @@ impl Scripting {
         inf.background_draws.clear();
         let pending = std::mem::take(&mut self.context.pending);
         for op in pending {
-            self.execute(world, cmd, inf, op);
+            self.execute_command(world, cmd, inf, op);
         }
     }
 
+    /// Set the game time for Itsy timers.
+    pub fn set_game_time(&mut self, age: f32) {
+        self.context.game_time = age;
+    }
+
+    /// Set mouse position.
+    pub fn set_mouse_pos(&mut self, x: f32, y: f32) {
+        self.context.mouse_pos = (x, y);
+    }
+
+    /// Set mouse delta (movement since last frame).
+    pub fn set_mouse_delta(&mut self, dx: f32, dy: f32) {
+        self.context.mouse_delta = (dx, dy);
+    }
+
+    /// Set the keyboard input masks for this frame (see KEY_* constants).
+    /// `keys` = currently held down, `pressed` = pressed this frame (incl. repeats),
+    /// `edge` = initial press this frame (no repeats).
+    pub fn set_input_state(&mut self, keys: u16, pressed: u16, edge: u16) {
+        self.context.input_keys = keys;
+        self.context.input_pressed = pressed;
+        self.context.input_edge = edge;
+    }
+
+    /// Set a spawn trigger for Itsy to process.
+    pub fn set_spawn_trigger(&mut self, trigger: u32) {
+        self.context.spawn_trigger = trigger;
+    }
+
+    /// Set collision pairs from the collider system.
+    /// Pairs are passed as flat list: [a, b, c, d, ...] = [(a,b), (c,d)].
+    pub fn set_collisions(&mut self, pairs: Vec<u64>) {
+        self.context.collisions = pairs;
+    }
+
     /// Execute one API operation recorded during vm.run() (see ApiOp).
-    fn execute(&mut self, world: &mut hecs::World, cmd: &mut hecs::CommandBuffer, inf: &mut Infrastructure, op: ApiOp) {
+    fn execute_command(&mut self, world: &mut hecs::World, cmd: &mut hecs::CommandBuffer, inf: &mut Infrastructure, op: ApiOp) {
         match op {
             ApiOp::CreateLayer { scale, blend } => {
                 let layer = Layer::new((scale * 1920., scale * 1080.)).arc();
@@ -260,12 +266,6 @@ impl Scripting {
                 }
             }
         }
-    }
-
-    /// Set collision pairs from the collider system.
-    /// Pairs are passed as flat list: [a, b, c, d, ...] = [(a,b), (c,d)].
-    pub fn set_collisions(&mut self, pairs: Vec<u64>) {
-        self.context.collisions = pairs;
     }
 
     /// Build the entity data snapshot from the ECS world.
