@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use hecs;
-use rodio::{MixerDeviceSink, DeviceSinkBuilder};
 use rodio::mixer::Mixer;
 use crate::scripting::Api;
 use crate::timeframe::Timeframe;
@@ -23,8 +22,6 @@ pub struct Infrastructure {
     /// Background texture cache (loaded on first draw_background).
     pub background_cache: HashMap<String, Arc<Texture>>,
     pub audio: Mixer,
-    /// Audio sink is unused but must stay alive for playback to work.
-    pub _audio_sink: MixerDeviceSink,
     /// Render layers created by the Itsy script (`create_layer`); the vector
     /// index is the layer ID shared between Itsy and Rust.
     pub layers: Vec<Arc<Layer>>,
@@ -70,27 +67,19 @@ pub struct Game {
 
 impl Game {
 
-    pub fn new(input: &Input, display: Arc<Display>, monitor: Option<Monitor>, fullscreen: bool) -> Self {
+    pub fn new(input: &Input, display: Arc<Display>, monitor: Option<Monitor>, fullscreen: bool, audio: &Mixer) -> Self {
 
         let world = hecs::World::new();
-
         let context = display.context().clone();
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let menu_font = Font::builder(&context).family("Arial").size(80.0).bold().build().unwrap().arc();
-        let mut audio_sink = DeviceSinkBuilder::open_default_sink().unwrap();
-        audio_sink.log_on_drop(false);
-        let audio = audio_sink.mixer().clone();
-
-        // Render layers are created by the Itsy script (create_layer /
-        // add_render_layer); player is spawned via the GAME_START trigger.
 
         let infrastructure = Infrastructure {
             radiant_ctx         : context.clone(),
             sprite_cache        : HashMap::new(),
             sound_cache         : HashMap::new(),
             background_cache    : HashMap::new(),
-            audio               : audio,
-            _audio_sink         : audio_sink,
+            audio               : audio.clone(),
             input               : input.clone(),
             layers              : Vec::new(),
             render_layers       : Vec::new(),

@@ -11,6 +11,7 @@ mod scripting;
 
 use crate::prelude::*;
 use crate::game::Game;
+use rodio::DeviceSinkBuilder;
 
 fn main() {
 
@@ -19,13 +20,16 @@ fn main() {
     display.grab_cursor();
     let fullscreen = match &monitor {
         Some(m) => { display.set_fullscreen(Some(m.clone())).unwrap(); true }
-        None    => false,
+        None => false,
     };
     let renderer =  Renderer::new(&display).unwrap();
     let debug_layer = Layer::new((1920., 1080.));
     let debug_font = Font::builder(&display.context()).family("Arial").size(20.0).build().unwrap().arc();
     let input = Input::new(&display);
-    let mut game = Game::new(&input, display.clone(), monitor.clone(), fullscreen);
+    let mut audio_sink = DeviceSinkBuilder::open_default_sink().unwrap();
+    audio_sink.log_on_drop(false);
+    let audio = audio_sink.mixer().clone();
+    let mut game = Game::new(&input, display.clone(), monitor.clone(), fullscreen, &audio);
 
     // game main loop
 
@@ -64,7 +68,7 @@ fn main() {
         // "Exit to Menu"); rebuild the level and keep running.
         if game.restart_requested() {
             let fullscreen_now = game.is_fullscreen();
-            game = Game::new(&input, display.clone(), monitor.clone(), fullscreen_now);
+            game = Game::new(&input, display.clone(), monitor.clone(), fullscreen_now, &audio);
             last_age = 0.;
         }
 
