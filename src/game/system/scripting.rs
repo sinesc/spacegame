@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use crate::scripting::{Api, ScriptContext, EntityData, ApiOp, SpawnRequest};
 use crate::game::component;
-use crate::game::Infrastructure;
-use crate::game::system::render::{RenderLayer, RenderFilter, BackgroundDraw};
+use crate::game::{Infrastructure, State};
+use crate::game::system::render::{RenderLayer, RenderFilter, RenderBackground};
 use crate::sound::Sound;
 use hecs;
 use itsy;
@@ -39,7 +39,7 @@ impl Scripting {
     }
 
     /// Run the Itsy script for one frame.
-    pub fn run(&mut self, world: &mut hecs::World, inf: &mut Infrastructure, cmd: &mut hecs::CommandBuffer) {
+    pub fn run(&mut self, world: &mut hecs::World, inf: &mut Infrastructure, state: &mut State, cmd: &mut hecs::CommandBuffer) {
         // Build entity snapshot
         self.build_snapshot(world);
 
@@ -101,7 +101,7 @@ impl Scripting {
         inf.background_draws.clear();
         let pending = std::mem::take(&mut self.context.pending);
         for op in pending {
-            self.execute_command(world, cmd, inf, op);
+            self.execute_command(world, cmd, inf, state, op);
         }
     }
 
@@ -141,7 +141,7 @@ impl Scripting {
     }
 
     /// Execute one API operation recorded during vm.run() (see ApiOp).
-    fn execute_command(&mut self, world: &mut hecs::World, cmd: &mut hecs::CommandBuffer, inf: &mut Infrastructure, op: ApiOp) {
+    fn execute_command(&mut self, world: &mut hecs::World, cmd: &mut hecs::CommandBuffer, inf: &mut Infrastructure, state: &mut State, op: ApiOp) {
         match op {
             ApiOp::CreateLayer { scale, blend } => {
                 let layer = Layer::new((scale * 1920., scale * 1080.)).arc();
@@ -173,24 +173,24 @@ impl Scripting {
                 inf.debug_layer = layer_id;
             }
             ApiOp::PauseTime => {
-                inf.timeframe.lerp_rate(0.0, Duration::from_millis(500));
+                state.timeframe.lerp_rate(0.0, Duration::from_millis(500));
             }
             ApiOp::ResumeTime => {
-                inf.timeframe.lerp_rate(1.0, Duration::from_millis(500));
+                state.timeframe.lerp_rate(1.0, Duration::from_millis(500));
             }
             ApiOp::RequestExit => {
-                inf.exit_requested = true;
+                state.exit_requested = true;
             }
             ApiOp::RequestLevelRestart => {
-                inf.restart_requested = true;
+                state.restart_requested = true;
             }
             ApiOp::ToggleFullscreen => {
-                if inf.fullscreen {
+                if state.fullscreen {
                     inf.display.set_windowed();
-                    inf.fullscreen = false;
+                    state.fullscreen = false;
                 } else if let Some(monitor) = &inf.monitor {
                     inf.display.set_fullscreen(Some(monitor.clone())).unwrap();
-                    inf.fullscreen = true;
+                    state.fullscreen = true;
                 }
             }
             ApiOp::PlaySound { id } => {
@@ -219,7 +219,7 @@ impl Scripting {
                         }
                     }
                 };
-                inf.background_draws.push(BackgroundDraw { texture, offset_x, offset_y });
+                inf.background_draws.push(RenderBackground { texture, offset_x, offset_y });
             }
             ApiOp::Spawn(req) => {
                 self.spawn_entity(req, cmd, inf);

@@ -4,7 +4,7 @@ use rodio::{MixerDeviceSink, DeviceSinkBuilder};
 use rodio::mixer::Mixer;
 use crate::scripting::Api;
 use crate::timeframe::Timeframe;
-use system::{RenderLayer, BackgroundDraw};
+use crate::game::system::{RenderLayer, RenderBackground};
 
 mod component;
 #[path="system/system.rs"]
@@ -22,22 +22,12 @@ pub struct Infrastructure {
     pub render_layers: Vec<RenderLayer>,
     /// Background images to show this frame (`draw_background`), in draw order.
     /// Rebuilt by the scripting system each frame (cleared before execution).
-    pub background_draws: Vec<BackgroundDraw>,
+    pub background_draws: Vec<RenderBackground>,
     pub font: Arc<Font>,
-    /// Font for Itsy-side menu text (Arial 80 bold).
     pub menu_font: Arc<Font>,
-    /// Game time; the Itsy script pauses/resumes it (pause_time / resume_time).
-    pub timeframe: Timeframe,
-    /// Set by the Itsy script (`request_exit`); checked by the main loop.
-    pub exit_requested: bool,
-    /// Set by the Itsy script (`request_level_restart`); the main loop rebuilds the level.
-    pub restart_requested: bool,
-    /// Display handle for the `toggle_fullscreen` API.
     pub display: Arc<Display>,
     pub monitor: Option<Monitor>,
-    pub fullscreen: bool,
-    /// Layer ID used for Rust-side debug text (set by Itsy via `set_debug_layer`);
-    /// `u32::MAX` = not set yet.
+    /// Layer ID used for Rust-side debug text (set by Itsy via `set_debug_layer`), `u32::MAX` = not set yet. // FIXME: use Option
     pub debug_layer: u32,
 }
 
@@ -48,12 +38,24 @@ impl Infrastructure {
     }
 }
 
+pub struct State {
+    /// Game time; the Itsy script pauses/resumes it (pause_time / resume_time).
+    pub timeframe: Timeframe,
+    /// Set by the Itsy script (`request_exit`); checked by the main loop.
+    pub exit_requested: bool,
+    /// Set by the Itsy script (`request_level_restart`); the main loop rebuilds the level.
+    pub restart_requested: bool,
+    // track if GAME_START trigger was sent
+    pub game_started: bool,
+    pub fullscreen: bool,
+}
+
 pub struct Game {
     world           : hecs::World,
     render_system   : system::Render,
     scripting       : system::Scripting,
     inf             : Infrastructure,
-    game_started    : bool,  // track if GAME_START trigger was sent
+    state           : State,
 }
 
 impl Game {
@@ -73,29 +75,33 @@ impl Game {
         // add_render_layer); player is spawned via the GAME_START trigger.
 
         let infrastructure = Infrastructure {
-            audio             : audio,
-            _audio_sink       : audio_sink,
-            input             : input.clone(),
-            layers            : Vec::new(),
-            render_layers     : Vec::new(),
-            background_draws  : Vec::new(),
-            font              : font,
-            menu_font         : menu_font,
-            timeframe         : Timeframe::new(),
-            exit_requested    : false,
-            restart_requested : false,
-            display           : display,
-            monitor           : monitor,
-            fullscreen        : fullscreen,
-            debug_layer       : u32::MAX,
+            audio               : audio,
+            _audio_sink         : audio_sink,
+            input               : input.clone(),
+            layers              : Vec::new(),
+            render_layers       : Vec::new(),
+            background_draws    : Vec::new(),
+            font                : font,
+            menu_font           : menu_font,
+            display             : display,
+            monitor             : monitor,
+            debug_layer         : u32::MAX,
+        };
+
+        let state = State {
+            timeframe           : Timeframe::new(),
+            exit_requested      : false,
+            restart_requested   : false,
+            fullscreen          : fullscreen,
+            game_started        : false,
         };
 
         Game {
             world           : world,
             render_system   : system::Render::new(context.clone()),
-            inf             : infrastructure,
             scripting       : system::Scripting::new(context.clone()),
-            game_started    : false,
+            inf             : infrastructure,
+            state           : state,
         }
     }
 
@@ -124,27 +130,27 @@ impl Game {
 
     /// Elapsed game time in seconds (read by the main loop for age/delta).
     pub fn game_age(&self) -> f64 {
-        Timeframe::duration_to_secs(self.inf.timeframe.elapsed())
+        Timeframe::duration_to_secs(self.state.timeframe.elapsed())
     }
 
     /// Current game time rate (0 = paused, 1 = normal).
     pub fn game_rate(&self) -> f64 {
-        self.inf.timeframe.rate()
+        self.state.timeframe.rate()
     }
 
     /// True if the Itsy script requested a game exit.
     pub fn exit_requested(&self) -> bool {
-        self.inf.exit_requested
+        self.state.exit_requested
     }
 
     /// True if the Itsy script requested a level restart.
     pub fn restart_requested(&self) -> bool {
-        self.inf.restart_requested
+        self.state.restart_requested
     }
 
     /// Current fullscreen state (may have been toggled by the Itsy script).
     pub fn is_fullscreen(&self) -> bool {
-        self.inf.fullscreen
+        self.state.fullscreen
     }
 
     pub fn process(&mut self, renderer: &Renderer, age: f32, delta: f32) {
@@ -195,15 +201,13 @@ impl Game {
         self.scripting.set_input_state(keys, pressed, edge);
 
         // Send GAME_START trigger on first frame
-        if !self.game_started {
+        if !self.state.game_started {
             self.scripting.set_spawn_trigger(Api::TRIGGER_GAME_START);
-            self.game_started = true;
+            self.state.game_started = true;
         }
 
-        // Periodic asteroid / mine / powerup spawning is handled in the Itsy script.
-
         // Run scripting subsystem (mutates self.inf via the &mut reference)
-        self.scripting.run(&mut self.world, &mut self.inf, &mut cmd);
+        self.scripting.run(&mut self.world, &mut self.inf, &mut self.state, &mut cmd);
 
         // Apply scripting commands BEFORE inertia so v_fraction changes take effect
         cmd.run_on(&mut self.world);

@@ -25,7 +25,7 @@ pub enum RenderFilter {
 /// scaled to cover the display and tiled (wrapped) around the given scroll
 /// offset for seamless infinite scrolling.
 #[derive(Clone)]
-pub struct BackgroundDraw {
+pub struct RenderBackground {
     pub texture : Arc<Texture>,
     /// Scroll offset in screen pixels (any value; wrapped to the image size).
     pub offset_x: f32,
@@ -152,7 +152,7 @@ impl Render {
     /// Draws `draw` tiled so it covers the entire display. The image is scaled to
     /// cover the display (aspect preserved), then repeated in both directions with
     /// the scroll offset wrapped, so any offset scrolls seamlessly.
-    fn draw_background_tiled(renderer: &Renderer, display_w: f32, display_h: f32, draw: &BackgroundDraw) {
+    fn draw_background_tiled(renderer: &Renderer, display_w: f32, display_h: f32, draw: &RenderBackground) {
         let (tw, th) = draw.texture.dimensions();
         for (x, y, w, h) in Self::background_tiles(display_w, display_h, tw as f32, th as f32, draw.offset_x, draw.offset_y) {
             renderer.rect(((x, y), (w, h))).texture(&draw.texture).blendmode(blendmodes::COPY).draw();
