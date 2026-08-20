@@ -3,10 +3,8 @@ use crate::scripting::{Api, ScriptContext, EntityData, ApiOp, SpawnRequest};
 use crate::game::component;
 use crate::game::{Infrastructure, State};
 use crate::game::system::render::{RenderLayer, RenderFilter, RenderBackground};
-use crate::sound::Sound;
 use hecs;
 use itsy;
-use std::collections::HashMap;
 
 /// The scripting subsystem: owns the Itsy VM and manages the frame cycle.
 pub struct Scripting {
@@ -14,27 +12,14 @@ pub struct Scripting {
     /// Persistent VM so that suspend/resume works and local state survives across frames.
     vm: Option<itsy::runtime::VM<Api, ScriptContext>>,
     context: ScriptContext,
-    /// Radiant context for loading sprites
-    radiant_ctx: Context,
-    /// Sprite cache
-    sprite_cache: HashMap<String, Arc<Sprite>>,
-    /// Sound cache (loaded on first play)
-    sound_cache: HashMap<String, Sound>,
-    /// Background texture cache (loaded on first draw_background)
-    background_cache: HashMap<String, Arc<Texture>>,
 }
 
 impl Scripting {
-    pub fn new(radiant_ctx: Context) -> Self {
-        let context = ScriptContext::new();
+    pub fn new() -> Self {
         Scripting {
             program: None,
             vm: None,
-            context,
-            radiant_ctx,
-            sprite_cache: HashMap::new(),
-            sound_cache: HashMap::new(),
-            background_cache: HashMap::new(),
+            context: ScriptContext::new(),
         }
     }
 
@@ -195,24 +180,24 @@ impl Scripting {
             }
             ApiOp::PlaySound { id } => {
                 let name = self.context.sound_list[id as usize].clone();
-                if self.sound_cache.get(&name).is_none() {
-                    match Sound::load(&name) {
-                        Ok(sound) => { self.sound_cache.insert(name.clone(), sound); }
+                if inf.sound_cache.get(&name).is_none() {
+                    match crate::sound::Sound::load(&name) {
+                        Ok(sound) => { inf.sound_cache.insert(name.clone(), sound); }
                         Err(e) => { eprintln!("play_sound: failed to load '{}': {}", name, e); return; }
                     }
                 }
-                let sound = self.sound_cache.get(&name).unwrap();
+                let sound = inf.sound_cache.get(&name).unwrap();
                 inf.audio.add(sound.decoder());
             }
             ApiOp::DrawBackground { id, offset_x, offset_y } => {
                 let name = self.context.background_list[id as usize].clone();
-                let texture = match self.background_cache.get(&name).cloned() {
+                let texture = match inf.background_cache.get(&name).cloned() {
                     Some(t) => t,
                     None => {
-                        match Texture::from_file(&self.radiant_ctx, &name) {
+                        match Texture::from_file(&inf.radiant_ctx, &name) {
                             Ok(t) => {
                                 let arc = Arc::new(t);
-                                self.background_cache.insert(name.clone(), arc.clone());
+                                inf.background_cache.insert(name.clone(), arc.clone());
                                 arc
                             }
                             Err(e) => { eprintln!("draw_background: failed to load '{}': {:?}", name, e); return; }
@@ -321,7 +306,7 @@ impl Scripting {
     }
 
     /// Create an ECS entity from a queued spawn request.
-    fn spawn_entity(&mut self, req: SpawnRequest, cmd: &mut hecs::CommandBuffer, inf: &Infrastructure) {
+    fn spawn_entity(&mut self, req: SpawnRequest, cmd: &mut hecs::CommandBuffer, inf: &mut Infrastructure) {
 
         let SpawnRequest {
             entity_type, sprite_id, layer_id, effect_layer_id,
@@ -408,13 +393,13 @@ impl Scripting {
             eprintln!("spawn_entity: invalid sprite_id {}", sprite_id);
             "res/sprite/placeholder_16x16x1.png".to_string()
         };
-        let sprite = match self.sprite_cache.get(&sprite_path).cloned() {
+        let sprite = match inf.sprite_cache.get(&sprite_path).cloned() {
             Some(s) => s,
             None => {
-                match Sprite::from_file(&self.radiant_ctx, &sprite_path) {
+                match Sprite::from_file(&inf.radiant_ctx, &sprite_path) {
                     Ok(s) => {
                         let arc = s.arc();
-                        self.sprite_cache.insert(sprite_path.clone(), arc.clone());
+                        inf.sprite_cache.insert(sprite_path.clone(), arc.clone());
                         arc
                     }
                     Err(e) => {

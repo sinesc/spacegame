@@ -5,6 +5,8 @@ use rodio::mixer::Mixer;
 use crate::scripting::Api;
 use crate::timeframe::Timeframe;
 use crate::game::system::{RenderLayer, RenderBackground};
+use crate::sound::Sound;
+use std::collections::HashMap;
 
 mod component;
 #[path="system/system.rs"]
@@ -12,6 +14,14 @@ mod system;
 
 pub struct Infrastructure {
     pub input: Input,
+    /// Radiant context for loading sprites, fonts and textures.
+    pub radiant_ctx: Context,
+    /// Sprite cache (loaded on first use).
+    pub sprite_cache: HashMap<String, Arc<Sprite>>,
+    /// Sound cache (loaded on first play).
+    pub sound_cache: HashMap<String, Sound>,
+    /// Background texture cache (loaded on first draw_background).
+    pub background_cache: HashMap<String, Arc<Texture>>,
     pub audio: Mixer,
     /// Audio sink is unused but must stay alive for playback to work.
     pub _audio_sink: MixerDeviceSink,
@@ -75,6 +85,10 @@ impl Game {
         // add_render_layer); player is spawned via the GAME_START trigger.
 
         let infrastructure = Infrastructure {
+            radiant_ctx         : context.clone(),
+            sprite_cache        : HashMap::new(),
+            sound_cache         : HashMap::new(),
+            background_cache    : HashMap::new(),
             audio               : audio,
             _audio_sink         : audio_sink,
             input               : input.clone(),
@@ -99,7 +113,7 @@ impl Game {
         Game {
             world           : world,
             render_system   : system::Render::new(context.clone()),
-            scripting       : system::Scripting::new(context.clone()),
+            scripting       : system::Scripting::new(),
             inf             : infrastructure,
             state           : state,
         }

@@ -25,7 +25,7 @@ fn main() {
     let debug_layer = Layer::new((1920., 1080.));
     let debug_font = Font::builder(&display.context()).family("Arial").size(20.0).build().unwrap().arc();
     let input = Input::new(&display);
-    let mut level = Game::new(&input, display.clone(), monitor.clone(), fullscreen);
+    let mut game = Game::new(&input, display.clone(), monitor.clone(), fullscreen);
 
     // game main loop
 
@@ -37,8 +37,8 @@ fn main() {
 
         // ingame time and delta
 
-        let age = level.game_age();
-        let rate = level.game_rate();
+        let age = game.game_age();
+        let rate = game.game_rate();
         let delta = age - last_age;
         last_age = age;
 
@@ -46,7 +46,7 @@ fn main() {
 
         // menu handling (open/close, input, actions) lives in the Itsy script.
 
-        level.process(&renderer, age as f32, delta as f32);
+        game.process(&renderer, age as f32, delta as f32);
 
         debug_font.write(&debug_layer, &format!("Renderer\nFPS: {}\nDelta: {:.4}", frame.fps, frame.delta_f32), (10.0, 10.0), Color::alpha_pm(0.4));
         debug_font.write(&debug_layer,
@@ -62,12 +62,12 @@ fn main() {
 
         // the Itsy script can request a level restart (menu "New Game" /
         // "Exit to Menu"); rebuild the level and keep running.
-        if level.restart_requested() {
-            let fullscreen_now = level.is_fullscreen();
-            level = Game::new(&input, display.clone(), monitor.clone(), fullscreen_now);
+        if game.restart_requested() {
+            let fullscreen_now = game.is_fullscreen();
+            game = Game::new(&input, display.clone(), monitor.clone(), fullscreen_now);
             last_age = 0.;
         }
 
-        !display.was_closed() && !level.exit_requested()
+        !display.was_closed() && !game.exit_requested()
     });
 }
