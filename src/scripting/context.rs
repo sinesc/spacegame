@@ -51,6 +51,8 @@ pub enum ApiOp {
     PauseTime,
     ResumeTime,
     ToggleFullscreen,
+    /// Resize the display (applied by the main loop after swap_frame).
+    SetResolution { width: u32, height: u32 },
     RequestExit,
     RequestLevelRestart,
     PlaySound { id: u32 },
@@ -84,6 +86,8 @@ pub struct ScriptContext {
     pub mouse_pos: (f32, f32),
     /// Mouse delta since last frame (set by control system). Reliable even when cursor is grabbed.
     pub mouse_delta: (f32, f32),
+    /// Current display size in pixels (set by the control system each frame).
+    pub screen_size: (f32, f32),
     /// Keyboard input masks (see KEY_* constants in scripting/mod.rs).
     /// `input_keys` = keys currently held down.
     pub input_keys: u16,
@@ -122,6 +126,7 @@ impl ScriptContext {
             game_time: 0.0,
             mouse_pos: (0.0, 0.0),
             mouse_delta: (0.0, 0.0),
+            screen_size: (0.0, 0.0),
             input_keys: 0,
             input_pressed: 0,
             input_edge: 0,

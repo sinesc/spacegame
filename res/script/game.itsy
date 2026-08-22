@@ -8,6 +8,7 @@ use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_vel
           get_think_count, get_think_id,
           get_collision_count, get_collision_id,
           get_game_time, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_spawn_trigger, get_rand_range,
+          get_screen_width, get_screen_height,
           get_sprites, get_sounds, play_sound,
           get_backgrounds, draw_background,
           create_layer, add_render_layer, write_text, set_debug_layer,
@@ -34,11 +35,12 @@ mod menu;
 
 const PI: f32 = 3.14159265;
 
-// World geometry (matches the layer scale of 1920x1080).
-const WORLD_CENTER_X: f32 = 800.0;
-const WORLD_CENTER_Y: f32 = 450.0;
-const WORLD_WIDTH: f32 = 1920.0;
-const WORLD_HEIGHT: f32 = 1080.0;
+// World geometry: the game world is the screen, so its size follows the
+// display resolution (changeable at runtime via set_resolution).
+fn world_width() -> f32 { get_screen_width() }
+fn world_height() -> f32 { get_screen_height() }
+fn world_center_x() -> f32 { get_screen_width() * 0.5 }
+fn world_center_y() -> f32 { get_screen_height() * 0.5 }
 const SPAWN_DISTANCE: f32 = 2000.0;
 
 // Spawner intervals (seconds).
@@ -613,12 +615,12 @@ fn find_nearest_player(to_entity_id: u64) -> u64 {
 
 fn spawn_asteroid() {
     let angle = get_rand_range(-PI, PI);
-    let px = WORLD_CENTER_X + angle.cos() * SPAWN_DISTANCE;
-    let py = WORLD_CENTER_Y + angle.sin() * SPAWN_DISTANCE;
+    let px = world_center_x() + angle.cos() * SPAWN_DISTANCE;
+    let py = world_center_y() + angle.sin() * SPAWN_DISTANCE;
     if (px < 0.0) { px = 0.0; }
-    if (px > WORLD_WIDTH) { px = WORLD_WIDTH; }
+    if (px > world_width()) { px = world_width(); }
     if (py < 0.0) { py = 0.0; }
-    if (py > WORLD_HEIGHT) { py = WORLD_HEIGHT; }
+    if (py > world_height()) { py = world_height(); }
     let faction = get_rand_range(2.0, 100.0) as u16;
 
     let def = get_def(ET_ASTEROID);
@@ -630,12 +632,12 @@ fn spawn_asteroid() {
 }
 
 fn spawn_mine(angle: f32, faction: u16) {
-    let px = WORLD_CENTER_X + angle.cos() * SPAWN_DISTANCE;
-    let py = WORLD_CENTER_Y + angle.sin() * SPAWN_DISTANCE;
+    let px = world_center_x() + angle.cos() * SPAWN_DISTANCE;
+    let py = world_center_y() + angle.sin() * SPAWN_DISTANCE;
     if (px < 0.0) { px = 0.0; }
-    if (px > WORLD_WIDTH) { px = WORLD_WIDTH; }
+    if (px > world_width()) { px = world_width(); }
     if (py < 0.0) { py = 0.0; }
-    if (py > WORLD_HEIGHT) { py = WORLD_HEIGHT; }
+    if (py > world_height()) { py = world_height(); }
 
     let mine_type = if (get_rand_range(0.0, 1.0) > 0.5) { ET_MINE_RED } else { ET_MINE_GREEN };
     let def = get_def(mine_type);
@@ -646,11 +648,11 @@ fn spawn_mine(angle: f32, faction: u16) {
 }
 
 fn spawn_powerup() {
-    let pw_y = get_rand_range(0.0, WORLD_HEIGHT);
+    let pw_y = get_rand_range(0.0, world_height());
     let pw_type = if (get_rand_range(0.0, 1.0) > 0.5) { ET_POWERUP_DUAL } else { ET_POWERUP_TRIPLE };
     let def = get_def(pw_type);
     // Spawns at the right edge and drifts left across the screen.
-    spawn_with_def(pw_type, def, WORLD_WIDTH, pw_y, 0.0, 0.0 - def.speed, 0.0, 0);
+    spawn_with_def(pw_type, def, world_width(), pw_y, 0.0, 0.0 - def.speed, 0.0, 0);
 }
 
 fn update_spawners(state: GameState, age: f32) {

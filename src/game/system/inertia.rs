@@ -5,6 +5,10 @@ use crate::game::Infrastructure;
 
 pub fn run(world: &mut hecs::World, delta: f32, inf: &Infrastructure) {
 
+    // World bounds = current display size (entities reflect off the edges).
+    let (display_w, display_h) = inf.display.dimensions();
+    let bounds: ((f32, f32), (f32, f32)) = ((0.0, 0.0), (display_w as f32, display_h as f32));
+
     for (_entity, (spatial, inertial)) in world.query_mut::<(&mut component::Spatial, &mut component::Inertial)>() {
 
         let v_trans = lerp(&inertial.trans_rest, &inertial.trans_motion, inertial.v_fraction.len());
@@ -83,7 +87,7 @@ pub fn run(world: &mut hecs::World, delta: f32, inf: &Infrastructure) {
 
         spatial.position += inertial.v_current * delta;
 
-        if let Some(outbound) = spatial.position.outbound(((0.0, 0.0), (1920.0, 1080.0))) {
+        if let Some(outbound) = spatial.position.outbound(bounds) {
             let edge_normal = -outbound.normalize();
             let reflection = inertial.v_current - 2.0 * (inertial.v_current.dot(&edge_normal)) * edge_normal;
 

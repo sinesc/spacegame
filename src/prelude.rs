@@ -7,4 +7,4 @@ pub use std::fmt::Debug;
 pub use radiant_utils::maths::{Angle, Vec2, lerp, approach, min, clamp};
 pub use radiant_utils::util::{Periodic, Rng};
 pub use radiant_utils::loops::renderloop;
-pub use radiant::{Layer, Sprite, Color, Input, InputId, Font, Renderer, Texture, Context, Display, Monitor, blendmodes, postprocessors};
+pub use radiant::{Layer, Sprite, Color, Input, InputId, Font, Renderer, Texture, Context, Display, blendmodes, postprocessors};

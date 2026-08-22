@@ -41,9 +41,9 @@ pub struct Render {
 }
 
 impl Render {
-    pub fn new(radiant_ctx: Context) -> Self {
+    pub fn new(radiant_ctx: Context, dimensions: (u32, u32)) -> Self {
 
-        let mut bloom = postprocessors::Bloom::new(&radiant_ctx, (1920u32, 1080u32), 2);
+        let mut bloom = postprocessors::Bloom::new(&radiant_ctx, dimensions, 2);
         bloom.clear = false;
         bloom.draw_color = Color::alpha_pm(0.15);
 
@@ -52,8 +52,15 @@ impl Render {
             num_frames: 0,
             last_num_frames: 0,
             bloom           : bloom,
-            glare           : bloom::Bloom::new(&radiant_ctx, (1920, 1080), 2, 5, 5.0),
+            glare           : bloom::Bloom::new(&radiant_ctx, dimensions, 2, 5, 5.0),
         }
+    }
+
+    /// Rebuild the postprocessor render targets for a new display size
+    /// (display resize).
+    pub fn resize(&mut self, radiant_ctx: &Context, dimensions: (u32, u32)) {
+        self.bloom.rebuild(radiant_ctx, dimensions, 2);
+        self.glare.rebuild(radiant_ctx, dimensions);
     }
 
     pub fn run(&mut self, world: &mut hecs::World, age: f32, delta: f32, inf: &Infrastructure, renderer: &Renderer) {

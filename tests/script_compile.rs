@@ -87,6 +87,9 @@ itsy::itsy_api! {
         fn request_exit(&mut _ctx) {}
         fn request_level_restart(&mut _ctx) {}
         fn toggle_fullscreen(&mut _ctx) {}
+        fn set_resolution(&mut _ctx, _width: u32, _height: u32) {}
+        fn get_screen_width(&mut _ctx) -> f32 { 1920.0 }
+        fn get_screen_height(&mut _ctx) -> f32 { 1080.0 }
         fn get_dying_count(&mut _ctx) -> i32 { 0 }
         fn get_dying_id(&mut _ctx, _index: u32) -> u64 { 0 }
         fn debug_print(&mut _ctx, _msg: String) { }

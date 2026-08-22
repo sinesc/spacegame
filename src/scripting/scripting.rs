@@ -164,7 +164,7 @@ itsy::itsy_api! {
         }
         /// Create a new render layer and return its ID (vector index into the
         /// layer list, shared between Itsy and Rust).
-        /// Layer size = (scale * 1920) x (scale * 1080).
+        /// Layer size = (scale * display width) x (scale * display height).
         /// `blendmode`: 0 = normal, 1 = add, 2 = lighten.
         fn create_layer(&mut context, scale: f32, blendmode: u32) -> u32 {
             // The ID is the layers-vector index the executor will assign
@@ -212,6 +212,26 @@ itsy::itsy_api! {
         /// Toggle windowed/fullscreen mode (starts in the mode the game was launched with).
         fn toggle_fullscreen(&mut context) {
             context.pending.push(ApiOp::ToggleFullscreen);
+        }
+        /// Change the display resolution. The window is resized live and the
+        /// game keeps running (all game state survives). If the game is in
+        /// fullscreen, it switches to windowed first (the window is locked to
+        /// the monitor size in fullscreen, so the resize would be a no-op).
+        fn set_resolution(&mut context, width: u32, height: u32) {
+            if width == 0 || height == 0 {
+                eprintln!("set_resolution: invalid size");
+                return;
+            }
+            eprintln!("[debug] set_resolution({width}, {height}) queued");
+            context.pending.push(ApiOp::SetResolution { width, height });
+        }
+        /// Current display width in pixels.
+        fn get_screen_width(&mut context) -> f32 {
+            context.screen_size.0
+        }
+        /// Current display height in pixels.
+        fn get_screen_height(&mut context) -> f32 {
+            context.screen_size.1
         }
         /// Play a sound file by ID (index into `get_sounds()`).
         /// Files are loaded on first use and cached.

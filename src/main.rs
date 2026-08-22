@@ -15,21 +15,21 @@ use rodio::DeviceSinkBuilder;
 
 fn main() {
 
-    let monitor = Display::monitors().into_iter().next();
-    let display = Arc::new(Display::builder().dimensions((1920, 1080)).vsync().build().unwrap());
+    let display = Arc::new(Display::builder().dimensions((1280, 720)).vsync().build().unwrap());
     display.grab_cursor();
-    let fullscreen = match &monitor {
-        Some(m) => { display.set_fullscreen(Some(m.clone())).unwrap(); true }
-        None => false,
-    };
+    // Starts windowed: the monitor list is only available after the first event
+    // pump, so fullscreen is entered via the menu (toggle_fullscreen) instead.
+    let fullscreen = false;
+    eprintln!("[debug] main: display created, dimensions = {:?}, fullscreen = {}", display.dimensions(), fullscreen);
     let renderer =  Renderer::new(&display).unwrap();
-    let debug_layer = Layer::new((1920., 1080.));
+    let (w, h) = display.dimensions();
+    let mut debug_layer = Layer::new((w as f32, h as f32));
     let debug_font = Font::builder(&display.context()).family("Arial").size(20.0).build().unwrap().arc();
     let input = Input::new(&display);
     let mut audio_sink = DeviceSinkBuilder::open_default_sink().unwrap();
     audio_sink.log_on_drop(false);
     let audio = audio_sink.mixer().clone();
-    let mut game = Game::new(&input, display.clone(), monitor.clone(), fullscreen, &audio);
+    let mut game = Game::new(&input, display.clone(), fullscreen, &audio);
 
     // game main loop
 
@@ -64,11 +64,19 @@ fn main() {
 
         display.swap_frame();
 
+        // the Itsy script can change the resolution live (windowed mode);
+        // applied here, after swap_frame, so no frame is in flight.
+        if let Some((w, h)) = game.take_resolution_request() {
+            game.apply_resolution(w, h);
+            let (w, h) = display.dimensions();
+            debug_layer = Layer::new((w as f32, h as f32));
+        }
+
         // the Itsy script can request a level restart (menu "New Game" /
         // "Exit to Menu"); rebuild the level and keep running.
         if game.restart_requested() {
             let fullscreen_now = game.is_fullscreen();
-            game = Game::new(&input, display.clone(), monitor.clone(), fullscreen_now, &audio);
+            game = Game::new(&input, display.clone(), fullscreen_now, &audio);
             last_age = 0.;
         }
 

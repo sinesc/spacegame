@@ -105,6 +105,11 @@ impl Scripting {
         self.context.mouse_delta = (dx, dy);
     }
 
+    /// Set the current display size in pixels (for the screen size getters).
+    pub fn set_screen_size(&mut self, width: f32, height: f32) {
+        self.context.screen_size = (width, height);
+    }
+
     /// Set the keyboard input masks for this frame (see KEY_* constants).
     /// `keys` = currently held down, `pressed` = pressed this frame (incl. repeats),
     /// `edge` = initial press this frame (no repeats).
@@ -129,13 +134,15 @@ impl Scripting {
     fn execute_command(&mut self, world: &mut hecs::World, cmd: &mut hecs::CommandBuffer, inf: &mut Infrastructure, state: &mut State, op: ApiOp) {
         match op {
             ApiOp::CreateLayer { scale, blend } => {
-                let layer = Layer::new((scale * 1920., scale * 1080.)).arc();
+                let (w, h) = inf.display.dimensions();
+                let layer = Layer::new((scale * w as f32, scale * h as f32)).arc();
                 match blend {
                     Api::BLEND_ADD     => { layer.set_blendmode(blendmodes::ADD); }
                     Api::BLEND_LIGHTEN => { layer.set_blendmode(blendmodes::LIGHTEN); }
                     _ => {}
                 }
                 inf.layers.push(layer);
+                inf.layer_scales.push(scale);
             }
             ApiOp::AddRenderLayer { layer_id, filter, component } => {
                 inf.render_layers.push(RenderLayer {
@@ -169,13 +176,37 @@ impl Scripting {
             ApiOp::RequestLevelRestart => {
                 state.restart_requested = true;
             }
+            ApiOp::SetResolution { width, height } => {
+                eprintln!("[debug] SetResolution op: ({width}, {height})");
+                state.resolution_requested = Some((width, height));
+            }
             ApiOp::ToggleFullscreen => {
+                eprintln!("[debug] ToggleFullscreen op, state.fullscreen = {}", state.fullscreen);
                 if state.fullscreen {
+                    // Capture the fullscreen size before switching, so the shrink
+                    // target is 3/4 of the monitor size.
+                    let (w, h) = inf.display.dimensions();
                     inf.display.set_windowed();
                     state.fullscreen = false;
-                } else if let Some(monitor) = &inf.monitor {
-                    inf.display.set_fullscreen(Some(monitor.clone())).unwrap();
-                    state.fullscreen = true;
+                    // The window keeps the monitor size after leaving fullscreen
+                    // and would look identical to fullscreen; shrink it so the
+                    // change is visible. Deferred via resolution_requested:
+                    // set_dimensions must not run mid-frame (it presents the
+                    // in-flight frame, leaving the target unprepared for the
+                    // rest of this frame's draws) — the main loop applies it
+                    // after swap_frame.
+                    let (sw, sh) = ((w * 3) / 4, (h * 3) / 4);
+                    eprintln!("[debug] ToggleFullscreen: -> windowed, deferring shrink to ({sw}, {sh})");
+                    state.resolution_requested = Some((sw, sh));
+                } else {
+                    // None = primary monitor. The monitor captured at startup can be
+                    // None (Display::monitors() is empty before the first event pump),
+                    // so don't depend on it.
+                    match inf.display.set_fullscreen(None) {
+                        Ok(()) => { state.fullscreen = true; }
+                        Err(e) => { eprintln!("toggle_fullscreen: failed to enter fullscreen: {:?}", e); }
+                    }
+                    eprintln!("[debug] ToggleFullscreen: -> fullscreen");
                 }
             }
             ApiOp::PlaySound { id } => {

@@ -2,8 +2,8 @@
 // Loaded by game.itsy via `mod menu;` and referenced there as menu::...
 // (original source: res/def/menu.yaml + src/menu/mod.rs).
 
-use Api::{get_input_pressed, get_input_edge, write_menu_text,
-          pause_time, resume_time, request_exit, request_level_restart, toggle_fullscreen,
+use Api::{get_input_pressed, get_input_edge, write_menu_text, get_screen_width, get_screen_height,
+          pause_time, resume_time, request_exit, request_level_restart, toggle_fullscreen, set_resolution,
           KEY_CURSOR_UP, KEY_CURSOR_DOWN, KEY_RETURN, KEY_ESCAPE,
           debug_print};
 
@@ -17,7 +17,7 @@ struct MenuItem {
     stride_y: f32,
 }
 
-// Menu group: left/top/strides are fractional (multiplied by 1920 x 1080).
+// Menu group: left/top/strides are fractional (multiplied by the current screen size).
 struct MenuGroup {
     left    : f32,
     top     : f32,
@@ -51,8 +51,10 @@ fn get_menu_group(name: String) -> MenuGroup {
         ]}
     } else if (name == "options") {
         MenuGroup { left: 0.3, top: 0.1, stride_x: 0.0, stride_y: 0.1, items: [
-            MenuItem { label: "Fullscreen",  action: "fullscreen",  stride_x: 0.0, stride_y: 0.0 },
-            MenuItem { label: "Main Menu",   action: "main",        stride_x: 0.0, stride_y: 0.0 },
+            MenuItem { label: "Fullscreen",  action: "fullscreen",      stride_x: 0.0, stride_y: 0.1 },
+            MenuItem { label: "1920x1080",   action: "res_1920x1080",   stride_x: 0.0, stride_y: 0.0 },
+            MenuItem { label: "1280x720",    action: "res_1280x720",    stride_x: 0.0, stride_y: 0.0 },
+            MenuItem { label: "Main Menu",   action: "main",            stride_x: 0.0, stride_y: 0.0 },
         ]}
     } else {
         MenuGroup { left: 0.3, top: 0.1, stride_x: 0.0, stride_y: 0.1, items: [ ] }
@@ -92,6 +94,12 @@ fn run_menu_action(action: String) -> MenuState {
     } else if (action == "fullscreen") {
         toggle_fullscreen();
         MenuState { group: "options", index: 0 }
+    } else if (action == "res_1920x1080") {
+        set_resolution(1920, 1080);
+        MenuState { group: "options", index: 0 }
+    } else if (action == "res_1280x720") {
+        set_resolution(1280, 720);
+        MenuState { group: "options", index: 0 }
     } else {
         debug_print("menu: unknown action {action}");
         MenuState { group: "", index: 0 }
@@ -125,7 +133,7 @@ fn menu_process(state: MenuState, menu_layer: u32) -> MenuState {
             while (i < def.items.len()) {
                 let item = def.items[i];
                 let alpha = if (i == state.index as u64) { 0.3 } else { 0.1 };
-                write_menu_text(menu_layer, item.label, pos_x * 1920.0, pos_y * 1080.0, alpha);
+                write_menu_text(menu_layer, item.label, pos_x * get_screen_width(), pos_y * get_screen_height(), alpha);
                 let sx = if (item.stride_x != 0.0) { item.stride_x } else { def.stride_x };
                 let sy = if (item.stride_y != 0.0) { item.stride_y } else { def.stride_y };
                 pos_x = pos_x + sx;

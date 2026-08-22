@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use radiant_utils::maths::Mat4;
 use hecs;
 use rodio::mixer::Mixer;
 use crate::scripting::Api;
@@ -25,6 +26,9 @@ pub struct Infrastructure {
     /// Render layers created by the Itsy script (`create_layer`); the vector
     /// index is the layer ID shared between Itsy and Rust.
     pub layers: Vec<Arc<Layer>>,
+    /// The `create_layer` scale of each layer in `layers` (parallel vector;
+    /// needed to re-apply the layer view matrix on a display resize).
+    pub layer_scales: Vec<f32>,
     /// Render passes created by the Itsy script (`add_render_layer`), in draw order.
     pub render_layers: Vec<RenderLayer>,
     /// Background images to show this frame (`draw_background`), in draw order.
@@ -33,7 +37,6 @@ pub struct Infrastructure {
     pub font: Arc<Font>,
     pub menu_font: Arc<Font>,
     pub display: Arc<Display>,
-    pub monitor: Option<Monitor>,
     /// Layer ID used for Rust-side debug text (set by Itsy via `set_debug_layer`), `u32::MAX` = not set yet. // FIXME: use Option
     pub debug_layer: u32,
 }
@@ -52,6 +55,9 @@ pub struct State {
     pub exit_requested: bool,
     /// Set by the Itsy script (`request_level_restart`); the main loop rebuilds the level.
     pub restart_requested: bool,
+    /// Set by the Itsy script (`set_resolution`); the main loop applies it
+    /// after swap_frame (Option so `take_resolution_request` can consume it).
+    pub resolution_requested: Option<(u32, u32)>,
     // track if GAME_START trigger was sent
     pub game_started: bool,
     pub fullscreen: bool,
@@ -67,12 +73,14 @@ pub struct Game {
 
 impl Game {
 
-    pub fn new(input: &Input, display: Arc<Display>, monitor: Option<Monitor>, fullscreen: bool, audio: &Mixer) -> Self {
+    pub fn new(input: &Input, display: Arc<Display>, fullscreen: bool, audio: &Mixer) -> Self {
 
         let world = hecs::World::new();
         let context = display.context().clone();
         let font = Font::builder(&context).family("Arial").size(20.0).build().unwrap().arc();
         let menu_font = Font::builder(&context).family("Arial").size(80.0).bold().build().unwrap().arc();
+
+        let dimensions = display.dimensions();
 
         let infrastructure = Infrastructure {
             radiant_ctx         : context.clone(),
@@ -82,12 +90,12 @@ impl Game {
             audio               : audio.clone(),
             input               : input.clone(),
             layers              : Vec::new(),
+            layer_scales        : Vec::new(),
             render_layers       : Vec::new(),
             background_draws    : Vec::new(),
             font                : font,
             menu_font           : menu_font,
             display             : display,
-            monitor             : monitor,
             debug_layer         : u32::MAX,
         };
 
@@ -95,13 +103,14 @@ impl Game {
             timeframe           : Timeframe::new(),
             exit_requested      : false,
             restart_requested   : false,
+            resolution_requested: None,
             fullscreen          : fullscreen,
             game_started        : false,
         };
 
         Game {
             world           : world,
-            render_system   : system::Render::new(context.clone()),
+            render_system   : system::Render::new(context.clone(), dimensions),
             scripting       : system::Scripting::new(),
             inf             : infrastructure,
             state           : state,
@@ -156,6 +165,39 @@ impl Game {
         self.state.fullscreen
     }
 
+    /// Consume a pending resolution change requested by the Itsy script.
+    pub fn take_resolution_request(&mut self) -> Option<(u32, u32)> {
+        std::mem::take(&mut self.state.resolution_requested)
+    }
+
+    /// Apply a live display resize (called by the main loop after swap_frame,
+    /// when no frame is prepared). Re-sets the script layers' view matrices to
+    /// the new size (keeping their scales) and rebuilds the postprocessors.
+    /// If the game is in fullscreen, it drops to windowed first: the window is
+    /// locked to the monitor size in fullscreen, so the resize would be a no-op.
+    pub fn apply_resolution(&mut self, width: u32, height: u32) {
+        let (before_w, before_h) = self.inf.display.dimensions();
+        eprintln!("[debug] apply_resolution: requested ({width}, {height}), before = ({before_w}, {before_h}), state.fullscreen = {}", self.state.fullscreen);
+        if self.state.fullscreen {
+            self.inf.display.set_windowed();
+            self.state.fullscreen = false;
+            eprintln!("[debug] apply_resolution: dropped to windowed");
+        }
+        self.inf.display.set_dimensions((width, height));
+        // Use the size the window actually got (the compositor may clamp it).
+        // NOTE: winit may report the old size here — the WM resize event can
+        // arrive later, so a stale value is not proof the resize failed.
+        let (w, h) = self.inf.display.dimensions();
+        eprintln!("[debug] apply_resolution: display.dimensions() after set_dimensions = ({w}, {h})");
+        for (layer, scale) in self.inf.layers.iter().zip(self.inf.layer_scales.iter()) {
+            // Mat4::viewport() returns the radiant_utils wrapper; .0 is the raw
+            // [[f32;4];4] that Layer::set_view_matrix expects.
+            let matrix = Mat4::viewport(*scale * w as f32, *scale * h as f32);
+            layer.set_view_matrix(matrix.0);
+        }
+        self.render_system.resize(&self.inf.radiant_ctx, (w, h));
+    }
+
     pub fn process(&mut self, renderer: &Renderer, age: f32, delta: f32) {
 
         let mut cmd = hecs::CommandBuffer::new();
@@ -174,6 +216,10 @@ impl Game {
         // Pass mouse delta (reliable even when cursor is grabbed/focused)
         let mouse_delta = self.inf.input.mouse_delta();
         self.scripting.set_mouse_delta(mouse_delta.0 as f32, mouse_delta.1 as f32);
+
+        // Pass the current display size
+        let (screen_w, screen_h) = self.inf.display.dimensions();
+        self.scripting.set_screen_size(screen_w as f32, screen_h as f32);
 
         // Input masks: one bit per key (see KEY_* in scripting/mod.rs).
         // `keys` = held down, `pressed` = pressed this frame (incl. repeats),
