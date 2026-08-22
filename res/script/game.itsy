@@ -7,7 +7,7 @@ use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_vel
           get_angle, get_script_type, is_alive, get_faction,
           get_think_count, get_think_id,
           get_collision_count, get_collision_id,
-          get_game_time, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_spawn_trigger, get_rand_range,
+          get_game_time, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_rand_range,
           get_screen_width, get_screen_height,
           get_sprites, get_sounds, play_sound,
           get_backgrounds, draw_background,
@@ -733,6 +733,9 @@ fn main() {
 
     let menu_state = menu::MenuState { group: "", index: 0 };
 
+    let def = get_def(ET_PLAYER);
+    spawn_with_def(ET_PLAYER, def, 230.0, 350.0, 0.0, 0.0, 0.0, 0);
+
     while (true) {
         let age = get_game_time();
 
@@ -753,13 +756,6 @@ fn main() {
 
         // Menu handling (Escape toggles, cursor navigation, item actions).
         menu_state = menu::menu_process(menu_state, menu_layer);
-
-        // Handle spawn triggers from Rust
-        let trigger = get_spawn_trigger();
-        if (trigger == TRIGGER_GAME_START) {
-            let def = get_def(ET_PLAYER);
-            spawn_with_def(ET_PLAYER, def, 230.0, 350.0, 0.0, 0.0, 0.0, 0);
-        }
 
         // Periodic asteroid / mine / powerup spawning
         update_spawners(state, age);

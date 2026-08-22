@@ -57,8 +57,6 @@ pub struct State {
     /// Set by the Itsy script (`set_resolution`); the main loop applies it
     /// after swap_frame (Option so `take_resolution_request` can consume it).
     pub resolution_requested: Option<(u32, u32)>,
-    // track if GAME_START trigger was sent
-    pub game_started: bool,
     pub fullscreen: bool,
 }
 
@@ -104,7 +102,6 @@ impl Game {
             restart_requested   : false,
             resolution_requested: None,
             fullscreen          : fullscreen,
-            game_started        : false,
         };
 
         Game {
@@ -178,7 +175,7 @@ impl Game {
     pub fn process(&mut self, renderer: &Renderer, age: f32, delta: f32) {
 
         // Run scripting subsystem and apply script commands
-        self.scripting.prepare_frame(&mut self.world, &mut self.inf, &mut self.state, age);
+        self.scripting.prepare_frame(&mut self.world, &mut self.inf, age);
         let mut cmd = hecs::CommandBuffer::new();
         self.scripting.run(&mut self.world, &mut self.inf, &mut self.state, &mut cmd);
         cmd.run_on(&mut self.world);

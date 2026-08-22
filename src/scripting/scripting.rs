@@ -135,11 +135,6 @@ itsy::itsy_api! {
         fn get_dying_id(&mut context, index: u32) -> u64 {
             context.dying_entities.get(index as usize).copied().unwrap_or(0)
         }
-        fn get_spawn_trigger(&mut context) -> u32 {
-            let t = context.spawn_trigger;
-            context.spawn_trigger = 0;  // consume trigger
-            t
-        }
         fn get_rand_range(&mut context, min: f32, max: f32) -> f32 {
             context.rng.range(min, max)
         }

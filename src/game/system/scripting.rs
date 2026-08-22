@@ -24,7 +24,7 @@ impl Scripting {
     }
 
     /// Prepare scripting state/input prior to script processing.
-    pub fn prepare_frame(self: &mut Self, world: &mut hecs::World, inf: &mut Infrastructure, state: &mut State, age: f32) {
+    pub fn prepare_frame(self: &mut Self, world: &mut hecs::World, inf: &mut Infrastructure, age: f32) {
 
         self.prepare_collision_pairs(world);
         self.prepare_keys(&inf.input);
@@ -33,12 +33,6 @@ impl Scripting {
         self.context.mouse_pos = inf.input.mouse();
         self.context.mouse_delta = inf.input.mouse_delta();
         self.context.screen_size = inf.display.dimensions();
-
-        // Send GAME_START trigger on first frame
-        if !state.game_started {
-            self.context.spawn_trigger = Api::TRIGGER_GAME_START;
-            state.game_started = true;
-        }
     }
 
     /// Run the Itsy script for one frame.

@@ -95,8 +95,6 @@ pub struct ScriptContext {
     pub input_pressed: u16,
     /// Keys pressed this frame, initial press only (no repeats).
     pub input_edge: u16,
-    /// Spawn trigger from Rust (set each frame, consumed by Itsy).
-    pub spawn_trigger: u32,
     /// Entities marked as dying this frame (for on_die dispatch).
     pub dying_entities: Vec<u64>,
     /// Random number generator for the Itsy script (seeded deterministically).
@@ -130,7 +128,6 @@ impl ScriptContext {
             input_keys: 0,
             input_pressed: 0,
             input_edge: 0,
-            spawn_trigger: 0,
             dying_entities: Vec::new(),
             rng: Rng::new(123.4),
             sprite_list: list_files_recursive("res/sprite"),
