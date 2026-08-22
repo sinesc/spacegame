@@ -197,7 +197,7 @@ impl Scripting {
                 let texture = match inf.background_cache.get(&name).cloned() {
                     Some(t) => t,
                     None => {
-                        match Texture::from_file(&inf.radiant_ctx, &name) {
+                        match Texture::from_file(&inf.display.context(), &name) {
                             Ok(t) => {
                                 let arc = Arc::new(t);
                                 inf.background_cache.insert(name.clone(), arc.clone());
@@ -399,7 +399,7 @@ impl Scripting {
         let sprite = match inf.sprite_cache.get(&sprite_path).cloned() {
             Some(s) => s,
             None => {
-                match Sprite::from_file(&inf.radiant_ctx, &sprite_path) {
+                match Sprite::from_file(&inf.display.context(), &sprite_path) {
                     Ok(s) => {
                         let arc = s.arc();
                         inf.sprite_cache.insert(sprite_path.clone(), arc.clone());

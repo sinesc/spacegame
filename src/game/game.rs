@@ -13,8 +13,6 @@ mod system;
 
 pub struct Infrastructure {
     pub input: Input,
-    /// Radiant context for loading sprites, fonts and textures.
-    pub radiant_ctx: Context,
     /// Sprite cache (loaded on first use).
     pub sprite_cache: HashMap<String, Arc<Sprite>>,
     /// Sound cache (loaded on first play).
@@ -80,7 +78,6 @@ impl Game {
         let dimensions = display.dimensions();
 
         let infrastructure = Infrastructure {
-            radiant_ctx         : context.clone(),
             sprite_cache        : HashMap::new(),
             sound_cache         : HashMap::new(),
             background_cache    : HashMap::new(),
@@ -106,7 +103,7 @@ impl Game {
 
         Game {
             world           : world,
-            render_system   : system::Render::new(context.clone(), dimensions),
+            render_system   : system::Render::new(&context, dimensions),
             scripting       : system::Scripting::new(),
             inf             : infrastructure,
             state           : state,
@@ -168,7 +165,7 @@ impl Game {
             let matrix = Mat4::viewport(*scale * w as f32, *scale * h as f32);
             layer.set_view_matrix(matrix.0);
         }
-        self.render_system.resize(&self.inf.radiant_ctx, (w, h));
+        self.render_system.resize(&self.inf.display.context(), (w, h));
     }
 
     /// Process a game frame.

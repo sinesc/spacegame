@@ -41,9 +41,9 @@ pub struct Render {
 }
 
 impl Render {
-    pub fn new(radiant_ctx: Context, dimensions: (u32, u32)) -> Self {
+    pub fn new(radiant_ctx: &Context, dimensions: (u32, u32)) -> Self {
 
-        let mut bloom = postprocessors::Bloom::new(&radiant_ctx, dimensions, 2);
+        let mut bloom = postprocessors::Bloom::new(radiant_ctx, dimensions, 2);
         bloom.clear = false;
         bloom.draw_color = Color::alpha_pm(0.15);
 
@@ -52,7 +52,7 @@ impl Render {
             num_frames: 0,
             last_num_frames: 0,
             bloom           : bloom,
-            glare           : bloom::Bloom::new(&radiant_ctx, dimensions, 2, 5, 5.0),
+            glare           : bloom::Bloom::new(radiant_ctx, dimensions, 2, 5, 5.0),
         }
     }
 
