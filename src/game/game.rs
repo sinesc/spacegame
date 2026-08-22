@@ -2,7 +2,6 @@ use crate::prelude::*;
 use radiant_utils::maths::Mat4;
 use hecs;
 use rodio::mixer::Mixer;
-use crate::scripting::Api;
 use crate::timeframe::Timeframe;
 use crate::game::system::{RenderLayer, RenderBackground};
 use crate::sound::Sound;
@@ -117,29 +116,6 @@ impl Game {
         }
     }
 
-    /// Detect collision pairs for the scripting subsystem.
-    /// Returns flat list: [a, b, c, d, ...] = [(a,b), (c,d)].
-    fn detect_collision_pairs(world: &hecs::World) -> Vec<u64> {
-        let entities: Vec<(hecs::Entity, Vec2, f32, u16)> = world
-            .query::<(&component::Spatial, &component::Bounding, &component::Hitpoints)>()
-            .iter()
-            .map(|(e, (s, b, _))| (e, s.position, b.radius, b.faction))
-            .collect();
-
-        let mut pairs = Vec::new();
-        for i in 0..entities.len() {
-            for j in (i + 1)..entities.len() {
-                let &(ea, pos_a, rad_a, fac_a) = &entities[i];
-                let &(eb, pos_b, rad_b, fac_b) = &entities[j];
-                if fac_a != fac_b && rad_a + rad_b > pos_a.distance(&pos_b) {
-                    pairs.push(ea.to_bits().into());
-                    pairs.push(eb.to_bits().into());
-                }
-            }
-        }
-        pairs
-    }
-
     /// Elapsed game time in seconds (read by the main loop for age/delta).
     pub fn game_age(&self) -> f64 {
         Timeframe::duration_to_secs(self.state.timeframe.elapsed())
@@ -198,70 +174,16 @@ impl Game {
         self.render_system.resize(&self.inf.radiant_ctx, (w, h));
     }
 
+    /// Process a game frame.
     pub fn process(&mut self, renderer: &Renderer, age: f32, delta: f32) {
 
+        // Run scripting subsystem and apply script commands
+        self.scripting.prepare_frame(&mut self.world, &mut self.inf, &mut self.state, age);
         let mut cmd = hecs::CommandBuffer::new();
-
-        // Detect collisions for scripting subsystem
-        let collision_pairs = Self::detect_collision_pairs(&self.world);
-        self.scripting.set_collisions(collision_pairs);
-
-        // Configure scripting subsystem
-        self.scripting.set_game_time(age);
-
-        // Pass mouse position and keyboard input
-        let mouse_pos = self.inf.input.mouse();
-        self.scripting.set_mouse_pos(mouse_pos.0 as f32, mouse_pos.1 as f32);
-
-        // Pass mouse delta (reliable even when cursor is grabbed/focused)
-        let mouse_delta = self.inf.input.mouse_delta();
-        self.scripting.set_mouse_delta(mouse_delta.0 as f32, mouse_delta.1 as f32);
-
-        // Pass the current display size
-        let (screen_w, screen_h) = self.inf.display.dimensions();
-        self.scripting.set_screen_size(screen_w as f32, screen_h as f32);
-
-        // Input masks: one bit per key (see KEY_* in scripting/mod.rs).
-        // `keys` = held down, `pressed` = pressed this frame (incl. repeats),
-        // `edge` = initial press this frame (no repeats).
-        let (keys, pressed, edge) = {
-            let input = &self.inf.input;
-            let mut keys = 0u16;
-            let mut pressed = 0u16;
-            let mut edge = 0u16;
-            let mut add_key = |key: InputId, bit: u16| {
-                if input.down(key) { keys |= bit; }
-                if input.pressed(key, true) { pressed |= bit; }
-                if input.pressed(key, false) { edge |= bit; }
-            };
-            add_key(InputId::W, Api::KEY_W);
-            add_key(InputId::S, Api::KEY_S);
-            add_key(InputId::A, Api::KEY_A);
-            add_key(InputId::D, Api::KEY_D);
-            add_key(InputId::RShift, Api::KEY_RSHIFT);
-            add_key(InputId::CursorUp, Api::KEY_CURSOR_UP);
-            add_key(InputId::CursorDown, Api::KEY_CURSOR_DOWN);
-            add_key(InputId::Return, Api::KEY_RETURN);
-            add_key(InputId::Escape, Api::KEY_ESCAPE);
-            add_key(InputId::Mouse1, Api::KEY_MOUSE1);
-            add_key(InputId::LControl, Api::KEY_LCONTROL);
-            (keys, pressed, edge)
-        };
-        self.scripting.set_input_state(keys, pressed, edge);
-
-        // Send GAME_START trigger on first frame
-        if !self.state.game_started {
-            self.scripting.set_spawn_trigger(Api::TRIGGER_GAME_START);
-            self.state.game_started = true;
-        }
-
-        // Run scripting subsystem (mutates self.inf via the &mut reference)
         self.scripting.run(&mut self.world, &mut self.inf, &mut self.state, &mut cmd);
-
-        // Apply scripting commands BEFORE inertia so v_fraction changes take effect
         cmd.run_on(&mut self.world);
 
-        // Shared systems (compute/upgrader/control moved to Itsy)
+        // Shared systems
         system::run_inertia(&mut self.world, delta, &self.inf);
         system::run_collider(&mut self.world);
         self.render_system.run(&mut self.world, age, delta, &self.inf, renderer);

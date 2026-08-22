@@ -83,11 +83,11 @@ pub struct ScriptContext {
     pub game_time: f32,
     /// Mouse position (set by control system). Note: may be unreliable when cursor is grabbed.
     /// Use `mouse_delta` for relative movement.
-    pub mouse_pos: (f32, f32),
+    pub mouse_pos: (i32, i32),
     /// Mouse delta since last frame (set by control system). Reliable even when cursor is grabbed.
-    pub mouse_delta: (f32, f32),
+    pub mouse_delta: (i32, i32),
     /// Current display size in pixels (set by the control system each frame).
-    pub screen_size: (f32, f32),
+    pub screen_size: (u32, u32),
     /// Keyboard input masks (see KEY_* constants in scripting/mod.rs).
     /// `input_keys` = keys currently held down.
     pub input_keys: u16,
@@ -124,9 +124,9 @@ impl ScriptContext {
             collisions: Vec::new(),
             think_entities: Vec::new(),
             game_time: 0.0,
-            mouse_pos: (0.0, 0.0),
-            mouse_delta: (0.0, 0.0),
-            screen_size: (0.0, 0.0),
+            mouse_pos: (0, 0),
+            mouse_delta: (0, 0),
+            screen_size: (0, 0),
             input_keys: 0,
             input_pressed: 0,
             input_edge: 0,

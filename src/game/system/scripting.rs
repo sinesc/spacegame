@@ -23,6 +23,24 @@ impl Scripting {
         }
     }
 
+    /// Prepare scripting state/input prior to script processing.
+    pub fn prepare_frame(self: &mut Self, world: &mut hecs::World, inf: &mut Infrastructure, state: &mut State, age: f32) {
+
+        self.prepare_collision_pairs(world);
+        self.prepare_keys(&inf.input);
+
+        self.context.game_time = age;
+        self.context.mouse_pos = inf.input.mouse();
+        self.context.mouse_delta = inf.input.mouse_delta();
+        self.context.screen_size = inf.display.dimensions();
+
+        // Send GAME_START trigger on first frame
+        if !state.game_started {
+            self.context.spawn_trigger = Api::TRIGGER_GAME_START;
+            state.game_started = true;
+        }
+    }
+
     /// Run the Itsy script for one frame.
     pub fn run(&mut self, world: &mut hecs::World, inf: &mut Infrastructure, state: &mut State, cmd: &mut hecs::CommandBuffer) {
         // Build entity snapshot
@@ -88,46 +106,6 @@ impl Scripting {
         for op in pending {
             self.execute_command(world, cmd, inf, state, op);
         }
-    }
-
-    /// Set the game time for Itsy timers.
-    pub fn set_game_time(&mut self, age: f32) {
-        self.context.game_time = age;
-    }
-
-    /// Set mouse position.
-    pub fn set_mouse_pos(&mut self, x: f32, y: f32) {
-        self.context.mouse_pos = (x, y);
-    }
-
-    /// Set mouse delta (movement since last frame).
-    pub fn set_mouse_delta(&mut self, dx: f32, dy: f32) {
-        self.context.mouse_delta = (dx, dy);
-    }
-
-    /// Set the current display size in pixels (for the screen size getters).
-    pub fn set_screen_size(&mut self, width: f32, height: f32) {
-        self.context.screen_size = (width, height);
-    }
-
-    /// Set the keyboard input masks for this frame (see KEY_* constants).
-    /// `keys` = currently held down, `pressed` = pressed this frame (incl. repeats),
-    /// `edge` = initial press this frame (no repeats).
-    pub fn set_input_state(&mut self, keys: u16, pressed: u16, edge: u16) {
-        self.context.input_keys = keys;
-        self.context.input_pressed = pressed;
-        self.context.input_edge = edge;
-    }
-
-    /// Set a spawn trigger for Itsy to process.
-    pub fn set_spawn_trigger(&mut self, trigger: u32) {
-        self.context.spawn_trigger = trigger;
-    }
-
-    /// Set collision pairs from the collider system.
-    /// Pairs are passed as flat list: [a, b, c, d, ...] = [(a,b), (c,d)].
-    pub fn set_collisions(&mut self, pairs: Vec<u64>) {
-        self.context.collisions = pairs;
     }
 
     /// Execute one API operation recorded during vm.run() (see ApiOp).
@@ -463,5 +441,62 @@ impl Scripting {
         });
 
         cmd.spawn(builder.build());
+    }
+
+    /// Identifies pressed keys.
+    fn prepare_keys(self: &mut Self, input: &Input) {
+
+        // Input masks: one bit per key (see KEY_* in scripting/mod.rs).
+        // `keys` = held down, `pressed` = pressed this frame (incl. repeats),
+        // `edge` = initial press this frame (no repeats).
+        let (keys, pressed, edge) = {
+            let mut keys = 0u16;
+            let mut pressed = 0u16;
+            let mut edge = 0u16;
+            let mut add_key = |key: InputId, bit: u16| {
+                if input.down(key) { keys |= bit; }
+                if input.pressed(key, true) { pressed |= bit; }
+                if input.pressed(key, false) { edge |= bit; }
+            };
+            add_key(InputId::W, Api::KEY_W);
+            add_key(InputId::S, Api::KEY_S);
+            add_key(InputId::A, Api::KEY_A);
+            add_key(InputId::D, Api::KEY_D);
+            add_key(InputId::RShift, Api::KEY_RSHIFT);
+            add_key(InputId::CursorUp, Api::KEY_CURSOR_UP);
+            add_key(InputId::CursorDown, Api::KEY_CURSOR_DOWN);
+            add_key(InputId::Return, Api::KEY_RETURN);
+            add_key(InputId::Escape, Api::KEY_ESCAPE);
+            add_key(InputId::Mouse1, Api::KEY_MOUSE1);
+            add_key(InputId::LControl, Api::KEY_LCONTROL);
+            (keys, pressed, edge)
+        };
+
+        self.context.input_keys = keys;
+        self.context.input_pressed = pressed;
+        self.context.input_edge = edge;
+    }
+
+    /// Detect collision pairs for the scripting subsystem.
+    /// Returns flat list: [a, b, c, d, ...] = [(a,b), (c,d)].
+    fn prepare_collision_pairs(self: &mut Self, world: &hecs::World) {
+        let entities: Vec<(hecs::Entity, Vec2, f32, u16)> = world
+            .query::<(&component::Spatial, &component::Bounding, &component::Hitpoints)>()
+            .iter()
+            .map(|(e, (s, b, _))| (e, s.position, b.radius, b.faction))
+            .collect();
+
+        let mut pairs = Vec::new();
+        for i in 0..entities.len() {
+            for j in (i + 1)..entities.len() {
+                let &(ea, pos_a, rad_a, fac_a) = &entities[i];
+                let &(eb, pos_b, rad_b, fac_b) = &entities[j];
+                if fac_a != fac_b && rad_a + rad_b > pos_a.distance(&pos_b) {
+                    pairs.push(ea.to_bits().into());
+                    pairs.push(eb.to_bits().into());
+                }
+            }
+        }
+        self.context.collisions = pairs;
     }
 }

@@ -105,16 +105,16 @@ itsy::itsy_api! {
             context.game_time
         }
         fn get_mouse_x(&mut context) -> f32 {
-            context.mouse_pos.0
+            context.mouse_pos.0 as f32 // TODO why f32
         }
         fn get_mouse_y(&mut context) -> f32 {
-            context.mouse_pos.1
+            context.mouse_pos.1 as f32 // TODO why f32
         }
         fn get_mouse_delta_x(&mut context) -> f32 {
-            context.mouse_delta.0
+            context.mouse_delta.0 as f32 // TODO why f32
         }
         fn get_mouse_delta_y(&mut context) -> f32 {
-            context.mouse_delta.1
+            context.mouse_delta.1 as f32 // TODO why f32
         }
         /// Keys currently held down (level-triggered `down` semantics).
         fn get_input_keys(&mut context) -> u16 {
@@ -227,11 +227,11 @@ itsy::itsy_api! {
         }
         /// Current display width in pixels.
         fn get_screen_width(&mut context) -> f32 {
-            context.screen_size.0
+            context.screen_size.0 as f32 // TODO why f32
         }
         /// Current display height in pixels.
         fn get_screen_height(&mut context) -> f32 {
-            context.screen_size.1
+            context.screen_size.1 as f32 // TODO why f32
         }
         /// Play a sound file by ID (index into `get_sounds()`).
         /// Files are loaded on first use and cached.
