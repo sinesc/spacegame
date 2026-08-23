@@ -1,0 +1,54 @@
+// Powerup entity: drifts across the screen; picked up by distance check
+// (powerups share the player's faction, and same-faction pairs are never
+// reported as collisions).
+
+use Api::{get_position_x, get_position_y, get_script_type, get_faction,
+          destroy_entity, debug_print, ET_NONE};
+
+struct Powerup {
+    id    : u64,
+    weapon: weapon::Weapon,
+}
+
+impl Entity for Powerup {
+    fn on_think(self: Self, age: f32) {
+        // Pickup via a distance check (see module comment).
+        let player_id = find_nearest_player(self.id);
+        if (player_id != 0) {
+            let dx = get_position_x(player_id) - get_position_x(self.id);
+            let dy = get_position_y(player_id) - get_position_y(self.id);
+            // Pickup radius: powerup (16) + player (20)
+            if (dx * dx + dy * dy < 1296.0) {
+                // Upgrade (old upgrader system: shooter.spawner = powerup.spawner,
+                // unconditional — picking up dual while triple downgrades too).
+                let player_opt = ENTITIES.get(player_id);
+                match player_opt {
+                    Some(player) => {
+                        player.set_weapon(self.weapon);
+                        debug_print("powerup picked up");
+                    },
+                    None => { },
+                };
+                destroy_entity(self.id);
+            }
+        }
+    }
+
+    fn on_collide(self: Self, other_id: u64) {
+        // No-op: same-faction pairs are never reported. Pickup is in on_think.
+    }
+
+    fn on_die(self: Self) {
+        // Collected (or expired): original played the powerup sound + fading
+        // ball visual here (fader-powerup spawner).
+        play_snd("projectile/powerup");
+        let etype = get_script_type(self.id);
+        let def = get_def(etype);
+        if (def.explode_as != ET_NONE) {
+            let px = get_position_x(self.id);
+            let py = get_position_y(self.id);
+            let explode_def = get_def(def.explode_as);
+            spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(self.id));
+        }
+    }
+}

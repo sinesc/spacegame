@@ -1,0 +1,18 @@
+// Single-shot weapon (old spawner player-weapon-single from
+// res/def/spawner/weapon.yaml). Holds its own cooldown.
+
+struct WeaponSingle {
+    shoot_timer   : f32,
+    shoot_interval: f32,
+}
+
+impl Weapon for WeaponSingle {
+    fn fire(self: Self, x: f32, y: f32, angle: f32, faction: u16, age: f32) -> bool {
+        if (age - self.shoot_timer >= self.shoot_interval) {
+            self.fire_shot(x, y, angle, 35.0, 0.0, 1.0, 1.0, 1.5, 1.0, 0.5, faction);
+            self.shoot_timer = age;
+            return true;
+        }
+        return false;
+    }
+}

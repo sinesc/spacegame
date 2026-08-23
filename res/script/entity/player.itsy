@@ -1,0 +1,57 @@
+// Player entity: mouse-delta movement (R-Shift to strafe), weapon fire.
+
+use Api::{get_position_x, get_position_y, get_angle, get_faction,
+          get_mouse_delta_x, get_mouse_delta_y, get_input_keys, set_v_motion,
+          KEY_RSHIFT, KEY_MOUSE1, KEY_LCONTROL,
+          MOTION_FOLLOW, MOTION_STRAFE};
+
+// id is the Rust ECS entity ID (stable for the entity's lifetime). Set at
+// registration; handlers use it for all per-entity API calls.
+struct Player {
+    id    : u64,
+    weapon: weapon::Weapon,
+}
+
+impl Entity for Player {
+    fn on_think(self: Self, age: f32) {
+        // Move in the direction of mouse delta.  This is reliable even when the
+        // cursor is grabbed (reset to window center each frame), unlike absolute
+        // mouse position which would always read as center.
+        let dx = get_mouse_delta_x();
+        let dy = get_mouse_delta_y();
+        let dist_sq = dx * dx + dy * dy;
+
+        // Normalized movement direction; (0, 0) when the mouse is idle so the
+        // ship decelerates to a stop (v_current decays toward zero).
+        let vx = 0.0;
+        let vy = 0.0;
+        if (dist_sq > 0.001) {
+            let dist = dist_sq.sqrt();
+            vx = dx / dist;
+            vy = dy / dist;
+        }
+
+        // R-Shift: strafe (move without rotating).  Default: FollowVector
+        // (move and face the movement direction).
+        let keys = get_input_keys();
+        let mode = if ((keys & KEY_RSHIFT) != 0u16) { MOTION_STRAFE } else { MOTION_FOLLOW };
+        set_v_motion(self.id, mode, vx, vy);
+
+        // Shoot: mouse button 1 or left ctrl. The weapon owns its cooldown;
+        // fire returns true only when a shot actually went out.
+        let firing = ((keys & (KEY_MOUSE1 | KEY_LCONTROL)) != 0u16);
+        if (firing) {
+            let px = get_position_x(self.id);
+            let py = get_position_y(self.id);
+            let angle = get_angle(self.id);
+            let faction = get_faction(self.id);
+            if (self.weapon.fire(px, py, angle, faction, age)) {
+                play_snd("projectile/pew");
+            }
+        }
+    }
+
+    fn set_weapon(self: Self, weapon: weapon::Weapon) {
+        self.weapon = weapon;
+    }
+}

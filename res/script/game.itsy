@@ -3,29 +3,31 @@
 // Entity definitions, AI logic, and event handling.
 // Communicates with Rust via API (input + direct action calls).
 
-use Api::{get_hitpoints, get_position_x, get_position_y, get_velocity_x, get_velocity_y,
-          get_angle, get_script_type, is_alive, get_faction,
+use Api::{get_position_x, get_position_y, get_script_type, is_alive,
           get_think_count, get_think_id,
           get_collision_count, get_collision_id,
-          get_game_time, get_mouse_x, get_mouse_y, get_mouse_delta_x, get_mouse_delta_y, get_input_keys, get_rand_range,
+          get_game_time, get_rand_range,
           get_screen_width, get_screen_height,
           get_sprites, get_sounds, play_sound,
           get_backgrounds, draw_background,
           create_layer, add_render_layer, write_text, set_debug_layer,
           get_dying_count, get_dying_id,
-          spawn_entity, destroy_entity, set_v_motion, set_angle, set_hitpoints, apply_damage,
+          spawn_entity,
           debug_print,
           // shared protocol constants (defined once in the Rust itsy_api! macro, available as Api::NAME)
-          KEY_W, KEY_S, KEY_A, KEY_D, KEY_RSHIFT, KEY_MOUSE1, KEY_LCONTROL,
           ET_NONE, ET_PLAYER, ET_ASTEROID, ET_MINE_RED, ET_MINE_GREEN, ET_POWERUP_DUAL, ET_POWERUP_TRIPLE, ET_PROJECTILE, ET_EXPLOSION,
-          TRIGGER_NONE, TRIGGER_GAME_START,
-          MOTION_CONST, MOTION_FOLLOW, MOTION_STRAFE, MOTION_DETACHED,
-          BLEND_NORMAL, BLEND_ADD, BLEND_LIGHTEN,
+          BLEND_NORMAL, BLEND_ADD,
           FILTER_NONE, FILTER_BLOOM, FILTER_GLARE,
           LAYER_ID_NONE};
 
 // Menu handling (res/script/menu.itsy), referenced as menu::...
 mod menu;
+
+// Entities (res/script/entity/), referenced as entity::... / entity::player::Player etc.
+mod entity;
+
+// Weapons (res/script/weapon/), referenced as weapon::... / weapon::single::WeaponSingle etc.
+mod weapon;
 
 // ============================================================
 // Spawner constants (Itsy-only). The Rust<->Itsy protocol constants
@@ -107,90 +109,9 @@ fn get_def(entity_type: u16) -> EntityDef {
 }
 
 // ============================================================
-// Weapons
-// ============================================================
-
-// Weapon interface: a fire pattern plus its own cooldown. fire() fires the
-// pattern at the ship's (x, y) along `angle` when the cooldown has elapsed
-// (measured against `age`, the current game time) and returns true only when
-// a shot actually went out. fire_shot() is a default single-shot spawner
-// (bolt sprite on the effects layer, same hitpoints / radius / speed as
-// DEF_PROJECTILE): off_x / off_y is the spawn offset in the ship's local
-// frame, rotated by `angle` (old spawner: parent_position +
-// spawn.position.rotate(parent_angle)); the shot flies along `angle` (the old
-// spawner ignored per-shot yaml angles, e.g. triple's ±0.1).
-trait Weapon {
-    fn fire(self: Self, x: f32, y: f32, angle: f32, faction: u16, age: f32) -> bool;
-
-    fn fire_shot(self: Self, x: f32, y: f32, angle: f32, off_x: f32, off_y: f32, cr: f32, cg: f32, cb: f32, lifetime: f32, fade: f32, faction: u16) {
-        let sx = x + angle.cos() * off_x - angle.sin() * off_y;
-        let sy = y + angle.sin() * off_x + angle.cos() * off_y;
-        let def = EntityDef { sprite: "res/sprite/projectile/bolt_white_60x36x1.jpg", layer: "effects", effect_layer: "", color_r: cr, color_g: cg, color_b: cb, hitpoints: 25.0, radius: 5.0, lifetime: lifetime, explode_as: ET_NONE, speed: 500.0, fade: fade, fps: 0 };
-        let vx = angle.cos() * def.speed;
-        let vy = angle.sin() * def.speed;
-        spawn_with_def(ET_PROJECTILE, def, sx, sy, angle, vx, vy, faction);
-    }
-}
-
-// Weapon patterns (old spawners player-weapon-single/dual/triple from
-// res/def/spawner/weapon.yaml). Each holds its own cooldown so weapon types
-// can later have different fire rates.
-struct WeaponSingle {
-    shoot_timer   : f32,
-    shoot_interval: f32,
-}
-
-struct WeaponDual {
-    shoot_timer   : f32,
-    shoot_interval: f32,
-}
-
-struct WeaponTriple {
-    shoot_timer   : f32,
-    shoot_interval: f32,
-}
-
-impl Weapon for WeaponSingle {
-    fn fire(self: Self, x: f32, y: f32, angle: f32, faction: u16, age: f32) -> bool {
-        if (age - self.shoot_timer >= self.shoot_interval) {
-            self.fire_shot(x, y, angle, 35.0, 0.0, 1.0, 1.0, 1.5, 1.0, 0.5, faction);
-            self.shoot_timer = age;
-            return true;
-        }
-        return false;
-    }
-}
-
-impl Weapon for WeaponDual {
-    fn fire(self: Self, x: f32, y: f32, angle: f32, faction: u16, age: f32) -> bool {
-        if (age - self.shoot_timer >= self.shoot_interval) {
-            // 2 cyan shots from [10, -25] / [10, 25], lifetime 1.5.
-            self.fire_shot(x, y, angle, 10.0, -25.0, 1.0, 1.5, 1.5, 1.5, 1.0, faction);
-            self.fire_shot(x, y, angle, 10.0,  25.0, 1.0, 1.5, 1.5, 1.5, 1.0, faction);
-            self.shoot_timer = age;
-            return true;
-        }
-        return false;
-    }
-}
-
-impl Weapon for WeaponTriple {
-    fn fire(self: Self, x: f32, y: f32, angle: f32, faction: u16, age: f32) -> bool {
-        if (age - self.shoot_timer >= self.shoot_interval) {
-            // 1 orange shot [35, 0] + 2 yellow shots [10, -25] / [10, 25],
-            // lifetime 2.0.
-            self.fire_shot(x, y, angle, 35.0,   0.0, 1.5, 1.0, 1.0, 2.0, 1.5, faction);
-            self.fire_shot(x, y, angle, 10.0, -25.0, 1.5, 1.5, 1.0, 2.0, 1.5, faction);
-            self.fire_shot(x, y, angle, 10.0,  25.0, 1.5, 1.5, 1.0, 2.0, 1.5, faction);
-            self.shoot_timer = age;
-            return true;
-        }
-        return false;
-    }
-}
-
-// ============================================================
-// Entity trait: common interface for all entity types
+// Resource ID maps & entity registry
+// (the Entity trait lives in res/script/entity.itsy = entity::Entity,
+//  the Weapon trait in res/script/weapon.itsy = weapon::Weapon)
 // ============================================================
 
 // Resource ID maps (populated once at startup in main()). Maps are
@@ -211,235 +132,15 @@ const SOUND_GROUPS: [ String => [ String ] ] = [
     "projectile/powerup"     => [ "res/sound/projectile/powerup1.ogg" ],
 ];
 
-trait Entity {
-    fn on_think(self: Self, age: f32) { }
-    fn on_collide(self: Self, other_id: u64) { }
-    fn on_die(self: Self) { }
-    // Only shooter entities (Player) override; others ignore weapon swaps.
-    // On the Entity interface (default no-op) so a handler can hand a weapon
-    // to another entity: via ENTITIES, entities are only visible as Entity
-    // trait objects, and concrete fields are not reachable through those.
-    fn set_weapon(self: Self, weapon: Weapon) { }
-}
-
 // Single registry for all entities as trait objects. Global (like the
 // resource maps) because entity handlers cannot receive the GameState that
 // used to hold it (trait methods cannot take it — circular reference in the
 // resolver), yet e.g. Powerup needs to reach the picked-up player.
-const ENTITIES: [ u64 => Entity ] = [ => ];
-
-// ============================================================
-// Per-instance entity state structs
-// ============================================================
-
-// id is the Rust ECS entity ID (stable for the entity's lifetime). Set at
-// registration; handlers use it for all per-entity API calls.
-struct Player {
-    id    : u64,
-    weapon: Weapon,
-}
-
-struct Mine {
-    id            : u64,
-    shoot_timer   : f32,
-    shoot_interval: f32,
-    projectile_type: u16,
-}
-
-struct Asteroid {
-    id: u64,
-}
-
-struct Powerup {
-    id    : u64,
-    weapon: Weapon,
-}
-
-struct Projectile {
-    id: u64,
-}
-
-struct Explosion {
-    id: u64,
-}
-
-// ============================================================
-// Entity implementations
-// ============================================================
-
-impl Entity for Player {
-    fn on_think(self: Self, age: f32) {
-        // Move in the direction of mouse delta.  This is reliable even when the
-        // cursor is grabbed (reset to window center each frame), unlike absolute
-        // mouse position which would always read as center.
-        let dx = get_mouse_delta_x();
-        let dy = get_mouse_delta_y();
-        let dist_sq = dx * dx + dy * dy;
-
-        // Normalized movement direction; (0, 0) when the mouse is idle so the
-        // ship decelerates to a stop (v_current decays toward zero).
-        let vx = 0.0;
-        let vy = 0.0;
-        if (dist_sq > 0.001) {
-            let dist = dist_sq.sqrt();
-            vx = dx / dist;
-            vy = dy / dist;
-        }
-
-        // R-Shift: strafe (move without rotating).  Default: FollowVector
-        // (move and face the movement direction).
-        let keys = get_input_keys();
-        let mode = if ((keys & KEY_RSHIFT) != 0u16) { MOTION_STRAFE } else { MOTION_FOLLOW };
-        set_v_motion(self.id, mode, vx, vy);
-
-        // Shoot: mouse button 1 or left ctrl. The weapon owns its cooldown;
-        // fire returns true only when a shot actually went out.
-        let firing = ((keys & (KEY_MOUSE1 | KEY_LCONTROL)) != 0u16);
-        if (firing) {
-            let px = get_position_x(self.id);
-            let py = get_position_y(self.id);
-            let angle = get_angle(self.id);
-            let faction = get_faction(self.id);
-            if (self.weapon.fire(px, py, angle, faction, age)) {
-                play_snd("projectile/pew");
-            }
-        }
-    }
-
-    fn set_weapon(self: Self, weapon: Weapon) {
-        self.weapon = weapon;
-    }
-}
-
-impl Entity for Mine {
-    fn on_think(self: Self, age: f32) {
-        let player_id = find_nearest_player(self.id);
-        if (player_id != 0) {
-            let my_x = get_position_x(self.id);
-            let my_y = get_position_y(self.id);
-            let pl_x = get_position_x(player_id);
-            let pl_y = get_position_y(player_id);
-
-            let dx = pl_x - my_x;
-            let dy = pl_y - my_y;
-            let dist_sq = dx * dx + dy * dy;
-
-            if (dist_sq > 100.0) {
-                let dist = dist_sq.sqrt();
-                let nx = dx / dist;
-                let ny = dy / dist;
-                let angle = ny.atan2(nx);
-
-                set_angle(self.id, angle);
-                set_v_motion(self.id, MOTION_FOLLOW, nx, ny);
-            }
-
-            if (age - self.shoot_timer >= self.shoot_interval && dist_sq < 400000.0) {
-                let dist = dist_sq.sqrt();
-                let nx = dx / dist;
-                let ny = dy / dist;
-                let angle = ny.atan2(nx);
-
-                let def = get_def(self.projectile_type);
-                let vx = nx * def.speed;
-                let vy = ny * def.speed;
-                spawn_with_def(self.projectile_type, def, my_x, my_y, angle, vx, vy, get_faction(self.id));
-
-                self.shoot_timer = age;
-            }
-        }
-    }
-
-    fn on_die(self: Self) {
-        let etype = get_script_type(self.id);
-        let def = get_def(etype);
-        if (def.explode_as != ET_NONE) {
-            let px = get_position_x(self.id);
-            let py = get_position_y(self.id);
-            let explode_def = get_def(def.explode_as);
-            spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(self.id));
-            play_snd("damage/explosion_large");
-        }
-    }
-}
-
-impl Entity for Asteroid {
-    fn on_die(self: Self) {
-        let def = get_def(ET_ASTEROID);
-        if (def.explode_as != ET_NONE) {
-            let px = get_position_x(self.id);
-            let py = get_position_y(self.id);
-            let explode_def = get_def(def.explode_as);
-            spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(self.id));
-            play_snd("damage/explosion_pop");
-        }
-    }
-}
-
-impl Entity for Powerup {
-    fn on_think(self: Self, age: f32) {
-        // Pickup: powerups share the player's faction, and same-faction pairs are
-        // never reported as collisions, so pickup is done here via a distance check.
-        let player_id = find_nearest_player(self.id);
-        if (player_id != 0) {
-            let dx = get_position_x(player_id) - get_position_x(self.id);
-            let dy = get_position_y(player_id) - get_position_y(self.id);
-            // Pickup radius: powerup (16) + player (20)
-            if (dx * dx + dy * dy < 1296.0) {
-                // Upgrade (old upgrader system: shooter.spawner = powerup.spawner,
-                // unconditional — picking up dual while triple downgrades too).
-                let player_opt = ENTITIES.get(player_id);
-                match player_opt {
-                    Some(player) => {
-                        player.set_weapon(self.weapon);
-                        debug_print("powerup picked up");
-                    },
-                    None => { },
-                };
-                destroy_entity(self.id);
-            }
-        }
-    }
-
-    fn on_collide(self: Self, other_id: u64) {
-        // No-op: same-faction pairs are never reported. Pickup is in on_think.
-    }
-
-    fn on_die(self: Self) {
-        // Collected (or expired): original played the powerup sound + fading
-        // ball visual here (fader-powerup spawner).
-        play_snd("projectile/powerup");
-        let etype = get_script_type(self.id);
-        let def = get_def(etype);
-        if (def.explode_as != ET_NONE) {
-            let px = get_position_x(self.id);
-            let py = get_position_y(self.id);
-            let explode_def = get_def(def.explode_as);
-            spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(self.id));
-        }
-    }
-}
-
-impl Entity for Projectile {
-    fn on_die(self: Self) {
-        let def = get_def(ET_PROJECTILE);
-        if (def.explode_as != ET_NONE) {
-            let px = get_position_x(self.id);
-            let py = get_position_y(self.id);
-            let explode_def = get_def(def.explode_as);
-            spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(self.id));
-        }
-    }
-}
-
-impl Entity for Explosion {
-
-}
+const ENTITIES: [ u64 => entity::Entity ] = [ => ];
 
 // ============================================================
 // Game state: spawner timers (the entity registry is the global ENTITIES)
 // ============================================================
-
 struct GameState {
     next_asteroid: f32,
     next_mine: f32,
@@ -460,28 +161,28 @@ fn new_game_state() -> GameState {
 fn register_entity(entity_id: u64, entity_type: u16) {
     match entity_type {
         ET_PLAYER => {
-            ENTITIES[entity_id] = Player { id: entity_id, weapon: WeaponSingle { shoot_timer: 0.0, shoot_interval: 0.2 } };
+            ENTITIES[entity_id] = entity::player::Player { id: entity_id, weapon: weapon::single::WeaponSingle { shoot_timer: 0.0, shoot_interval: 0.2 } };
         },
         ET_ASTEROID => {
-            ENTITIES[entity_id] = Asteroid { id: entity_id };
+            ENTITIES[entity_id] = entity::asteroid::Asteroid { id: entity_id };
         },
         ET_MINE_RED => {
-            ENTITIES[entity_id] = Mine { id: entity_id, shoot_timer: 0.0, shoot_interval: 1.0, projectile_type: ET_PROJECTILE };
+            ENTITIES[entity_id] = entity::mine::Mine { id: entity_id, shoot_timer: 0.0, shoot_interval: 1.0, projectile_type: ET_PROJECTILE };
         },
         ET_MINE_GREEN => {
-            ENTITIES[entity_id] = Mine { id: entity_id, shoot_timer: 0.0, shoot_interval: 1.0, projectile_type: ET_PROJECTILE };
+            ENTITIES[entity_id] = entity::mine::Mine { id: entity_id, shoot_timer: 0.0, shoot_interval: 1.0, projectile_type: ET_PROJECTILE };
         },
         ET_POWERUP_DUAL => {
-            ENTITIES[entity_id] = Powerup { id: entity_id, weapon: WeaponDual { shoot_timer: 0.0, shoot_interval: 0.2 } };
+            ENTITIES[entity_id] = entity::powerup::Powerup { id: entity_id, weapon: weapon::dual::WeaponDual { shoot_timer: 0.0, shoot_interval: 0.2 } };
         },
         ET_POWERUP_TRIPLE => {
-            ENTITIES[entity_id] = Powerup { id: entity_id, weapon: WeaponTriple { shoot_timer: 0.0, shoot_interval: 0.2 } };
+            ENTITIES[entity_id] = entity::powerup::Powerup { id: entity_id, weapon: weapon::triple::WeaponTriple { shoot_timer: 0.0, shoot_interval: 0.2 } };
         },
         ET_PROJECTILE => {
-            ENTITIES[entity_id] = Projectile { id: entity_id };
+            ENTITIES[entity_id] = entity::projectile::Projectile { id: entity_id };
         },
         ET_EXPLOSION => {
-            ENTITIES[entity_id] = Explosion { id: entity_id };
+            ENTITIES[entity_id] = entity::explosion::Explosion { id: entity_id };
         },
         _ => { },
     }

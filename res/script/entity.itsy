@@ -1,0 +1,23 @@
+// Entity module: the Entity trait shared by all entity types.
+// Per-type state structs and implementations live in the submodules below,
+// referenced from the root as e.g. entity::player::Player; the trait as
+// entity::Entity. Loaded by game.itsy via `mod entity;`.
+
+mod player;
+mod mine;
+mod asteroid;
+mod powerup;
+mod projectile;
+mod explosion;
+
+// Entity trait: common interface for all entity types.
+// Only shooter entities (Player) override set_weapon; others ignore weapon
+// swaps. It is on the Entity interface (default no-op) so a handler can hand
+// a weapon to another entity: via ENTITIES, entities are only visible as
+// Entity trait objects, and concrete fields are not reachable through those.
+trait Entity {
+    fn on_think(self: Self, age: f32) { }
+    fn on_collide(self: Self, other_id: u64) { }
+    fn on_die(self: Self) { }
+    fn set_weapon(self: Self, weapon: weapon::Weapon) { }
+}

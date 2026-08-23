@@ -1,0 +1,9 @@
+// Explosion entity: pure visual (bloom pass), no behavior.
+
+struct Explosion {
+    id: u64,
+}
+
+impl Entity for Explosion {
+
+}

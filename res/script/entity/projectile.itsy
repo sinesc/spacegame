@@ -1,0 +1,19 @@
+// Projectile entity: flies straight; explodes on death.
+
+use Api::{get_position_x, get_position_y, get_faction, ET_PROJECTILE, ET_NONE};
+
+struct Projectile {
+    id: u64,
+}
+
+impl Entity for Projectile {
+    fn on_die(self: Self) {
+        let def = get_def(ET_PROJECTILE);
+        if (def.explode_as != ET_NONE) {
+            let px = get_position_x(self.id);
+            let py = get_position_y(self.id);
+            let explode_def = get_def(def.explode_as);
+            spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(self.id));
+        }
+    }
+}

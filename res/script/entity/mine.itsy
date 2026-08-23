@@ -1,0 +1,63 @@
+// Mine entity: steers toward the nearest player and fires projectiles at it.
+
+use Api::{get_position_x, get_position_y, get_faction, get_script_type,
+          set_angle, set_v_motion, MOTION_FOLLOW, ET_NONE};
+
+struct Mine {
+    id            : u64,
+    shoot_timer   : f32,
+    shoot_interval: f32,
+    projectile_type: u16,
+}
+
+impl Entity for Mine {
+    fn on_think(self: Self, age: f32) {
+        let player_id = find_nearest_player(self.id);
+        if (player_id != 0) {
+            let my_x = get_position_x(self.id);
+            let my_y = get_position_y(self.id);
+            let pl_x = get_position_x(player_id);
+            let pl_y = get_position_y(player_id);
+
+            let dx = pl_x - my_x;
+            let dy = pl_y - my_y;
+            let dist_sq = dx * dx + dy * dy;
+
+            if (dist_sq > 100.0) {
+                let dist = dist_sq.sqrt();
+                let nx = dx / dist;
+                let ny = dy / dist;
+                let angle = ny.atan2(nx);
+
+                set_angle(self.id, angle);
+                set_v_motion(self.id, MOTION_FOLLOW, nx, ny);
+            }
+
+            if (age - self.shoot_timer >= self.shoot_interval && dist_sq < 400000.0) {
+                let dist = dist_sq.sqrt();
+                let nx = dx / dist;
+                let ny = dy / dist;
+                let angle = ny.atan2(nx);
+
+                let def = get_def(self.projectile_type);
+                let vx = nx * def.speed;
+                let vy = ny * def.speed;
+                spawn_with_def(self.projectile_type, def, my_x, my_y, angle, vx, vy, get_faction(self.id));
+
+                self.shoot_timer = age;
+            }
+        }
+    }
+
+    fn on_die(self: Self) {
+        let etype = get_script_type(self.id);
+        let def = get_def(etype);
+        if (def.explode_as != ET_NONE) {
+            let px = get_position_x(self.id);
+            let py = get_position_y(self.id);
+            let explode_def = get_def(def.explode_as);
+            spawn_with_def(def.explode_as, explode_def, px, py, 0.0, 0.0, 0.0, get_faction(self.id));
+            play_snd("damage/explosion_large");
+        }
+    }
+}

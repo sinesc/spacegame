@@ -1,0 +1,20 @@
+// Dual-shot weapon (old spawner player-weapon-dual from
+// res/def/spawner/weapon.yaml). Holds its own cooldown.
+
+struct WeaponDual {
+    shoot_timer   : f32,
+    shoot_interval: f32,
+}
+
+impl Weapon for WeaponDual {
+    fn fire(self: Self, x: f32, y: f32, angle: f32, faction: u16, age: f32) -> bool {
+        if (age - self.shoot_timer >= self.shoot_interval) {
+            // 2 cyan shots from [10, -25] / [10, 25], lifetime 1.5.
+            self.fire_shot(x, y, angle, 10.0, -25.0, 1.0, 1.5, 1.5, 1.5, 1.0, faction);
+            self.fire_shot(x, y, angle, 10.0,  25.0, 1.0, 1.5, 1.5, 1.5, 1.0, faction);
+            self.shoot_timer = age;
+            return true;
+        }
+        return false;
+    }
+}
