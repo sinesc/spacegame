@@ -1,5 +1,4 @@
 {
-    "markdown.styles": [".vscode/markdown.css"],
     "rust-analyzer.files.excludeDirs": [
         "./res/script"
     ],
